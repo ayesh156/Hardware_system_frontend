@@ -227,58 +227,57 @@ export const Customers: React.FC = () => {
             /* Desktop Creative Table */
             <div className={`rounded-2xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[800px]">
                   <thead>
                     <tr className={`border-b ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
-                      <th className={`px-6 py-5 text-left text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-orange-400" />
+                          <Users className="w-4 h-4 text-orange-400 flex-shrink-0" />
                           {t('customers.customerName')}
                         </div>
                       </th>
-                      <th className={`px-6 py-5 text-left text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-purple-400" />
+                          <Building2 className="w-4 h-4 text-purple-400 flex-shrink-0" />
                           {t('customers.businessName')}
                         </div>
                       </th>
-                      <th className={`px-6 py-5 text-left text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         <div className="flex items-center gap-2">
-                          <Mail className="w-4 h-4 text-blue-400" />
+                          <Mail className="w-4 h-4 text-blue-400 flex-shrink-0" />
                           {t('common.email')}
                         </div>
                       </th>
-                      <th className={`px-6 py-5 text-left text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-emerald-400" />
+                          <Phone className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                           {t('common.phone')}
                         </div>
                       </th>
-                      <th className={`px-6 py-5 text-right text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         <div className="flex items-center justify-end gap-2">
-                          <Wallet className="w-4 h-4 text-amber-400" />
+                          <Wallet className="w-4 h-4 text-amber-400 flex-shrink-0" />
                           {t('customers.totalSpent')}
                         </div>
                       </th>
-                      <th className={`px-6 py-5 text-center text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-center text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         {t('common.actions')}
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/30">
+                  <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/30' : 'divide-slate-200'}`}>
                     {filteredCustomers.map((customer, index) => (
                       <tr
                         key={customer.id}
-                        className={`group table-row-creative transition-all duration-300 ${
+                        className={`group transition-all duration-300 ${
                           theme === 'dark' 
-                            ? 'hover:bg-gradient-to-r hover:from-slate-700/30 hover:to-transparent' 
-                            : 'hover:bg-gradient-to-r hover:from-slate-50 hover:to-transparent'
+                            ? 'hover:bg-slate-700/20' 
+                            : 'hover:bg-slate-50'
                         }`}
-                        style={{ animationDelay: `${index * 30}ms` }}
                       >
-                        <td className="px-6 py-5">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-transform group-hover:scale-110 ${
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 ${
                               theme === 'dark' 
                                 ? 'bg-gradient-to-br from-orange-500/20 to-rose-500/20 text-orange-400' 
                                 : 'bg-gradient-to-br from-orange-100 to-rose-100 text-orange-600'
@@ -290,30 +289,29 @@ export const Customers: React.FC = () => {
                             </span>
                           </div>
                         </td>
-                        <td className={`px-6 py-5 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm ${
+                        <td className={`px-4 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-sm ${
                             theme === 'dark' ? 'bg-purple-500/10 text-purple-300' : 'bg-purple-50 text-purple-700'
                           }`}>
                             {customer.businessName}
                           </span>
                         </td>
-                        <td className={`px-6 py-5 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <td className={`px-4 py-4 text-sm whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                           {customer.email}
                         </td>
-                        <td className={`px-6 py-5 text-sm font-mono ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <td className={`px-4 py-4 text-sm font-mono whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                           {customer.phone}
                         </td>
-                        <td className="px-6 py-5 text-right">
+                        <td className="px-4 py-4 text-right whitespace-nowrap">
                           <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 font-bold text-sm">
-                            <span className="text-emerald-500/60">Rs.</span>
-                            {customer.totalSpent.toLocaleString()}
+                            Rs. {customer.totalSpent.toLocaleString()}
                           </span>
                         </td>
-                        <td className="px-6 py-5">
-                          <div className="flex items-center justify-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => handleViewCustomer(customer)}
-                              className={`p-2.5 rounded-xl transition-all hover:scale-110 ${
+                              className={`p-2 rounded-lg transition-all hover:scale-110 ${
                                 theme === 'dark' 
                                   ? 'hover:bg-blue-500/20 text-blue-400' 
                                   : 'hover:bg-blue-50 text-blue-500'
@@ -324,7 +322,7 @@ export const Customers: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleEditCustomer(customer)}
-                              className={`p-2.5 rounded-xl transition-all hover:scale-110 ${
+                              className={`p-2 rounded-lg transition-all hover:scale-110 ${
                                 theme === 'dark' 
                                   ? 'hover:bg-amber-500/20 text-amber-400' 
                                   : 'hover:bg-amber-50 text-amber-500'
@@ -335,7 +333,7 @@ export const Customers: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleDeleteClick(customer)}
-                              className={`p-2.5 rounded-xl transition-all hover:scale-110 ${
+                              className={`p-2 rounded-lg transition-all hover:scale-110 ${
                                 theme === 'dark' 
                                   ? 'hover:bg-red-500/20 text-red-400' 
                                   : 'hover:bg-red-50 text-red-500'

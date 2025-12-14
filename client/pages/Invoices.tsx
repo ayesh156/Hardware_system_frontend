@@ -302,73 +302,73 @@ export const Invoices: React.FC = () => {
             /* Desktop Creative Table */
             <div className={`rounded-2xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[900px]">
                   <thead>
                     <tr className={`border-b ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
-                      <th className={`px-6 py-5 text-left text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-blue-400" />
+                          <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
                           {t('invoices.invoiceNumber')}
                         </div>
                       </th>
-                      <th className={`px-6 py-5 text-left text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-purple-400" />
+                          <User className="w-4 h-4 text-purple-400 flex-shrink-0" />
                           {t('invoices.customer')}
                         </div>
                       </th>
-                      <th className={`px-6 py-5 text-left text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-emerald-400" />
+                          <Calendar className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                           {t('invoices.issueDate')}
                         </div>
                       </th>
-                      <th className={`px-6 py-5 text-left text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-amber-400" />
+                          <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
                           {t('invoices.dueDate')}
                         </div>
                       </th>
-                      <th className={`px-6 py-5 text-right text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         <div className="flex items-center justify-end gap-2">
-                          <Receipt className="w-4 h-4 text-teal-400" />
+                          <Receipt className="w-4 h-4 text-teal-400 flex-shrink-0" />
                           {t('invoices.totalAmount')}
                         </div>
                       </th>
-                      <th className={`px-6 py-5 text-left text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-center text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         {t('common.status')}
                       </th>
-                      <th className={`px-6 py-5 text-center text-xs font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
+                      <th className={`px-4 py-4 text-center text-xs font-bold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400 bg-slate-800/80' : 'text-slate-500 bg-slate-50'}`}>
                         {t('common.actions')}
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/30">
+                  <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/30' : 'divide-slate-200'}`}>
                     {filteredInvoices.map((invoice, index) => (
                       <tr
                         key={invoice.id}
-                        className={`group table-row-creative transition-all duration-300 ${
+                        className={`group transition-all duration-300 ${
                           theme === 'dark' 
-                            ? 'hover:bg-gradient-to-r hover:from-slate-700/30 hover:to-transparent' 
-                            : 'hover:bg-gradient-to-r hover:from-slate-50 hover:to-transparent'
+                            ? 'hover:bg-slate-700/20' 
+                            : 'hover:bg-slate-50'
                         }`}
                       >
-                        <td className="px-6 py-5">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <button
                             onClick={() => navigate(`/invoice/${invoice.id}`)}
-                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono font-bold text-sm transition-all group-hover:scale-105 ${
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono font-bold text-sm transition-all hover:scale-105 ${
                               theme === 'dark' 
                                 ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' 
                                 : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                             }`}
                           >
-                            <FileText className="w-3.5 h-3.5" />
+                            <FileText className="w-3.5 h-3.5 flex-shrink-0" />
                             {invoice.invoiceNumber}
                           </button>
                         </td>
-                        <td className="px-6 py-5">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold ${
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 ${
                               theme === 'dark' 
                                 ? 'bg-gradient-to-br from-purple-500/20 to-pink-500/20 text-purple-400' 
                                 : 'bg-gradient-to-br from-purple-100 to-pink-100 text-purple-600'
@@ -380,37 +380,36 @@ export const Invoices: React.FC = () => {
                             </span>
                           </div>
                         </td>
-                        <td className={`px-6 py-5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <td className={`px-4 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                           <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-slate-500" />
+                            <Calendar className="w-4 h-4 text-slate-500 flex-shrink-0" />
                             {new Date(invoice.issueDate).toLocaleDateString()}
                           </div>
                         </td>
-                        <td className={`px-6 py-5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <td className={`px-4 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                           <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-slate-500" />
+                            <Clock className="w-4 h-4 text-slate-500 flex-shrink-0" />
                             {new Date(invoice.dueDate).toLocaleDateString()}
                           </div>
                         </td>
-                        <td className="px-6 py-5 text-right">
+                        <td className="px-4 py-4 text-right whitespace-nowrap">
                           <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 font-bold text-sm border border-emerald-500/20">
-                            <span className="text-emerald-500/60">Rs.</span>
-                            {invoice.total.toLocaleString()}
+                            Rs. {invoice.total.toLocaleString()}
                           </span>
                         </td>
-                        <td className="px-6 py-5">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${getStatusColor(invoice.status)}`}>
-                            {invoice.status === 'paid' && <CheckCircle className="w-3.5 h-3.5" />}
-                            {invoice.status === 'pending' && <Clock className="w-3.5 h-3.5" />}
-                            {invoice.status === 'overdue' && <AlertTriangle className="w-3.5 h-3.5" />}
+                            {invoice.status === 'paid' && <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />}
+                            {invoice.status === 'pending' && <Clock className="w-3.5 h-3.5 flex-shrink-0" />}
+                            {invoice.status === 'overdue' && <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />}
                             {t(`invoices.${invoice.status}`)}
                           </span>
                         </td>
-                        <td className="px-6 py-5">
-                          <div className="flex items-center justify-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => handleViewClick(invoice)}
-                              className={`p-2.5 rounded-xl transition-all hover:scale-110 ${
+                              className={`p-2 rounded-lg transition-all hover:scale-110 ${
                                 theme === 'dark' 
                                   ? 'hover:bg-blue-500/20 text-blue-400' 
                                   : 'hover:bg-blue-50 text-blue-500'
@@ -421,7 +420,7 @@ export const Invoices: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handlePrintClick(invoice)}
-                              className={`p-2.5 rounded-xl transition-all hover:scale-110 ${
+                              className={`p-2 rounded-lg transition-all hover:scale-110 ${
                                 theme === 'dark' 
                                   ? 'hover:bg-cyan-500/20 text-cyan-400' 
                                   : 'hover:bg-cyan-50 text-cyan-500'
@@ -432,7 +431,7 @@ export const Invoices: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleEditClick(invoice)}
-                              className={`p-2.5 rounded-xl transition-all hover:scale-110 ${
+                              className={`p-2 rounded-lg transition-all hover:scale-110 ${
                                 theme === 'dark' 
                                   ? 'hover:bg-amber-500/20 text-amber-400' 
                                   : 'hover:bg-amber-50 text-amber-500'
@@ -443,7 +442,7 @@ export const Invoices: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleDeleteClick(invoice)}
-                              className={`p-2.5 rounded-xl transition-all hover:scale-110 ${
+                              className={`p-2 rounded-lg transition-all hover:scale-110 ${
                                 theme === 'dark' 
                                   ? 'hover:bg-red-500/20 text-red-400' 
                                   : 'hover:bg-red-50 text-red-500'
