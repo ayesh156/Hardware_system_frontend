@@ -183,7 +183,7 @@ export const Invoices: React.FC = () => {
             {t('invoices.title')}
           </h1>
           <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            Manage your invoices, track payments, and view sales history
+            {t('invoices.description')}
           </p>
         </div>
         <button
@@ -204,7 +204,7 @@ export const Invoices: React.FC = () => {
             </div>
             <div>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{stats.totalInvoices}</p>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Total Invoices</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('invoices.totalInvoices')}</p>
             </div>
           </div>
         </div>
@@ -214,8 +214,8 @@ export const Invoices: React.FC = () => {
               <TrendingUp className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Rs. {(stats.totalRevenue / 1000).toFixed(0)}K</p>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Revenue ({stats.paidCount} paid)</p>
+              <p className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{t('common.currency')} {(stats.totalRevenue / 1000).toFixed(0)}K</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('invoices.revenueStats', { count: stats.paidCount })}</p>
             </div>
           </div>
         </div>
@@ -225,8 +225,8 @@ export const Invoices: React.FC = () => {
               <Clock className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Rs. {(stats.pendingAmount / 1000).toFixed(0)}K</p>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Pending ({stats.pendingCount})</p>
+              <p className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{t('common.currency')} {(stats.pendingAmount / 1000).toFixed(0)}K</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('invoices.pendingStats', { count: stats.pendingCount })}</p>
             </div>
           </div>
         </div>
@@ -236,8 +236,8 @@ export const Invoices: React.FC = () => {
               <AlertTriangle className="w-5 h-5 text-red-400" />
             </div>
             <div>
-              <p className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Rs. {(stats.overdueAmount / 1000).toFixed(0)}K</p>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Overdue ({stats.overdueCount})</p>
+              <p className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{t('common.currency')} {(stats.overdueAmount / 1000).toFixed(0)}K</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('invoices.overdueStats', { count: stats.overdueCount })}</p>
             </div>
           </div>
         </div>
@@ -252,7 +252,7 @@ export const Invoices: React.FC = () => {
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
               <input
                 type="text"
-                placeholder="Search invoices..."
+                placeholder={t('invoices.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${
@@ -293,7 +293,7 @@ export const Invoices: React.FC = () => {
                 }`}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                Clear
+                {t('invoices.clear')}
               </button>
             )}
           </div>
@@ -343,17 +343,17 @@ export const Invoices: React.FC = () => {
             {/* Status Filter */}
             <div className="flex-1 min-w-[150px]">
               <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Status
+                {t('filters.status')}
               </label>
               <SearchableSelect
                 value={statusFilter}
                 onValueChange={(value) => setStatusFilter(value)}
-                placeholder="All Status"
+                placeholder={t('filters.allStatus')}
                 searchPlaceholder={t('common.search')}
-                emptyMessage="No options found"
+                emptyMessage={t('filters.noOptions')}
                 theme={theme}
                 options={[
-                  { value: 'all', label: 'All Status', icon: <Filter className="w-4 h-4" /> },
+                  { value: 'all', label: t('filters.allStatus'), icon: <Filter className="w-4 h-4" /> },
                   { value: 'paid', label: t('invoices.paid'), icon: <CheckCircle className="w-4 h-4 text-emerald-500" /> },
                   { value: 'pending', label: t('invoices.pending'), icon: <Clock className="w-4 h-4 text-amber-500" /> },
                   { value: 'overdue', label: t('invoices.overdue'), icon: <AlertTriangle className="w-4 h-4 text-red-500" /> },
@@ -364,17 +364,17 @@ export const Invoices: React.FC = () => {
             {/* Customer Filter */}
             <div className="flex-1 min-w-[180px]">
               <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Customer
+                {t('filters.customer')}
               </label>
               <SearchableSelect
                 value={customerFilter}
                 onValueChange={(value) => setCustomerFilter(value)}
-                placeholder="All Customers"
+                placeholder={t('filters.allCustomers')}
                 searchPlaceholder={t('common.search')}
-                emptyMessage="No customers"
+                emptyMessage={t('filters.noCustomers')}
                 theme={theme}
                 options={[
-                  { value: 'all', label: 'All Customers', icon: <User className="w-4 h-4" /> },
+                  { value: 'all', label: t('filters.allCustomers'), icon: <User className="w-4 h-4" /> },
                   ...invoiceCustomers.map(c => ({ value: c.id, label: c.name, icon: <Building2 className="w-4 h-4" /> }))
                 ]}
               />
@@ -383,20 +383,20 @@ export const Invoices: React.FC = () => {
             {/* Date Filter */}
             <div className="flex-1 min-w-[150px]">
               <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Time Period
+                {t('filters.timePeriod')}
               </label>
               <SearchableSelect
                 value={dateFilter}
                 onValueChange={(value) => setDateFilter(value)}
-                placeholder="All Time"
+                placeholder={t('filters.allTime')}
                 searchPlaceholder={t('common.search')}
-                emptyMessage="No options"
+                emptyMessage={t('filters.noOptions')}
                 theme={theme}
                 options={[
-                  { value: 'all', label: 'All Time', icon: <Calendar className="w-4 h-4" /> },
-                  { value: 'today', label: 'Today', icon: <Calendar className="w-4 h-4" /> },
-                  { value: 'week', label: 'This Week', icon: <Calendar className="w-4 h-4" /> },
-                  { value: 'month', label: 'This Month', icon: <Calendar className="w-4 h-4" /> },
+                  { value: 'all', label: t('filters.allTime'), icon: <Calendar className="w-4 h-4" /> },
+                  { value: 'today', label: t('filters.today'), icon: <Calendar className="w-4 h-4" /> },
+                  { value: 'week', label: t('filters.thisWeek'), icon: <Calendar className="w-4 h-4" /> },
+                  { value: 'month', label: t('filters.thisMonth'), icon: <Calendar className="w-4 h-4" /> },
                 ]}
               />
             </div>
@@ -507,12 +507,12 @@ export const Invoices: React.FC = () => {
               <table className="w-full min-w-[800px]">
                 <thead className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>
                   <tr>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Invoice</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Customer</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Date</th>
-                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Amount</th>
-                    <th className={`px-4 py-3 text-center text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Status</th>
-                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Actions</th>
+                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.invoice')}</th>
+                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.customer')}</th>
+                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.date')}</th>
+                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.amount')}</th>
+                    <th className={`px-4 py-3 text-center text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.status')}</th>
+                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.actions')}</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-200'}`}>

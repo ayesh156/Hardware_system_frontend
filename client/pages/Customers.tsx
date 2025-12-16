@@ -263,7 +263,7 @@ export const Customers: React.FC = () => {
               <Wallet className="w-5 h-5 text-purple-500" />
             </div>
             <div>
-              <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Rs. {stats.totalLoanBalance.toLocaleString()}</p>
+              <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{t('common.currency')} {stats.totalLoanBalance.toLocaleString()}</p>
               <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('customers.totalLoans')}</p>
             </div>
           </div>
@@ -549,7 +549,7 @@ export const Customers: React.FC = () => {
                             </span>
                           </div>
                           <p className="text-sm font-bold text-emerald-400">
-                            Rs. {customer.totalSpent.toLocaleString()}
+                            {t('common.currency')} {customer.totalSpent.toLocaleString()}
                           </p>
                         </div>
                         
@@ -567,7 +567,7 @@ export const Customers: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-2">
                             <p className={`text-sm font-bold ${overdue ? 'text-red-400' : customer.loanBalance > 0 ? 'text-purple-400' : theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                              Rs. {customer.loanBalance.toLocaleString()}
+                              {t('common.currency')} {customer.loanBalance.toLocaleString()}
                             </p>
                             {overdue && (
                               <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-500 text-white text-xs font-bold rounded">

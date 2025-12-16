@@ -316,14 +316,14 @@ export const Brands: React.FC = () => {
               <SearchableSelect
                 value={statusFilter}
                 onValueChange={(v) => setStatusFilter(v as 'all' | 'active' | 'inactive')}
-                placeholder="All Status"
+                placeholder={t('filters.allStatus')}
                 searchPlaceholder={t('common.search')}
-                emptyMessage="No options found"
+                emptyMessage={t('filters.noOptions')}
                 theme={theme}
                 options={[
-                  { value: 'all', label: 'All Status', count: brands.length, icon: <Filter className="w-4 h-4" /> },
-                  { value: 'active', label: 'Active', count: activeBrands, icon: <UserCheck className="w-4 h-4 text-green-500" /> },
-                  { value: 'inactive', label: 'Inactive', count: brands.length - activeBrands, icon: <UserX className="w-4 h-4 text-red-500" /> },
+                  { value: 'all', label: t('filters.allStatus'), count: brands.length, icon: <Filter className="w-4 h-4" /> },
+                  { value: 'active', label: t('common.active'), count: activeBrands, icon: <UserCheck className="w-4 h-4 text-green-500" /> },
+                  { value: 'inactive', label: t('common.inactive'), count: brands.length - activeBrands, icon: <UserX className="w-4 h-4 text-red-500" /> },
                 ]}
               />
             </div>
@@ -337,7 +337,7 @@ export const Brands: React.FC = () => {
                 }`}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                Clear
+                {t('filters.clear')}
               </button>
             )}
           </div>
@@ -408,13 +408,13 @@ export const Brands: React.FC = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-slate-800 border-slate-700' : ''}>
                     <DropdownMenuItem onClick={() => handleEditBrand(brand)}>
-                      <Edit2 className="w-4 h-4 mr-2" /> Edit
+                      <Edit2 className="w-4 h-4 mr-2" /> {t('tableHeaders.edit')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleToggleStatus(brand)}>
                       {brand.isActive ? (
-                        <><X className="w-4 h-4 mr-2" /> Deactivate</>
+                        <><X className="w-4 h-4 mr-2" /> {t('tableHeaders.deactivate')}</>
                       ) : (
-                        <><Check className="w-4 h-4 mr-2" /> Activate</>
+                        <><Check className="w-4 h-4 mr-2" /> {t('tableHeaders.activate')}</>
                       )}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className={theme === 'dark' ? 'bg-slate-700' : ''} />
@@ -422,7 +422,7 @@ export const Brands: React.FC = () => {
                       onClick={() => handleDeleteBrand(brand)}
                       className="text-red-500 focus:text-red-500"
                     >
-                      <Trash2 className="w-4 h-4 mr-2" /> Delete
+                      <Trash2 className="w-4 h-4 mr-2" /> {t('tableHeaders.delete')}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -435,11 +435,11 @@ export const Brands: React.FC = () => {
                   </h3>
                   {brand.isActive ? (
                     <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 text-[10px]">
-                      Active
+                      {t('common.active')}
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-slate-500 border-slate-500/30 bg-slate-500/10 text-[10px]">
-                      Inactive
+                      {t('common.inactive')}
                     </Badge>
                   )}
                 </div>
@@ -464,7 +464,7 @@ export const Brands: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <Package className={`w-3.5 h-3.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
                   <span className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {getProductCount(brand.name)} products
+                    {getProductCount(brand.name)} {t('tableHeaders.products').toLowerCase()}
                   </span>
                 </div>
                 <span className={`text-[10px] ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
@@ -484,22 +484,22 @@ export const Brands: React.FC = () => {
               <tr className={theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50'}>
                 <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>Brand</th>
+                }`}>{t('tableHeaders.brand')}</th>
                 <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>Country</th>
+                }`}>{t('tableHeaders.country')}</th>
                 <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>Description</th>
+                }`}>{t('tableHeaders.description')}</th>
                 <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>Products</th>
+                }`}>{t('tableHeaders.products')}</th>
                 <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>Status</th>
+                }`}>{t('tableHeaders.status')}</th>
                 <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>Actions</th>
+                }`}>{t('tableHeaders.actions')}</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-100'}`}>

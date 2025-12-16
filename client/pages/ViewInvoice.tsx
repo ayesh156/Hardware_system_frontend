@@ -365,16 +365,16 @@ export const ViewInvoice: React.FC = () => {
                         }`}>#</th>
                         <th className={`py-4 px-4 text-left text-xs font-bold uppercase tracking-wider ${
                           theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                        }`}>Item Description</th>
+                        }`}>{t('tableHeaders.itemDescription')}</th>
                         <th className={`py-4 px-4 text-center text-xs font-bold uppercase tracking-wider ${
                           theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                        }`}>Qty</th>
+                        }`}>{t('tableHeaders.qty')}</th>
                         <th className={`py-4 px-4 text-right text-xs font-bold uppercase tracking-wider ${
                           theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                        }`}>Unit Price</th>
+                        }`}>{t('tableHeaders.unitPrice')}</th>
                         <th className={`py-4 px-4 text-right text-xs font-bold uppercase tracking-wider ${
                           theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                        }`}>Total</th>
+                        }`}>{t('tableHeaders.total')}</th>
                       </tr>
                     </thead>
                     <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700' : 'divide-slate-200'}`}>

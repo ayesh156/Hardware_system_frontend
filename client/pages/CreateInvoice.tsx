@@ -313,11 +313,11 @@ export const CreateInvoice: React.FC = () => {
                 <FileText className="w-5 h-5 text-blue-400" />
               </div>
               <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Create Invoice
+                {t('invoice.createInvoice')}
               </h1>
             </div>
             <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>
-              Create a new invoice in 3 easy steps
+              {t('invoice.createInvoiceSteps')}
             </p>
           </div>
         </div>
@@ -345,7 +345,7 @@ export const CreateInvoice: React.FC = () => {
                 <p className={`mt-2 text-sm font-medium ${
                   s <= step ? (theme === 'dark' ? 'text-white' : 'text-slate-900') : (theme === 'dark' ? 'text-slate-400' : 'text-slate-500')
                 }`}>
-                  {s === 1 ? 'Customer' : s === 2 ? 'Products' : 'Review & Pay'}
+                  {s === 1 ? t('invoice.stepCustomer') : s === 2 ? t('invoice.stepProducts') : t('invoice.stepReview')}
                 </p>
               </div>
               {s < 3 && (
@@ -372,10 +372,10 @@ export const CreateInvoice: React.FC = () => {
                 </div>
                 <div>
                   <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    Select Customer
+                    {t('invoice.selectCustomer')}
                   </h3>
                   <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Choose an existing customer or proceed as walk-in
+                    {t('invoice.selectCustomerHint')}
                   </p>
                 </div>
               </div>
@@ -395,7 +395,7 @@ export const CreateInvoice: React.FC = () => {
                 }`}
               >
                 <UserX className="w-4 h-4" />
-                Walk-in Customer
+                {t('invoice.walkInCustomer')}
               </button>
             </div>
 
@@ -414,10 +414,10 @@ export const CreateInvoice: React.FC = () => {
                   </div>
                   <div>
                     <h4 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                      Walk-in Customer
+                      {t('invoice.walkInCustomer')}
                     </h4>
                     <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Proceeding without customer details. Click "Next" to add products.
+                      {t('invoice.walkInCustomerConfirm')}
                     </p>
                   </div>
                   <CheckCircle className="w-6 h-6 text-emerald-400 ml-auto" />
@@ -431,7 +431,7 @@ export const CreateInvoice: React.FC = () => {
                   <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search customers by name, business, email, or phone..."
+                    placeholder={t('invoice.searchCustomerPlaceholder')}
                     value={customerSearch}
                     onChange={(e) => setCustomerSearch(e.target.value)}
                     className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -446,7 +446,7 @@ export const CreateInvoice: React.FC = () => {
                 {filteredCustomers.length === 0 ? (
                   <div className={`text-center py-12 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                     <User className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No customers found matching "{customerSearch}"</p>
+                    <p>{t('invoice.noCustomersFound')} "{customerSearch}"</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2">
@@ -481,12 +481,12 @@ export const CreateInvoice: React.FC = () => {
                               </p>
                               {customer.customerType === 'wholesale' && (
                                 <span className="px-2 py-0.5 text-xs font-medium bg-purple-500/10 text-purple-400 rounded-full">
-                                  Wholesale
+                                  {t('invoice.wholesale')}
                                 </span>
                               )}
                               {customer.customerType === 'credit' && (
                                 <span className="px-2 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-400 rounded-full">
-                                  Credit
+                                  {t('invoice.credit')}
                                 </span>
                               )}
                             </div>
@@ -515,14 +515,14 @@ export const CreateInvoice: React.FC = () => {
                                       : 'text-amber-400'
                                   }`}>
                                     <CreditCard className="w-3 h-3 inline mr-1" />
-                                    Due Balance
+                                    {t('invoice.dueBalance')}
                                   </span>
                                   <span className={`text-sm font-bold ${
                                     customer.loanDueDate && new Date(customer.loanDueDate) < new Date()
                                       ? 'text-red-400'
                                       : 'text-amber-400'
                                   }`}>
-                                    Rs. {customer.loanBalance.toLocaleString()}
+                                    {t('common.currency')} {customer.loanBalance.toLocaleString()}
                                   </span>
                                 </div>
                                 {customer.loanDueDate && (
@@ -532,10 +532,10 @@ export const CreateInvoice: React.FC = () => {
                                     {new Date(customer.loanDueDate) < new Date() ? (
                                       <>
                                         <AlertTriangle className="w-3 h-3 inline mr-1" />
-                                        Overdue since {new Date(customer.loanDueDate).toLocaleDateString()}
+                                        {t('invoice.overdueSince')} {new Date(customer.loanDueDate).toLocaleDateString()}
                                       </>
                                     ) : (
-                                      <>Due by {new Date(customer.loanDueDate).toLocaleDateString()}</>
+                                      <>{t('invoice.dueBy')} {new Date(customer.loanDueDate).toLocaleDateString()}</>
                                     )}
                                   </p>
                                 )}
@@ -544,9 +544,9 @@ export const CreateInvoice: React.FC = () => {
                             
                             {/* Total Spent */}
                             <div className={`mt-2 flex items-center justify-between text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                              <span>Total Purchases</span>
+                              <span>{t('invoice.totalPurchases')}</span>
                               <span className="font-medium text-emerald-500">
-                                Rs. {customer.totalSpent.toLocaleString()}
+                                {t('common.currency')} {customer.totalSpent.toLocaleString()}
                               </span>
                             </div>
                           </div>
@@ -571,13 +571,13 @@ export const CreateInvoice: React.FC = () => {
                 </div>
                 <div>
                   <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    Add Products
+                    {t('invoice.addProducts')}
                   </h3>
                   <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                     {currentCustomer?.customerType === 'wholesale' && (
-                      <span className="text-purple-400 font-medium">Wholesale Pricing Active • </span>
+                      <span className="text-purple-400 font-medium">{t('invoice.wholesalePricing')} • </span>
                     )}
-                    Search and add products to invoice
+                    {t('invoice.searchAddProducts')}
                   </p>
                 </div>
               </div>
@@ -593,7 +593,7 @@ export const CreateInvoice: React.FC = () => {
                 }`}
               >
                 <PackagePlus className="w-4 h-4" />
-                Quick Add
+                {t('invoice.quickAddProduct')}
               </button>
             </div>
 
@@ -605,14 +605,14 @@ export const CreateInvoice: React.FC = () => {
                 <div className="flex items-center gap-2 mb-4">
                   <Zap className="w-5 h-5 text-amber-400" />
                   <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    Quick Add (Not in Inventory)
+                    {t('invoice.quickAddTitle')}
                   </h4>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div className="md:col-span-2">
                     <input
                       type="text"
-                      placeholder="Product/Service name"
+                      placeholder={t('invoice.productServicePlaceholder')}
                       value={quickAddName}
                       onChange={(e) => setQuickAddName(e.target.value)}
                       className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 ${
@@ -624,10 +624,10 @@ export const CreateInvoice: React.FC = () => {
                   </div>
                   <div>
                     <div className="relative">
-                      <span className={`absolute left-3 top-2.5 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Rs.</span>
+                      <span className={`absolute left-3 top-2.5 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('common.currency')}</span>
                       <input
                         type="number"
-                        placeholder="Price"
+                        placeholder={t('invoice.pricePlaceholder')}
                         value={quickAddPrice || ''}
                         onChange={(e) => setQuickAddPrice(parseFloat(e.target.value) || 0)}
                         className={`w-full pl-10 pr-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 ${
@@ -641,7 +641,7 @@ export const CreateInvoice: React.FC = () => {
                   <div className="flex gap-2">
                     <input
                       type="number"
-                      placeholder="Qty"
+                      placeholder={t('invoice.qtyPlaceholder')}
                       min="1"
                       value={quickAddQty}
                       onChange={(e) => setQuickAddQty(parseInt(e.target.value) || 1)}
@@ -671,7 +671,7 @@ export const CreateInvoice: React.FC = () => {
                   <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search by name, SKU, barcode, brand, category..."
+                    placeholder={t('invoice.searchProductPlaceholder')}
                     value={productSearch}
                     onChange={(e) => {
                       setProductSearch(e.target.value);
@@ -692,12 +692,12 @@ export const CreateInvoice: React.FC = () => {
                   {filteredProducts.length === 0 ? (
                     <div className={`p-8 text-center ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                       <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                      <p>No products found</p>
+                      <p>{t('invoice.noProductsFound')}</p>
                       <button
                         onClick={() => setShowQuickAdd(true)}
                         className="mt-2 text-amber-400 text-sm hover:underline"
                       >
-                        Quick add item instead?
+                        {t('invoice.quickAddInstead')}
                       </button>
                     </div>
                   ) : (
@@ -738,7 +738,7 @@ export const CreateInvoice: React.FC = () => {
                                 </p>
                                 {isOutOfStock && (
                                   <span className="px-1.5 py-0.5 text-xs font-medium bg-red-500/10 text-red-400 rounded">
-                                    Out of Stock
+                                    {t('invoice.outOfStock')}
                                   </span>
                                 )}
                               </div>
@@ -754,14 +754,14 @@ export const CreateInvoice: React.FC = () => {
                             <div className="text-right flex-shrink-0">
                               <div className="flex flex-col items-end">
                                 {isWholesale && p.wholesalePrice && (
-                                  <span className="text-xs text-purple-400 font-medium">Wholesale</span>
+                                  <span className="text-xs text-purple-400 font-medium">{t('invoice.wholesale')}</span>
                                 )}
                                 <p className="font-bold text-emerald-500">
-                                  Rs. {displayPrice.toLocaleString()}
+                                  {t('common.currency')} {displayPrice.toLocaleString()}
                                 </p>
                                 {p.wholesalePrice && p.retailPrice && isWholesale && (
                                   <p className="text-xs text-slate-500 line-through">
-                                    Rs. {p.retailPrice.toLocaleString()}
+                                    {t('common.currency')} {p.retailPrice.toLocaleString()}
                                   </p>
                                 )}
                               </div>
@@ -791,13 +791,13 @@ export const CreateInvoice: React.FC = () => {
                           {currentProduct.name}
                         </h4>
                         <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {currentProduct.sku} • Available: <span className={currentProduct.stock <= (currentProduct.minStock || 5) ? 'text-amber-400 font-medium' : 'text-emerald-400 font-medium'}>{currentProduct.stock} {currentProduct.unit || 'pcs'}</span>
+                          {currentProduct.sku} • {t('invoice.available')}: <span className={currentProduct.stock <= (currentProduct.minStock || 5) ? 'text-amber-400 font-medium' : 'text-emerald-400 font-medium'}>{currentProduct.stock} {currentProduct.unit || 'pcs'}</span>
                         </p>
                       </div>
                       <div className="text-right">
                         {currentCustomer?.customerType === 'wholesale' && currentProduct.wholesalePrice && (
                           <span className="px-2 py-0.5 text-xs font-medium bg-purple-500/10 text-purple-400 rounded">
-                            Wholesale Rate
+                            {t('invoice.wholesaleRate')}
                           </span>
                         )}
                       </div>
@@ -806,7 +806,7 @@ export const CreateInvoice: React.FC = () => {
                     {/* Price Selection */}
                     <div className="mb-4">
                       <label className={`block text-xs font-medium mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Price Mode
+                        {t('invoice.priceMode')}
                       </label>
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -817,7 +817,7 @@ export const CreateInvoice: React.FC = () => {
                               : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                           }`}
                         >
-                          Auto ({currentCustomer?.customerType === 'wholesale' ? 'Wholesale' : 'Retail'})
+                          {t('invoice.auto')} ({currentCustomer?.customerType === 'wholesale' ? t('invoice.wholesale') : t('invoice.retail')})
                         </button>
                         <button
                           onClick={() => setPriceMode('retail')}
@@ -827,7 +827,7 @@ export const CreateInvoice: React.FC = () => {
                               : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                           }`}
                         >
-                          Retail: Rs. {(currentProduct.retailPrice || currentProduct.price || 0).toLocaleString()}
+                          {t('invoice.retail')}: {t('common.currency')} {(currentProduct.retailPrice || currentProduct.price || 0).toLocaleString()}
                         </button>
                         {currentProduct.wholesalePrice && (
                           <button
@@ -838,7 +838,7 @@ export const CreateInvoice: React.FC = () => {
                                 : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                             }`}
                           >
-                            Wholesale: Rs. {currentProduct.wholesalePrice.toLocaleString()}
+                            {t('invoice.wholesale')}: {t('common.currency')} {currentProduct.wholesalePrice.toLocaleString()}
                           </button>
                         )}
                         <button
@@ -850,7 +850,7 @@ export const CreateInvoice: React.FC = () => {
                           }`}
                         >
                           <Edit3 className="w-3 h-3 inline mr-1" />
-                          Custom
+                          {t('invoice.custom')}
                         </button>
                       </div>
                     </div>
@@ -859,10 +859,10 @@ export const CreateInvoice: React.FC = () => {
                     {priceMode === 'custom' && (
                       <div className="mb-4">
                         <label className={`block text-xs font-medium mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Custom Price
+                          {t('invoice.customPrice')}
                         </label>
                         <div className="relative">
-                          <span className={`absolute left-3 top-2.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Rs.</span>
+                          <span className={`absolute left-3 top-2.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('common.currency')}</span>
                           <input
                             type="number"
                             value={customPrice || ''}
@@ -881,7 +881,7 @@ export const CreateInvoice: React.FC = () => {
                     {priceMode !== 'custom' && (
                       <div className="mb-4">
                         <label className={`block text-xs font-medium mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Item Discount (optional)
+                          {t('invoice.itemDiscountOptional')}
                         </label>
                         <div className="flex gap-2">
                           <button
@@ -892,7 +892,7 @@ export const CreateInvoice: React.FC = () => {
                                 : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                             }`}
                           >
-                            None
+                            {t('invoice.none')}
                           </button>
                           <button
                             onClick={() => setItemDiscountType('percentage')}
@@ -903,7 +903,7 @@ export const CreateInvoice: React.FC = () => {
                             }`}
                           >
                             <Percent className="w-3 h-3" />
-                            Percentage
+                            {t('invoice.percentage')}
                           </button>
                           <button
                             onClick={() => setItemDiscountType('fixed')}
@@ -914,17 +914,17 @@ export const CreateInvoice: React.FC = () => {
                             }`}
                           >
                             <Tag className="w-3 h-3" />
-                            Fixed Amount
+                            {t('invoice.fixed')}
                           </button>
                         </div>
                         {itemDiscountType !== 'none' && (
                           <div className="mt-2 relative">
                             {itemDiscountType === 'fixed' && (
-                              <span className={`absolute left-3 top-2.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Rs.</span>
+                              <span className={`absolute left-3 top-2.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('common.currency')}</span>
                             )}
                             <input
                               type="number"
-                              placeholder={itemDiscountType === 'percentage' ? 'Discount %' : 'Discount amount'}
+                              placeholder={itemDiscountType === 'percentage' ? t('invoice.discountPercentPlaceholder') : t('invoice.discountAmountPlaceholder')}
                               value={itemDiscountValue || ''}
                               onChange={(e) => setItemDiscountValue(parseFloat(e.target.value) || 0)}
                               className={`w-full ${itemDiscountType === 'fixed' ? 'pl-10' : 'pl-4'} pr-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 ${
@@ -953,29 +953,29 @@ export const CreateInvoice: React.FC = () => {
                         }`}>
                           <div className="flex items-center justify-between mb-1">
                             <span className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              {priceMode === 'custom' ? 'Custom Price' : `${label} Price`}
+                              {priceMode === 'custom' ? t('invoice.customPrice') : `${label === 'Wholesale' ? t('invoice.wholesale') : t('invoice.retail')} ${t('invoice.price')}`}
                             </span>
                             <span className={`text-sm ${hasDiscount ? 'line-through text-slate-500' : 'font-medium ' + (theme === 'dark' ? 'text-white' : 'text-slate-900')}`}>
-                              Rs. {basePrice.toLocaleString()}
+                              {t('common.currency')} {basePrice.toLocaleString()}
                             </span>
                           </div>
                           {hasDiscount && priceMode !== 'custom' && (
                             <>
                               <div className="flex items-center justify-between mb-1">
                                 <span className={`text-xs text-pink-400`}>
-                                  Discount ({itemDiscountType === 'percentage' ? `${itemDiscountValue}%` : `Rs. ${itemDiscountValue}`})
+                                  {t('invoice.discount')} ({itemDiscountType === 'percentage' ? `${itemDiscountValue}%` : `${t('common.currency')} ${itemDiscountValue}`})
                                 </span>
                                 <span className="text-sm text-pink-400">
-                                  - Rs. {(basePrice - finalPrice).toLocaleString()}
+                                  - {t('common.currency')} {(basePrice - finalPrice).toLocaleString()}
                                 </span>
                               </div>
                               <div className={`border-t pt-1 mt-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                                 <div className="flex items-center justify-between">
                                   <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                                    Final Unit Price
+                                    {t('invoice.finalUnitPrice')}
                                   </span>
                                   <span className="text-sm font-bold text-emerald-500">
-                                    Rs. {finalPrice.toLocaleString()}
+                                    {t('common.currency')} {finalPrice.toLocaleString()}
                                   </span>
                                 </div>
                               </div>
@@ -984,10 +984,10 @@ export const CreateInvoice: React.FC = () => {
                           <div className={`flex items-center justify-between mt-2 pt-2 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                             <span className={`text-sm font-medium flex items-center gap-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                               <Calculator className="w-3.5 h-3.5" />
-                              Total ({quantity} × Rs. {finalPrice.toLocaleString()})
+                              {t('invoice.total')} ({quantity} × {t('common.currency')} {finalPrice.toLocaleString()})
                             </span>
                             <span className="text-lg font-bold text-emerald-500">
-                              Rs. {(quantity * finalPrice).toLocaleString()}
+                              {t('common.currency')} {(quantity * finalPrice).toLocaleString()}
                             </span>
                           </div>
                         </div>
@@ -1021,7 +1021,7 @@ export const CreateInvoice: React.FC = () => {
                         className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium flex items-center gap-2 transition-all shadow-lg shadow-cyan-500/20"
                       >
                         <Plus className="w-5 h-5" />
-                        Add to Cart
+                        {t('invoice.addToInvoice')}
                       </button>
                     </div>
                   </div>
@@ -1035,11 +1035,11 @@ export const CreateInvoice: React.FC = () => {
                 <div className="flex items-center justify-between mb-4">
                   <h4 className={`font-semibold flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <ShoppingCart className="w-4 h-4" />
-                    Cart ({items.length} items)
+                    {t('invoice.selectedItems')} ({items.length} {t('invoice.items')})
                   </h4>
                   {items.length > 0 && (
                     <span className="text-emerald-500 font-bold text-lg">
-                      Rs. {subtotal.toLocaleString()}
+                      {t('common.currency')} {subtotal.toLocaleString()}
                     </span>
                   )}
                 </div>
@@ -1047,8 +1047,8 @@ export const CreateInvoice: React.FC = () => {
                 {items.length === 0 ? (
                   <div className={`text-center py-12 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
                     <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <p>No items added yet</p>
-                    <p className="text-xs mt-1">Select products from the left to add them</p>
+                    <p>{t('invoice.noItemsYet')}</p>
+                    <p className="text-xs mt-1">{t('invoice.selectProductsHint')}</p>
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
@@ -1071,20 +1071,20 @@ export const CreateInvoice: React.FC = () => {
                                 </p>
                                 {extItem.isQuickAdd && (
                                   <span className="px-1.5 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-400 rounded">
-                                    Quick
+                                    {t('invoice.quickBadge')}
                                   </span>
                                 )}
                                 {extItem.isCustomPrice && (
                                   <span className="px-1.5 py-0.5 text-xs font-medium bg-purple-500/10 text-purple-400 rounded">
-                                    Custom
+                                    {t('invoice.customBadge')}
                                   </span>
                                 )}
                               </div>
                               <div className={`text-xs flex items-center gap-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                <span>Rs. {item.unitPrice.toLocaleString()} × {item.quantity}</span>
+                                <span>{t('common.currency')} {item.unitPrice.toLocaleString()} × {item.quantity}</span>
                                 {extItem.discountType && (
                                   <span className="text-pink-400">
-                                    ({extItem.discountType === 'percentage' ? `${extItem.discountValue}% off` : `Rs. ${extItem.discountValue} off`})
+                                    ({extItem.discountType === 'percentage' ? `${extItem.discountValue}% ${t('invoice.off')}` : `${t('common.currency')} ${extItem.discountValue} ${t('invoice.off')}`})
                                   </span>
                                 )}
                               </div>
@@ -1111,7 +1111,7 @@ export const CreateInvoice: React.FC = () => {
                           </div>
                           <div className="flex justify-end mt-1">
                             <span className="text-emerald-500 font-semibold">
-                              Rs. {item.total.toLocaleString()}
+                              {t('common.currency')} {item.total.toLocaleString()}
                             </span>
                           </div>
                         </div>
@@ -1135,10 +1135,10 @@ export const CreateInvoice: React.FC = () => {
                 </div>
                 <div>
                   <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    Review & Complete
+                    {t('invoice.reviewComplete')}
                   </h3>
                   <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Preview your invoice before completing
+                    {t('invoice.reviewHint')}
                   </p>
                 </div>
               </div>
@@ -1148,7 +1148,7 @@ export const CreateInvoice: React.FC = () => {
                   : 'bg-emerald-500/10 border border-emerald-500/30'
               }`}>
                 <span className={`text-sm font-medium ${paymentMethod === 'credit' ? 'text-amber-400' : 'text-emerald-400'}`}>
-                  {paymentMethod === 'credit' ? 'Credit Sale' : 'Cash Sale'}
+                  {paymentMethod === 'credit' ? t('invoice.creditSale') : t('invoice.cashSale')}
                 </span>
               </div>
             </div>
@@ -1162,7 +1162,7 @@ export const CreateInvoice: React.FC = () => {
                 }`}>
                   <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <User className="w-4 h-4 text-blue-400" />
-                    Customer
+                    {t('invoice.customer')}
                   </h4>
                   {isWalkIn ? (
                     <div className="flex items-center gap-3">
@@ -1172,8 +1172,8 @@ export const CreateInvoice: React.FC = () => {
                         <UserX className="w-5 h-5 text-purple-400" />
                       </div>
                       <div>
-                        <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Walk-in Customer</p>
-                        <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Cash/Quick sale</p>
+                        <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{t('invoice.walkInCustomer')}</p>
+                        <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('invoice.cashQuickSale')}</p>
                       </div>
                     </div>
                   ) : currentCustomer && (
@@ -1190,7 +1190,7 @@ export const CreateInvoice: React.FC = () => {
                       </div>
                       {currentCustomer.customerType === 'wholesale' && (
                         <span className="ml-auto px-2 py-1 text-xs font-medium bg-purple-500/10 text-purple-400 rounded">
-                          Wholesale
+                          {t('invoice.wholesale')}
                         </span>
                       )}
                     </div>
@@ -1203,12 +1203,12 @@ export const CreateInvoice: React.FC = () => {
                 }`}>
                   <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <Calendar className="w-4 h-4 text-cyan-400" />
-                    Invoice Dates
+                    {t('invoice.invoiceDates')}
                   </h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Issue Date
+                        {t('invoice.issueDate')}
                       </label>
                       <input
                         type="date"
@@ -1223,7 +1223,7 @@ export const CreateInvoice: React.FC = () => {
                     </div>
                     <div>
                       <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Due Date
+                        {t('invoice.dueDate')}
                       </label>
                       <input
                         type="date"
@@ -1245,14 +1245,14 @@ export const CreateInvoice: React.FC = () => {
                 }`}>
                   <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <CreditCard className="w-4 h-4 text-emerald-400" />
-                    Payment Method
+                    {t('invoice.paymentMethod')}
                   </h4>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { value: 'cash', label: 'Cash', icon: DollarSign, color: 'emerald' },
-                      { value: 'card', label: 'Card', icon: CreditCard, color: 'blue' },
-                      { value: 'bank_transfer', label: 'Bank', icon: Building2, color: 'purple' },
-                      { value: 'credit', label: 'Credit', icon: AlertTriangle, color: 'amber' },
+                      { value: 'cash', label: t('invoice.cash'), icon: DollarSign, color: 'emerald' },
+                      { value: 'card', label: t('invoice.card'), icon: CreditCard, color: 'blue' },
+                      { value: 'bank_transfer', label: t('invoice.bankTransfer'), icon: Building2, color: 'purple' },
+                      { value: 'credit', label: t('invoice.credit'), icon: AlertTriangle, color: 'amber' },
                     ].map(({ value, label, icon: Icon, color }) => (
                       <button
                         key={value}
@@ -1278,15 +1278,15 @@ export const CreateInvoice: React.FC = () => {
                 }`}>
                   <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <Percent className="w-4 h-4 text-pink-400" />
-                    Overall Discount
+                    {t('invoice.overallDiscount')}
                   </h4>
                   <div className="space-y-3">
                     {/* Discount Type Selection */}
                     <div className="grid grid-cols-3 gap-2">
                       {[
-                        { value: 'none', label: 'None' },
-                        { value: 'percentage', label: '%' },
-                        { value: 'fixed', label: 'Fixed' },
+                        { value: 'none', label: t('invoice.none') },
+                        { value: 'percentage', label: t('invoice.percentage') },
+                        { value: 'fixed', label: t('invoice.fixed') },
                       ].map(({ value, label }) => (
                         <button
                           key={value}
@@ -1327,11 +1327,11 @@ export const CreateInvoice: React.FC = () => {
                           }`}
                         />
                         <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>
-                          {discountType === 'percentage' ? '%' : 'Rs.'}
+                          {discountType === 'percentage' ? '%' : t('common.currency')}
                         </span>
                         {discountAmount > 0 && (
                           <span className="text-pink-400 font-medium">
-                            - Rs. {discountAmount.toLocaleString()}
+                            - {t('common.currency')} {discountAmount.toLocaleString()}
                           </span>
                         )}
                       </div>
@@ -1345,7 +1345,7 @@ export const CreateInvoice: React.FC = () => {
                 }`}>
                   <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <Calculator className="w-4 h-4 text-cyan-400" />
-                    Tax Settings
+                    {t('invoice.taxSettings')}
                   </h4>
                   <div className="space-y-3">
                     {/* Enable Tax Toggle */}
@@ -1366,7 +1366,7 @@ export const CreateInvoice: React.FC = () => {
                         </div>
                       </div>
                       <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Add Tax
+                        {t('invoice.addTax')}
                       </span>
                     </label>
                     {/* Tax Rate Input */}
@@ -1387,7 +1387,7 @@ export const CreateInvoice: React.FC = () => {
                         <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>%</span>
                         {tax > 0 && (
                           <span className="text-cyan-400 font-medium">
-                            + Rs. {tax.toLocaleString()}
+                            + {t('common.currency')} {tax.toLocaleString()}
                           </span>
                         )}
                       </div>
@@ -1401,12 +1401,12 @@ export const CreateInvoice: React.FC = () => {
                 }`}>
                   <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <FileText className="w-4 h-4 text-slate-400" />
-                    Notes (Optional)
+                    {t('invoice.notes')}
                   </label>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Add any notes for this invoice..."
+                    placeholder={t('invoice.notesPlaceholder')}
                     rows={2}
                     className={`w-full px-3 py-2 border rounded-xl text-sm resize-none ${
                       theme === 'dark'
@@ -1430,7 +1430,7 @@ export const CreateInvoice: React.FC = () => {
                         <p className="text-blue-200 text-xs mt-1 tracking-widest">QUALITY BUILDING MATERIALS</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-3xl font-bold tracking-wider">INVOICE</p>
+                        <p className="text-3xl font-bold tracking-wider">{t('tableHeaders.invoice').toUpperCase()}</p>
                         <p className="text-blue-200 text-sm mt-1">#{`INV-${new Date().getFullYear()}-XXXXXX`}</p>
                       </div>
                     </div>
@@ -1441,9 +1441,9 @@ export const CreateInvoice: React.FC = () => {
                     {/* Customer & Date Row */}
                     <div className="flex justify-between mb-6 pb-4 border-b border-dashed border-slate-300 dark:border-slate-700">
                       <div>
-                        <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>Bill To</p>
+                        <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>{t('invoice.billTo')}</p>
                         <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                          {isWalkIn ? 'Walk-in Customer' : currentCustomer?.name}
+                          {isWalkIn ? t('invoice.walkInCustomer') : currentCustomer?.name}
                         </p>
                         {!isWalkIn && currentCustomer && (
                           <>
@@ -1454,13 +1454,13 @@ export const CreateInvoice: React.FC = () => {
                       </div>
                       <div className="text-right">
                         <div className="mb-2">
-                          <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Issue Date</p>
+                          <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('invoice.issueDate')}</p>
                           <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                             {new Date(issueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </p>
                         </div>
                         <div>
-                          <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Due Date</p>
+                          <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('invoice.dueDate')}</p>
                           <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                             {new Date(dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </p>
@@ -1474,10 +1474,10 @@ export const CreateInvoice: React.FC = () => {
                         <thead>
                           <tr className={`text-xs uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                             <th className="text-left py-2 font-semibold">#</th>
-                            <th className="text-left py-2 font-semibold">Item</th>
-                            <th className="text-center py-2 font-semibold">Qty</th>
-                            <th className="text-right py-2 font-semibold">Price</th>
-                            <th className="text-right py-2 font-semibold">Total</th>
+                            <th className="text-left py-2 font-semibold">{t('tableHeaders.item')}</th>
+                            <th className="text-center py-2 font-semibold">{t('tableHeaders.qty')}</th>
+                            <th className="text-right py-2 font-semibold">{t('tableHeaders.price')}</th>
+                            <th className="text-right py-2 font-semibold">{t('tableHeaders.total')}</th>
                           </tr>
                         </thead>
                         <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-800' : 'divide-slate-100'}`}>
@@ -1490,19 +1490,19 @@ export const CreateInvoice: React.FC = () => {
                                   <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{item.productName}</span>
                                   {extItem.discountType && (
                                     <span className="ml-2 text-xs text-pink-400">
-                                      ({extItem.discountType === 'percentage' ? `${extItem.discountValue}% off` : `Rs.${extItem.discountValue} off`})
+                                      ({extItem.discountType === 'percentage' ? `${extItem.discountValue}% ${t('invoice.off')}` : `${t('common.currency')} ${extItem.discountValue} ${t('invoice.off')}`})
                                     </span>
                                   )}
                                   {extItem.isQuickAdd && (
-                                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-500/10 text-amber-400 rounded">Quick</span>
+                                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-500/10 text-amber-400 rounded">{t('invoice.quickBadge')}</span>
                                   )}
                                 </td>
                                 <td className="py-2 text-center">{item.quantity}</td>
                                 <td className={`py-2 text-right font-mono ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  Rs. {item.unitPrice.toLocaleString()}
+                                  {t('common.currency')} {item.unitPrice.toLocaleString()}
                                 </td>
                                 <td className={`py-2 text-right font-mono font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                                  Rs. {item.total.toLocaleString()}
+                                  {t('common.currency')} {item.total.toLocaleString()}
                                 </td>
                               </tr>
                             );
@@ -1510,7 +1510,7 @@ export const CreateInvoice: React.FC = () => {
                           {items.length > 5 && (
                             <tr>
                               <td colSpan={5} className={`py-2 text-center text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                                ... and {items.length - 5} more items
+                                {t('invoice.andMoreItems').replace('{count}', (items.length - 5).toString())}
                               </td>
                             </tr>
                           )}
@@ -1522,24 +1522,24 @@ export const CreateInvoice: React.FC = () => {
                     <div className="flex justify-end">
                       <div className="w-64">
                         <div className={`flex justify-between py-2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                          <span>Subtotal</span>
-                          <span className="font-mono">Rs. {subtotal.toLocaleString()}</span>
+                          <span>{t('invoice.subtotal')}</span>
+                          <span className="font-mono">{t('common.currency')} {subtotal.toLocaleString()}</span>
                         </div>
                         {discountAmount > 0 && (
                           <div className="flex justify-between py-2 text-sm text-pink-400">
-                            <span>Discount {discountType === 'percentage' ? `(${discount}%)` : '(Fixed)'}</span>
-                            <span className="font-mono">- Rs. {discountAmount.toLocaleString()}</span>
+                            <span>{t('invoice.discount')} {discountType === 'percentage' ? `(${discount}%)` : `(${t('invoice.fixed')})`}</span>
+                            <span className="font-mono">- {t('common.currency')} {discountAmount.toLocaleString()}</span>
                           </div>
                         )}
                         {enableTax && (
                           <div className={`flex justify-between py-2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <span>Tax ({taxRate}%)</span>
-                            <span className="font-mono">Rs. {tax.toFixed(2)}</span>
+                            <span>{t('invoice.tax')} ({taxRate}%)</span>
+                            <span className="font-mono">{t('common.currency')} {tax.toFixed(2)}</span>
                           </div>
                         )}
                         <div className={`flex justify-between py-3 mt-2 border-t-2 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
-                          <span className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Total</span>
-                          <span className="text-xl font-bold text-emerald-500">Rs. {total.toLocaleString()}</span>
+                          <span className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{t('invoice.totalAmount')}</span>
+                          <span className="text-xl font-bold text-emerald-500">{t('common.currency')} {total.toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
@@ -1552,21 +1552,21 @@ export const CreateInvoice: React.FC = () => {
                         paymentMethod === 'bank_transfer' ? 'bg-purple-500/10 text-purple-400' :
                         'bg-amber-500/10 text-amber-400'
                       }`}>
-                        {paymentMethod === 'cash' ? '💵 Cash Payment' :
-                         paymentMethod === 'card' ? '💳 Card Payment' :
-                         paymentMethod === 'bank_transfer' ? '🏦 Bank Transfer' :
-                         '📝 Credit/Due'}
+                        {paymentMethod === 'cash' ? `💵 ${t('invoice.cashPayment')}` :
+                         paymentMethod === 'card' ? `💳 ${t('invoice.cardPayment')}` :
+                         paymentMethod === 'bank_transfer' ? `🏦 ${t('invoice.bankTransferPayment')}` :
+                         `📝 ${t('invoice.creditDue')}`}
                       </div>
                       <div className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
                         paymentMethod === 'credit' ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'
                       }`}>
-                        {paymentMethod === 'credit' ? 'PENDING' : 'PAID'}
+                        {paymentMethod === 'credit' ? t('invoice.pending') : t('invoice.paid')}
                       </div>
                     </div>
 
                     {notes && (
                       <div className={`mt-4 p-3 rounded-lg ${theme === 'dark' ? 'bg-amber-500/5 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
-                        <p className={`text-xs font-semibold mb-1 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-700'}`}>Notes:</p>
+                        <p className={`text-xs font-semibold mb-1 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-700'}`}>{t('invoice.notes')}:</p>
                         <p className={`text-sm ${theme === 'dark' ? 'text-amber-200/70' : 'text-amber-800'}`}>{notes}</p>
                       </div>
                     )}
@@ -1575,7 +1575,7 @@ export const CreateInvoice: React.FC = () => {
                   {/* Invoice Footer */}
                   <div className={`px-6 py-4 ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'} border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                     <p className={`text-center text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                      Thank you for your business! • Cosmos Hardware • 📞 011-2345678
+                      {t('invoice.thankYouMessage')} • Cosmos Hardware • 📞 011-2345678
                     </p>
                   </div>
                 </div>
@@ -1587,7 +1587,7 @@ export const CreateInvoice: React.FC = () => {
                   className="w-full mt-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl shadow-emerald-500/30"
                 >
                   <CheckCircle className="w-6 h-6" />
-                  Complete Invoice & Print
+                  {t('invoice.completeAndPrint')}
                 </button>
               </div>
             </div>
@@ -1609,7 +1609,7 @@ export const CreateInvoice: React.FC = () => {
           }`}
         >
           <ChevronLeft className="w-4 h-4" />
-          Back
+          {t('invoice.previous')}
         </button>
 
         {step < 3 && (
@@ -1621,7 +1621,7 @@ export const CreateInvoice: React.FC = () => {
             disabled={(step === 1 && !canProceedToStep2) || (step === 2 && !canProceedToStep3)}
             className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all shadow-lg shadow-blue-500/20"
           >
-            Continue
+            {t('invoice.next')}
             <ChevronRight className="w-4 h-4" />
           </button>
         )}
@@ -1634,8 +1634,8 @@ export const CreateInvoice: React.FC = () => {
         invoice={createdInvoice}
         customer={isWalkIn ? { 
           id: 'walk-in', 
-          name: 'Walk-in Customer', 
-          businessName: 'Walk-in Customer',
+          name: t('invoice.walkInCustomer'), 
+          businessName: t('invoice.walkInCustomer'),
           email: '',
           phone: '',
           address: '',

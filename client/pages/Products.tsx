@@ -113,7 +113,7 @@ export const Products: React.FC = () => {
 
   const hasActiveFilters = searchQuery || categoryFilter !== 'all' || brandFilter !== 'all' || stockFilter !== 'all';
 
-  const formatPrice = (price: number) => `Rs. ${price.toLocaleString()}`;
+  const formatPrice = (price: number) => `${t('common.currency')} ${price.toLocaleString()}`;
 
   const getStockStatus = (stock: number, minStock?: number) => {
     const threshold = minStock || 10;
@@ -177,7 +177,7 @@ export const Products: React.FC = () => {
             {t('products.title')}
           </h1>
           <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            Manage your product inventory, variants, and pricing
+            {t('products.description')}
           </p>
         </div>
         <button
@@ -198,7 +198,7 @@ export const Products: React.FC = () => {
             </div>
             <div>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{stats.totalProducts}</p>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Total Products</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('products.allProducts')}</p>
             </div>
           </div>
         </div>
@@ -209,7 +209,7 @@ export const Products: React.FC = () => {
             </div>
             <div>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{stats.lowStock}</p>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Low Stock</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('products.lowStock')}</p>
             </div>
           </div>
         </div>
@@ -220,7 +220,7 @@ export const Products: React.FC = () => {
             </div>
             <div>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{stats.outOfStock}</p>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Out of Stock</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('products.outOfStock')}</p>
             </div>
           </div>
         </div>
@@ -230,8 +230,8 @@ export const Products: React.FC = () => {
               <BarChart3 className="w-5 h-5 text-green-400" />
             </div>
             <div>
-              <p className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Rs. {(stats.totalValue / 1000000).toFixed(1)}M</p>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Stock Value</p>
+              <p className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{t('common.currency')} {(stats.totalValue / 1000000).toFixed(1)}M</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('products.stockValue')}</p>
             </div>
           </div>
         </div>
@@ -246,7 +246,7 @@ export const Products: React.FC = () => {
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
               <input
                 type="text"
-                placeholder="Search products..."
+                placeholder={t('filters.searchProducts')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${
@@ -287,7 +287,7 @@ export const Products: React.FC = () => {
                 }`}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                Clear
+                {t('filters.clear')}
               </button>
             )}
           </div>
@@ -298,14 +298,14 @@ export const Products: React.FC = () => {
               <SearchableSelect
                 value={priceDisplay}
                 onValueChange={(value) => setPriceDisplay(value as PriceDisplayMode)}
-                placeholder="Price Display"
+                placeholder={t('filters.priceDisplay')}
                 searchPlaceholder={t('common.search')}
-                emptyMessage="No options found"
+                emptyMessage={t('filters.noOptions')}
                 theme={theme}
                 options={[
-                  { value: 'both', label: 'Both Prices', icon: <DollarSign className="w-4 h-4" /> },
-                  { value: 'retail', label: 'Retail Only', icon: <Tag className="w-4 h-4" /> },
-                  { value: 'wholesale', label: 'Wholesale Only', icon: <Package className="w-4 h-4" /> },
+                  { value: 'both', label: t('filters.bothPrices'), icon: <DollarSign className="w-4 h-4" /> },
+                  { value: 'retail', label: t('filters.retailOnly'), icon: <Tag className="w-4 h-4" /> },
+                  { value: 'wholesale', label: t('filters.wholesaleOnly'), icon: <Package className="w-4 h-4" /> },
                 ]}
               />
             </div>
@@ -354,17 +354,17 @@ export const Products: React.FC = () => {
             {/* Category Filter */}
             <div className="flex-1 min-w-[180px]">
               <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Category
+                {t('filters.category')}
               </label>
               <SearchableSelect
                 value={categoryFilter}
                 onValueChange={(value) => setCategoryFilter(value)}
-                placeholder="All Categories"
+                placeholder={t('filters.allCategories')}
                 searchPlaceholder={t('common.search')}
-                emptyMessage="No categories found"
+                emptyMessage={t('filters.noCategories')}
                 theme={theme}
                 options={[
-                  { value: 'all', label: 'All Categories', count: allCategories.length, icon: <Layers className="w-4 h-4" /> },
+                  { value: 'all', label: t('filters.allCategories'), count: allCategories.length, icon: <Layers className="w-4 h-4" /> },
                   ...allCategories.map(cat => ({
                     value: cat.id,
                     label: `${cat.name}${cat.nameAlt ? ` (${cat.nameAlt})` : ''}`,
@@ -377,17 +377,17 @@ export const Products: React.FC = () => {
             {/* Brand Filter */}
             <div className="flex-1 min-w-[180px]">
               <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Brand
+                {t('filters.brand')}
               </label>
               <SearchableSelect
                 value={brandFilter}
                 onValueChange={(value) => setBrandFilter(value)}
-                placeholder="All Brands"
+                placeholder={t('filters.allBrands')}
                 searchPlaceholder={t('common.search')}
-                emptyMessage="No brands found"
+                emptyMessage={t('filters.noBrands')}
                 theme={theme}
                 options={[
-                  { value: 'all', label: 'All Brands', count: allBrands.length, icon: <Building2 className="w-4 h-4" /> },
+                  { value: 'all', label: t('filters.allBrands'), count: allBrands.length, icon: <Building2 className="w-4 h-4" /> },
                   ...allBrands.map(brand => ({
                     value: brand.id,
                     label: `${brand.name} (${brand.country})`,
@@ -400,20 +400,20 @@ export const Products: React.FC = () => {
             {/* Stock Filter */}
             <div className="flex-1 min-w-[180px]">
               <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Stock Status
+                {t('filters.stockStatus')}
               </label>
               <SearchableSelect
                 value={stockFilter}
                 onValueChange={(value) => setStockFilter(value)}
-                placeholder="All Stock Levels"
+                placeholder={t('filters.allStockLevels')}
                 searchPlaceholder={t('common.search')}
-                emptyMessage="No options found"
+                emptyMessage={t('filters.noOptions')}
                 theme={theme}
                 options={[
-                  { value: 'all', label: 'All Stock Levels', icon: <Box className="w-4 h-4" /> },
-                  { value: 'in', label: 'In Stock', icon: <CheckCircle className="w-4 h-4 text-green-500" /> },
-                  { value: 'low', label: 'Low Stock', icon: <AlertTriangle className="w-4 h-4 text-yellow-500" /> },
-                  { value: 'out', label: 'Out of Stock', icon: <XCircle className="w-4 h-4 text-red-500" /> },
+                  { value: 'all', label: t('filters.allStockLevels'), icon: <Box className="w-4 h-4" /> },
+                  { value: 'in', label: t('products.inStock'), icon: <CheckCircle className="w-4 h-4 text-green-500" /> },
+                  { value: 'low', label: t('products.lowStock'), icon: <AlertTriangle className="w-4 h-4 text-yellow-500" /> },
+                  { value: 'out', label: t('products.outOfStock'), icon: <XCircle className="w-4 h-4 text-red-500" /> },
                 ]}
               />
             </div>
@@ -447,7 +447,7 @@ export const Products: React.FC = () => {
                     </div>
                     {product.isFeatured && (
                       <span className="ml-2 px-2 py-0.5 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full">
-                        Featured
+                        {t('products.featured')}
                       </span>
                     )}
                   </div>
@@ -472,7 +472,7 @@ export const Products: React.FC = () => {
                   {(priceDisplay === 'both' || priceDisplay === 'retail') && (
                     <div className="flex items-center justify-between">
                       <span className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                        Retail Price
+                        {t('products.retailPrice')}
                       </span>
                       <span className="text-lg font-bold text-green-500">
                         {formatPrice(product.retailPrice || product.price || 0)}
@@ -482,7 +482,7 @@ export const Products: React.FC = () => {
                   {(priceDisplay === 'both' || priceDisplay === 'wholesale') && product.wholesalePrice && (
                     <div className="flex items-center justify-between">
                       <span className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                        Wholesale Price
+                        {t('products.wholesalePrice')}
                       </span>
                       <span className="text-lg font-bold text-blue-500">
                         {formatPrice(product.wholesalePrice)}
@@ -492,10 +492,10 @@ export const Products: React.FC = () => {
                   {priceDisplay === 'both' && product.costPrice && (
                     <div className="flex items-center justify-between">
                       <span className={`text-xs ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
-                        Cost: {formatPrice(product.costPrice)}
+                        {t('products.cost')}: {formatPrice(product.costPrice)}
                       </span>
                       <span className={`text-xs ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
-                        Margin: {Math.round(((product.retailPrice || product.price || 0) - product.costPrice) / product.costPrice * 100)}%
+                        {t('products.margin')}: {Math.round(((product.retailPrice || product.price || 0) - product.costPrice) / product.costPrice * 100)}%
                       </span>
                     </div>
                   )}
@@ -541,7 +541,7 @@ export const Products: React.FC = () => {
                       className={`w-full flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${theme === 'dark' ? 'bg-slate-700/50 hover:bg-slate-700' : 'bg-slate-100 hover:bg-slate-200'}`}
                     >
                       <span className={theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
-                        {product.variants.length} Variants Available
+                        {t('products.variantsAvailable', { count: product.variants.length })}
                       </span>
                       <ChevronDown className={`w-4 h-4 transition-transform ${expandedVariants.includes(product.id) ? 'rotate-180' : ''}`} />
                     </button>
@@ -556,14 +556,14 @@ export const Products: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-green-500">{formatPrice(variant.retailPrice)}</span>
                             <span className={`${variant.stock <= (variant.minStock || 5) ? 'text-yellow-500' : ''}`}>
-                              ({variant.stock} in stock)
+                              ({variant.stock} {t('products.inStock')})
                             </span>
                           </div>
                         </div>
                       ))}
                       {product.variants.length > 4 && (
                         <p className={`text-xs text-center ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                          +{product.variants.length - 4} more variants
+                          {t('products.moreVariants', { count: product.variants.length - 4 })}
                         </p>
                       )}
                     </div>
@@ -593,14 +593,14 @@ export const Products: React.FC = () => {
                     className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl transition-colors text-sm font-medium ${theme === 'dark' ? 'text-slate-300 hover:bg-slate-700/50' : 'text-slate-600 hover:bg-slate-100'}`}
                   >
                     <Edit2 className="w-4 h-4" />
-                    Edit
+                    {t('tableHeaders.edit')}
                   </button>
                   <button
                     onClick={() => handleDeleteClick(product)}
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors text-sm font-medium"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Delete
+                    {t('tableHeaders.delete')}
                   </button>
                 </div>
               </div>
@@ -627,14 +627,14 @@ export const Products: React.FC = () => {
               <table className="w-full min-w-[900px]">
                 <thead className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>
                   <tr>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Product</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Brand</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Category</th>
-                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Wholesale</th>
-                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Retail</th>
-                    <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Stock</th>
-                    <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Variants</th>
-                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Actions</th>
+                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.product')}</th>
+                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.brand')}</th>
+                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.category')}</th>
+                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.wholesale')}</th>
+                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.retail')}</th>
+                    <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.stock')}</th>
+                    <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.variants')}</th>
+                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.actions')}</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-200'}`}>
@@ -718,14 +718,14 @@ export const Products: React.FC = () => {
         <div className={`p-12 text-center rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
           <Package className={`w-12 h-12 mx-auto mb-4 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`} />
           <p className={`text-lg ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            No products found
+            {t('products.noProductsFound')}
           </p>
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
               className="mt-4 text-purple-400 hover:text-purple-300 transition-colors text-sm"
             >
-              Clear filters to see all products
+              {t('products.clearFiltersMessage')}
             </button>
           )}
         </div>
@@ -741,8 +741,8 @@ export const Products: React.FC = () => {
 
       <DeleteConfirmationModal
         isOpen={showDeleteModal}
-        title="Delete Product"
-        message="Are you sure you want to delete this product? This action cannot be undone."
+        title={t('modals.deleteProduct')}
+        message={t('modals.deleteProductMessage')}
         itemName={productToDelete?.name}
         onConfirm={handleConfirmDelete}
         onCancel={() => setShowDeleteModal(false)}

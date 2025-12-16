@@ -311,7 +311,7 @@ export const EditInvoice: React.FC = () => {
                 </div>
                 <div>
                   <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    Edit Invoice
+                    {t('invoice.editInvoice')}
                   </h1>
                   <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                     {originalInvoice.invoiceNumber} • Updating invoice details
@@ -338,7 +338,7 @@ export const EditInvoice: React.FC = () => {
               className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20"
             >
               <Save className="w-5 h-5" />
-              Save Changes
+              {t('invoice.saveChanges')}
             </button>
           </div>
         </div>
@@ -981,14 +981,14 @@ export const EditInvoice: React.FC = () => {
               <label className={`block text-sm font-medium mb-2 ${
                 theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
               }`}>
-                Payment Method
+                {t('invoice.paymentMethod')}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { value: 'cash', label: 'Cash', icon: DollarSign, emoji: '💵' },
-                  { value: 'card', label: 'Card', icon: CreditCard, emoji: '💳' },
-                  { value: 'bank_transfer', label: 'Bank', icon: Building2, emoji: '🏦' },
-                  { value: 'credit', label: 'Credit', icon: Receipt, emoji: '📝' }
+                  { value: 'cash', label: t('invoice.cash'), icon: DollarSign, emoji: '💵' },
+                  { value: 'card', label: t('invoice.card'), icon: CreditCard, emoji: '💳' },
+                  { value: 'bank_transfer', label: t('invoice.bankTransfer'), icon: Building2, emoji: '🏦' },
+                  { value: 'credit', label: t('invoice.credit'), icon: Receipt, emoji: '📝' }
                 ].map(({ value, label, icon: Icon, emoji }) => (
                   <button
                     key={value}
@@ -1073,15 +1073,15 @@ export const EditInvoice: React.FC = () => {
                 theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
               }`}>
                 <Percent className="w-4 h-4 text-pink-400" />
-                Overall Discount
+                {t('invoice.overallDiscount')}
               </label>
               <div className="space-y-3">
                 {/* Discount Type Selection */}
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { value: 'none', label: 'None' },
-                    { value: 'percentage', label: '%' },
-                    { value: 'fixed', label: 'Fixed' },
+                    { value: 'none', label: t('invoice.none') },
+                    { value: 'percentage', label: t('invoice.percentage') },
+                    { value: 'fixed', label: t('invoice.fixed') },
                   ].map(({ value, label }) => (
                     <button
                       key={value}
@@ -1142,7 +1142,7 @@ export const EditInvoice: React.FC = () => {
                 theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
               }`}>
                 <Calculator className="w-4 h-4 text-cyan-400" />
-                Tax Settings
+                {t('invoice.taxSettings')}
               </label>
               <div className="space-y-3">
                 {/* Enable Tax Toggle */}
@@ -1163,7 +1163,7 @@ export const EditInvoice: React.FC = () => {
                     </div>
                   </div>
                   <span className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Add Tax
+                    {t('invoice.addTax')}
                   </span>
                 </label>
                 {/* Tax Rate Input */}
@@ -1235,7 +1235,7 @@ export const EditInvoice: React.FC = () => {
                 className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl shadow-emerald-500/30"
               >
                 <Save className="w-6 h-6" />
-                Save Changes
+                {t('invoice.saveChanges')}
               </button>
             </div>
           </div>

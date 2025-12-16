@@ -46,12 +46,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { path: '/categories', icon: FolderTree, label: 'nav.categories', badge: null },
     { path: '/brands', icon: Building, label: 'nav.brands', badge: null },
     { path: '/customers', icon: Users, label: 'nav.customers', badge: '3' },
-    { path: '/financial-reports', icon: TrendingUp, label: 'Financial Reports', badge: null },
+    { path: '/financial-reports', icon: TrendingUp, label: 'nav.financialReports', badge: null },
   ];
 
   const bottomNavItems = [
-    { path: '/settings', icon: Settings, label: 'Settings' },
-    { path: '/help', icon: HelpCircle, label: 'Help Center' },
+    { path: '/settings', icon: Settings, label: 'nav.settings' },
+    { path: '/help', icon: HelpCircle, label: 'nav.helpCenter' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -82,7 +82,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 Hardware<span className="text-orange-500">Pro</span>
               </span>
               <span className={`text-[10px] -mt-0.5 tracking-wider uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                Admin Panel
+                {t('sidebar.adminPanel')}
               </span>
             </div>
           )}
@@ -95,7 +95,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <div className="flex-1 space-y-1">
           {!sidebarCollapsed && (
             <span className={`px-3 text-[10px] font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-              Main Menu
+              {t('sidebar.mainMenu')}
             </span>
           )}
           <div className="mt-2 space-y-1">
@@ -164,7 +164,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <div className="pt-4 space-y-1 border-t border-slate-800/30">
           {!sidebarCollapsed && (
             <span className={`px-3 text-[10px] font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-              Support
+              {t('sidebar.support')}
             </span>
           )}
           <div className="mt-2 space-y-1">
@@ -184,19 +184,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         ? 'text-slate-400 hover:text-white hover:bg-slate-800/50' 
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
-                  title={sidebarCollapsed ? item.label : undefined}
+                  title={sidebarCollapsed ? t(item.label) : undefined}
                 >
                   {active && (
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-orange-500 to-rose-500 rounded-r-full" />
                   )}
                   <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${active ? 'text-orange-500' : ''}`} />
-                  {!sidebarCollapsed && <span>{item.label}</span>}
+                  {!sidebarCollapsed && <span>{t(item.label)}</span>}
                   
                   {sidebarCollapsed && (
                     <div className={`absolute left-full ml-2 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 ${
                       theme === 'dark' ? 'bg-slate-800 text-white shadow-xl' : 'bg-slate-900 text-white shadow-xl'
                     }`}>
-                      {item.label}
+                      {t(item.label)}
                     </div>
                   )}
                 </Link>
@@ -219,7 +219,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               ) : (
                 <>
                   <ChevronLeft className="w-5 h-5" />
-                  <span>Collapse</span>
+                  <span>{t('sidebar.collapse')}</span>
                 </>
               )}
             </button>
@@ -236,14 +236,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-orange-500" />
               <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Pro Features
+                {t('sidebar.proFeatures')}
               </span>
             </div>
             <p className={`text-xs mb-3 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-              Unlock advanced analytics and reports
+              {t('sidebar.proDescription')}
             </p>
             <button className="w-full py-2 px-3 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-orange-500/20">
-              Upgrade Now
+              {t('sidebar.upgradeNow')}
             </button>
           </div>
         )}
@@ -296,7 +296,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 Hardware<span className="text-orange-500">Pro</span>
               </span>
               <span className={`text-[10px] -mt-0.5 tracking-wider uppercase ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                Admin Panel
+                {t('sidebar.adminPanel')}
               </span>
             </div>
           </Link>
@@ -306,7 +306,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <nav className="flex flex-col h-[calc(100%-4rem)] px-3 py-4 overflow-y-auto">
           <div className="flex-1 space-y-1">
             <span className={`px-3 text-[10px] font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-              Main Menu
+              {t('sidebar.mainMenu')}
             </span>
             <div className="mt-2 space-y-1">
               {navItems.map((item) => {
@@ -355,14 +355,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-orange-500" />
               <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Pro Features
+                {t('sidebar.proFeatures')}
               </span>
             </div>
             <p className={`text-xs mb-3 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-              Unlock advanced analytics
+              {t('sidebar.proDescription')}
             </p>
             <button className="w-full py-2 px-3 bg-gradient-to-r from-orange-500 to-rose-500 text-white text-sm font-medium rounded-lg">
-              Upgrade Now
+              {t('sidebar.upgradeNow')}
             </button>
           </div>
         </nav>
@@ -415,7 +415,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <Search className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
                 <input
                   type="text"
-                  placeholder="Search anything..."
+                  placeholder={t('header.searchAnything')}
                   className={`bg-transparent outline-none text-sm w-48 lg:w-64 ${
                     theme === 'dark' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
                   }`}
@@ -438,7 +438,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50' 
                     : 'bg-white border-slate-200 hover:bg-slate-50'
                 }`}
-                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                title={theme === 'dark' ? t('common.switchToLight') : t('common.switchToDark')}
               >
                 <Sun className={`w-4 h-4 text-amber-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ${
                   theme === 'dark' ? 'opacity-0 rotate-90 scale-0' : 'opacity-100 rotate-0 scale-100'
@@ -520,19 +520,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         theme === 'dark' ? 'text-slate-300 hover:bg-slate-700/50' : 'text-slate-700 hover:bg-slate-50'
                       }`}>
                         <User className="w-4 h-4" />
-                        Profile Settings
+                        {t('header.profileSettings')}
                       </button>
                       <button className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                         theme === 'dark' ? 'text-slate-300 hover:bg-slate-700/50' : 'text-slate-700 hover:bg-slate-50'
                       }`}>
                         <Shield className="w-4 h-4" />
-                        Security
+                        {t('header.security')}
                       </button>
                       <button className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                         theme === 'dark' ? 'text-slate-300 hover:bg-slate-700/50' : 'text-slate-700 hover:bg-slate-50'
                       }`}>
                         <TrendingUp className="w-4 h-4" />
-                        Activity Log
+                        {t('header.activityLog')}
                       </button>
                     </div>
                     <div className={`border-t py-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-100'}`}>
@@ -540,7 +540,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         theme === 'dark' ? 'hover:bg-red-500/10' : 'hover:bg-red-50'
                       }`}>
                         <LogOut className="w-4 h-4" />
-                        Sign Out
+                        {t('header.signOut')}
                       </button>
                     </div>
                   </div>

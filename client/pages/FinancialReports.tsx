@@ -176,11 +176,11 @@ export const FinancialReports: React.FC = () => {
     const revenueCount = mockFinancialTransactions.filter(t => t.type === 'revenue').length;
     const expenseCount = mockFinancialTransactions.filter(t => t.type === 'expense').length;
     return [
-      { value: 'all', label: 'All Types', icon: <Filter className="w-4 h-4 text-slate-400" />, count: mockFinancialTransactions.length },
-      { value: 'revenue', label: 'Revenue Only', icon: <TrendingUp className="w-4 h-4 text-emerald-500" />, count: revenueCount },
-      { value: 'expense', label: 'Expense Only', icon: <TrendingDown className="w-4 h-4 text-red-500" />, count: expenseCount },
+      { value: 'all', label: t('financial.allTypes'), icon: <Filter className="w-4 h-4 text-slate-400" />, count: mockFinancialTransactions.length },
+      { value: 'revenue', label: t('financial.revenueType'), icon: <TrendingUp className="w-4 h-4 text-emerald-500" />, count: revenueCount },
+      { value: 'expense', label: t('financial.expenseType'), icon: <TrendingDown className="w-4 h-4 text-red-500" />, count: expenseCount },
     ];
-  }, []);
+  }, [t]);
 
   // Month options for SearchableSelect
   const monthOptions: SearchableSelectOption[] = useMemo(() => {
@@ -744,10 +744,10 @@ export const FinancialReports: React.FC = () => {
   };
 
   const periodLabels = {
-    daily: 'Daily',
-    weekly: 'Weekly',
-    monthly: 'Monthly',
-    yearly: 'Yearly'
+    daily: t('financial.daily'),
+    weekly: t('financial.weekly'),
+    monthly: t('financial.monthly'),
+    yearly: t('financial.yearly')
   };
 
   const getPaymentMethodIcon = (method: string) => {
@@ -762,10 +762,10 @@ export const FinancialReports: React.FC = () => {
 
   const getPaymentMethodLabel = (method: string) => {
     switch (method) {
-      case 'cash': return 'Cash';
-      case 'card': return 'Card';
-      case 'bank_transfer': return 'Bank Transfer';
-      case 'credit': return 'Credit';
+      case 'cash': return t('financial.cash');
+      case 'card': return t('financial.card');
+      case 'bank_transfer': return t('financial.bankTransfer');
+      case 'credit': return t('financial.cheque');
       default: return method;
     }
   };
@@ -777,10 +777,10 @@ export const FinancialReports: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              Financial Reports
+              {t('financial.title')}
             </h1>
             <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-              Track your revenue, expenses, and profit for your hardware business
+              {t('financial.subtitle')}
             </p>
           </div>
           <button
@@ -788,7 +788,7 @@ export const FinancialReports: React.FC = () => {
             className="no-print flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-orange-500/20"
           >
             <Download className="w-4 h-4" />
-            Export PDF
+            {t('financial.exportPdf')}
           </button>
         </div>
 
@@ -818,9 +818,9 @@ export const FinancialReports: React.FC = () => {
                 options={monthOptions}
                 value={selectedMonth.toString()}
                 onValueChange={(val) => setSelectedMonth(parseInt(val))}
-                placeholder="Select Month"
-                searchPlaceholder="Search month..."
-                emptyMessage="No month found."
+                placeholder={t('financial.selectMonth')}
+                searchPlaceholder={t('financial.searchMonth')}
+                emptyMessage={t('financial.noMonthFound')}
                 theme={theme}
               />
             </div>
@@ -830,9 +830,9 @@ export const FinancialReports: React.FC = () => {
                 options={yearOptions}
                 value={selectedYear.toString()}
                 onValueChange={(val) => setSelectedYear(parseInt(val))}
-                placeholder="Select Year"
-                searchPlaceholder="Search year..."
-                emptyMessage="No year found."
+                placeholder={t('financial.selectYear')}
+                searchPlaceholder={t('financial.searchYear')}
+                emptyMessage={t('financial.noYearFound')}
                 theme={theme}
               />
             </div>
@@ -859,7 +859,7 @@ export const FinancialReports: React.FC = () => {
                 </span>
               </div>
               <p className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                Total Revenue
+                {t('financial.revenue')}
               </p>
               <p className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 Rs. {summary.revenue.toLocaleString()}
@@ -883,7 +883,7 @@ export const FinancialReports: React.FC = () => {
                 </span>
               </div>
               <p className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                Total Expenses
+                {t('financial.expenses')}
               </p>
               <p className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 Rs. {summary.expenses.toLocaleString()}
@@ -914,7 +914,7 @@ export const FinancialReports: React.FC = () => {
                 </span>
               </div>
               <p className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                Net Profit
+                {t('financial.profit')}
               </p>
               <p className={`text-3xl font-bold ${
                 summary.profit >= 0
@@ -942,7 +942,7 @@ export const FinancialReports: React.FC = () => {
                 </span>
               </div>
               <p className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                Profit Margin
+                {t('financial.profitMargin')}
               </p>
               <p className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {summary.profitMargin.toFixed(1)}%
@@ -961,7 +961,7 @@ export const FinancialReports: React.FC = () => {
                   <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
                   <input
                     type="text"
-                    placeholder="Search transactions..."
+                    placeholder={t('financial.searchTransactions')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${
@@ -1002,7 +1002,7 @@ export const FinancialReports: React.FC = () => {
                     }`}
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    Clear
+                    {t('financial.clearFilters')}
                   </button>
                 )}
               </div>
@@ -1064,7 +1064,7 @@ export const FinancialReports: React.FC = () => {
             columns={[
               {
                 id: 'date',
-                header: 'Date',
+                header: t('tableHeaders.date'),
                 cell: (transaction) => (
                   <div className="flex items-center gap-2">
                     <Calendar className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
@@ -1076,7 +1076,7 @@ export const FinancialReports: React.FC = () => {
               },
               {
                 id: 'type',
-                header: 'Type',
+                header: t('tableHeaders.type'),
                 cell: (transaction) => (
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
                     transaction.type === 'revenue'
@@ -1084,16 +1084,16 @@ export const FinancialReports: React.FC = () => {
                       : theme === 'dark' ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700'
                   }`}>
                     {transaction.type === 'revenue' ? (
-                      <><TrendingUp className="w-3 h-3" /> Revenue</>
+                      <><TrendingUp className="w-3 h-3" /> {t('financial.revenueType')}</>
                     ) : (
-                      <><TrendingDown className="w-3 h-3" /> Expense</>
+                      <><TrendingDown className="w-3 h-3" /> {t('financial.expenseType')}</>
                     )}
                   </span>
                 ),
               },
               {
                 id: 'category',
-                header: 'Category',
+                header: t('tableHeaders.category'),
                 cell: (transaction) => (
                   <div className="flex items-center gap-2">
                     {getCategoryIcon(transaction.category)}
@@ -1105,7 +1105,7 @@ export const FinancialReports: React.FC = () => {
               },
               {
                 id: 'description',
-                header: 'Description',
+                header: t('tableHeaders.description'),
                 cell: (transaction) => (
                   <span className={`max-w-xs truncate block ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     {transaction.description}
@@ -1114,7 +1114,7 @@ export const FinancialReports: React.FC = () => {
               },
               {
                 id: 'amount',
-                header: 'Amount',
+                header: t('tableHeaders.amount'),
                 headerClassName: 'text-right',
                 className: 'text-right',
                 cell: (transaction) => (
@@ -1129,12 +1129,12 @@ export const FinancialReports: React.FC = () => {
             pageSize={itemsPerPage}
             currentPage={currentPage}
             onPageChange={setCurrentPage}
-            title="Transactions"
+            title={t('financial.transactionHistory')}
             icon={<FileText className={`w-5 h-5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />}
             emptyState={{
               icon: <FileText className="w-12 h-12 opacity-30" />,
-              title: 'No transactions found',
-              description: 'Try adjusting your filters or search query'
+              title: t('financial.noTransactions'),
+              description: t('financial.adjustFilters')
             }}
             theme={theme}
             getRowKey={(row) => row.id}

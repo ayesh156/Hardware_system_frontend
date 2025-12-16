@@ -1,6 +1,7 @@
 import * as React from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // ============================================================================
 // DataTable Types
@@ -69,6 +70,7 @@ export function Pagination({
   showPageNumbers = true,
   maxVisiblePages = 5,
 }: PaginationProps) {
+  const { t } = useLanguage();
   const startItem = totalItems > 0 ? (currentPage - 1) * pageSize + 1 : 0;
   const endItem = Math.min(currentPage * pageSize, totalItems);
 
@@ -123,9 +125,9 @@ export function Pagination({
         "text-sm",
         theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
       )}>
-        Showing <span className={cn("font-semibold", theme === 'dark' ? 'text-orange-400' : 'text-orange-600')}>{startItem}</span> to{' '}
-        <span className={cn("font-semibold", theme === 'dark' ? 'text-orange-400' : 'text-orange-600')}>{endItem}</span> of{' '}
-        <span className={cn("font-semibold", theme === 'dark' ? 'text-white' : 'text-slate-900')}>{totalItems}</span> results
+        {t('pagination.showing')} <span className={cn("font-semibold", theme === 'dark' ? 'text-orange-400' : 'text-orange-600')}>{startItem}</span> {t('pagination.to')}{' '}
+        <span className={cn("font-semibold", theme === 'dark' ? 'text-orange-400' : 'text-orange-600')}>{endItem}</span> {t('pagination.of')}{' '}
+        <span className={cn("font-semibold", theme === 'dark' ? 'text-white' : 'text-slate-900')}>{totalItems}</span> {t('pagination.results')}
       </div>
 
       {/* Pagination controls */}
@@ -140,8 +142,8 @@ export function Pagination({
               ? 'hover:bg-slate-700/80 text-slate-400 hover:text-orange-400 disabled:hover:bg-transparent disabled:hover:text-slate-500'
               : 'hover:bg-slate-200 text-slate-500 hover:text-orange-600 disabled:hover:bg-transparent disabled:hover:text-slate-400'
           )}
-          title="First page"
-          aria-label="Go to first page"
+          title={t('pagination.firstPage')}
+          aria-label={t('pagination.firstPage')}
         >
           <ChevronsLeft className="w-4 h-4" />
         </button>
@@ -156,8 +158,8 @@ export function Pagination({
               ? 'hover:bg-slate-700/80 text-slate-400 hover:text-orange-400 disabled:hover:bg-transparent disabled:hover:text-slate-500'
               : 'hover:bg-slate-200 text-slate-500 hover:text-orange-600 disabled:hover:bg-transparent disabled:hover:text-slate-400'
           )}
-          title="Previous page"
-          aria-label="Go to previous page"
+          title={t('pagination.previousPage')}
+          aria-label={t('pagination.previousPage')}
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -208,8 +210,8 @@ export function Pagination({
               ? 'hover:bg-slate-700/80 text-slate-400 hover:text-orange-400 disabled:hover:bg-transparent disabled:hover:text-slate-500'
               : 'hover:bg-slate-200 text-slate-500 hover:text-orange-600 disabled:hover:bg-transparent disabled:hover:text-slate-400'
           )}
-          title="Next page"
-          aria-label="Go to next page"
+          title={t('pagination.nextPage')}
+          aria-label={t('pagination.nextPage')}
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -224,8 +226,8 @@ export function Pagination({
               ? 'hover:bg-slate-700/80 text-slate-400 hover:text-orange-400 disabled:hover:bg-transparent disabled:hover:text-slate-500'
               : 'hover:bg-slate-200 text-slate-500 hover:text-orange-600 disabled:hover:bg-transparent disabled:hover:text-slate-400'
           )}
-          title="Last page"
-          aria-label="Go to last page"
+          title={t('pagination.lastPage')}
+          aria-label={t('pagination.lastPage')}
         >
           <ChevronsRight className="w-4 h-4" />
         </button>

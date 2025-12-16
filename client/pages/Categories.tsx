@@ -394,13 +394,13 @@ export const Categories: React.FC = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-slate-800 border-slate-700' : ''}>
                     <DropdownMenuItem onClick={() => handleEditCategory(category)}>
-                      <Edit2 className="w-4 h-4 mr-2" /> Edit
+                      <Edit2 className="w-4 h-4 mr-2" /> {t('tableHeaders.edit')}
                     </DropdownMenuItem>
                     <DropdownMenuItem 
                       onClick={() => handleDeleteCategory(category)}
                       className="text-red-500 focus:text-red-500"
                     >
-                      <Trash2 className="w-4 h-4 mr-2" /> Delete
+                      <Trash2 className="w-4 h-4 mr-2" /> {t('tableHeaders.delete')}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -455,19 +455,19 @@ export const Categories: React.FC = () => {
               <tr className={theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50'}>
                 <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>Category</th>
+                }`}>{t('tableHeaders.category')}</th>
                 <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>Sinhala Name</th>
+                }`}>{t('tableHeaders.sinhalaName')}</th>
                 <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>Parent Category</th>
+                }`}>{t('tableHeaders.parentCategory')}</th>
                 <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>Description</th>
+                }`}>{t('tableHeaders.description')}</th>
                 <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>Actions</th>
+                }`}>{t('tableHeaders.actions')}</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-100'}`}>

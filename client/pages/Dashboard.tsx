@@ -27,31 +27,31 @@ export const Dashboard: React.FC = () => {
 
   // Mock chart data for revenue
   const revenueData = [
-    { day: 'Mon', value: 125000 },
-    { day: 'Tue', value: 180000 },
-    { day: 'Wed', value: 150000 },
-    { day: 'Thu', value: 220000 },
-    { day: 'Fri', value: 190000 },
-    { day: 'Sat', value: 280000 },
-    { day: 'Sun', value: 160000 },
+    { day: t('common.days.mon'), value: 125000 },
+    { day: t('common.days.tue'), value: 180000 },
+    { day: t('common.days.wed'), value: 150000 },
+    { day: t('common.days.thu'), value: 220000 },
+    { day: t('common.days.fri'), value: 190000 },
+    { day: t('common.days.sat'), value: 280000 },
+    { day: t('common.days.sun'), value: 160000 },
   ];
   const maxRevenue = Math.max(...revenueData.map(d => d.value));
 
   // Category distribution
   const categoryData = [
-    { name: 'Hardware', value: 45, color: 'from-blue-500 to-cyan-500' },
-    { name: 'Electrical', value: 25, color: 'from-purple-500 to-pink-500' },
-    { name: 'Tools', value: 20, color: 'from-orange-500 to-rose-500' },
-    { name: 'Other', value: 10, color: 'from-emerald-500 to-teal-500' },
+    { name: t('dashboard.categories.hardware'), value: 45, color: 'from-blue-500 to-cyan-500' },
+    { name: t('dashboard.categories.electrical'), value: 25, color: 'from-purple-500 to-pink-500' },
+    { name: t('dashboard.categories.tools'), value: 20, color: 'from-orange-500 to-rose-500' },
+    { name: t('dashboard.categories.other'), value: 10, color: 'from-emerald-500 to-teal-500' },
   ];
 
   // Recent activities
   const recentActivities = [
-    { id: 1, type: 'invoice', message: 'Invoice INV-2024-0156 was paid', time: '2 min ago', icon: CheckCircle, color: 'text-green-500' },
-    { id: 2, type: 'customer', message: 'New customer registered: Kasun Bandara', time: '15 min ago', icon: Users, color: 'text-blue-500' },
-    { id: 3, type: 'stock', message: 'Low stock alert: Cordless Impact Driver', time: '1 hour ago', icon: AlertTriangle, color: 'text-amber-500' },
-    { id: 4, type: 'invoice', message: 'Invoice INV-2024-0155 created', time: '2 hours ago', icon: FileText, color: 'text-purple-500' },
-    { id: 5, type: 'order', message: 'Order #1234 shipped', time: '3 hours ago', icon: Package, color: 'text-cyan-500' },
+    { id: 1, type: 'invoice', message: t('dashboard.activities.invoicePaid', { id: 'INV-2024-0156' }), time: t('common.time.minAgo', { count: 2 }), icon: CheckCircle, color: 'text-green-500' },
+    { id: 2, type: 'customer', message: t('dashboard.activities.newCustomer', { name: 'Kasun Bandara' }), time: t('common.time.minAgo', { count: 15 }), icon: Users, color: 'text-blue-500' },
+    { id: 3, type: 'stock', message: t('dashboard.activities.lowStock', { product: 'Cordless Impact Driver' }), time: t('common.time.hourAgo', { count: 1 }), icon: AlertTriangle, color: 'text-amber-500' },
+    { id: 4, type: 'invoice', message: t('dashboard.activities.invoiceCreated', { id: 'INV-2024-0155' }), time: t('common.time.hoursAgo', { count: 2 }), icon: FileText, color: 'text-purple-500' },
+    { id: 5, type: 'order', message: t('dashboard.activities.orderShipped', { id: '#1234' }), time: t('common.time.hoursAgo', { count: 3 }), icon: Package, color: 'text-cyan-500' },
   ];
 
   // Top customers
@@ -66,7 +66,7 @@ export const Dashboard: React.FC = () => {
             {t('home.dashboard')}
           </h1>
           <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            Welcome back! Here's what's happening with your business.
+            {t('dashboard.welcomeBack')}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -118,14 +118,14 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <p className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-              Total Revenue
+              {t('dashboard.totalRevenue')}
             </p>
             <p className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              Rs. {(totalRevenue / 1000).toFixed(0)}K
+              {t('common.currency')} {(totalRevenue / 1000).toFixed(0)}K
             </p>
             <div className={`mt-3 pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
               <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                Pending: <span className="text-amber-500 font-semibold">Rs. {(pendingRevenue / 1000).toFixed(0)}K</span>
+                {t('dashboard.pending')}: <span className="text-amber-500 font-semibold">{t('common.currency')} {(pendingRevenue / 1000).toFixed(0)}K</span>
               </p>
             </div>
           </div>
@@ -149,7 +149,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <p className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-              Total Invoices
+              {t('dashboard.totalInvoices')}
             </p>
             <p className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
               {mockInvoices.length}
@@ -186,7 +186,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <p className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-              Products
+              {t('dashboard.products')}
             </p>
             <p className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
               {totalProducts}
@@ -195,12 +195,12 @@ export const Dashboard: React.FC = () => {
               {lowStockProducts > 0 ? (
                 <p className="flex items-center gap-1.5 text-xs text-amber-500">
                   <AlertTriangle className="w-3 h-3" />
-                  {lowStockProducts} products low on stock
+                  {lowStockProducts} {t('dashboard.productsLowStock')}
                 </p>
               ) : (
                 <p className="flex items-center gap-1.5 text-xs text-green-500">
                   <CheckCircle className="w-3 h-3" />
-                  All products well stocked
+                  {t('dashboard.allWellStocked')}
                 </p>
               )}
             </div>
@@ -225,14 +225,14 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <p className={`text-sm font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-              Customers
+              {t('dashboard.customers')}
             </p>
             <p className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
               {totalCustomers}
             </p>
             <div className={`mt-3 pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
               <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                Total spent: <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-700'}`}>Rs. {(totalCustomerSpent / 1000000).toFixed(1)}M</span>
+                {t('dashboard.totalSpent')}: <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-700'}`}>{t('common.currency')} {(totalCustomerSpent / 1000000).toFixed(1)}M</span>
               </p>
             </div>
           </div>
@@ -248,10 +248,10 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Revenue Overview
+                {t('dashboard.revenueOverview')}
               </h3>
               <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Weekly revenue performance
+                {t('dashboard.weeklyPerformance')}
               </p>
             </div>
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
@@ -289,21 +289,21 @@ export const Dashboard: React.FC = () => {
             theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
           }`}>
             <div>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>This week</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('dashboard.thisWeek')}</p>
               <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Rs. 1,305,000
+                {t('common.currency')} 1,305,000
               </p>
             </div>
             <div>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Last week</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('dashboard.lastWeek')}</p>
               <p className={`text-lg font-bold ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Rs. 1,132,000
+                {t('common.currency')} 1,132,000
               </p>
             </div>
             <div>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Avg. daily</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('dashboard.avgDaily')}</p>
               <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Rs. 186,400
+                {t('common.currency')} 186,400
               </p>
             </div>
           </div>
@@ -316,10 +316,10 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Sales by Category
+                {t('dashboard.salesByCategory')}
               </h3>
               <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Product distribution
+                {t('dashboard.productDistribution')}
               </p>
             </div>
             <PieChart className={`w-5 h-5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
@@ -358,7 +358,7 @@ export const Dashboard: React.FC = () => {
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {totalProducts}
               </p>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Total</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('dashboard.total')}</p>
             </div>
           </div>
 
@@ -390,16 +390,16 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Recent Activity
+                {t('dashboard.recentActivity')}
               </h3>
               <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Latest updates from your business
+                {t('dashboard.latestUpdates')}
               </p>
             </div>
             <button className={`text-sm font-medium transition-colors ${
               theme === 'dark' ? 'text-orange-400 hover:text-orange-300' : 'text-orange-500 hover:text-orange-600'
             }`}>
-              View all
+              {t('dashboard.viewAll')}
             </button>
           </div>
 
@@ -444,10 +444,10 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Top Customers
+                {t('dashboard.topCustomers')}
               </h3>
               <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                By total spending
+                {t('dashboard.byTotalSpending')}
               </p>
             </div>
             <Award className={`w-5 h-5 text-amber-500`} />
@@ -479,7 +479,7 @@ export const Dashboard: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <p className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    Rs. {(customer.totalSpent / 1000).toFixed(0)}K
+                    {t('common.currency')} {(customer.totalSpent / 1000).toFixed(0)}K
                   </p>
                 </div>
               </div>
@@ -494,7 +494,7 @@ export const Dashboard: React.FC = () => {
                 : 'border-slate-200 hover:bg-slate-50 text-slate-600'
             }`}
           >
-            View all customers
+            {t('dashboard.viewAllCustomers')}
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
@@ -505,7 +505,7 @@ export const Dashboard: React.FC = () => {
         theme === 'dark' ? 'bg-gradient-to-r from-slate-800/50 to-slate-900/50 border-slate-700/50' : 'bg-gradient-to-r from-white to-slate-50 border-slate-200'
       }`}>
         <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-          Quick Actions
+          {t('dashboard.quickActions')}
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Link 
@@ -518,7 +518,7 @@ export const Dashboard: React.FC = () => {
           >
             <FileText className="w-5 h-5 text-blue-500" />
             <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              New Invoice
+              {t('dashboard.newInvoice')}
             </span>
           </Link>
           <Link 
@@ -531,7 +531,7 @@ export const Dashboard: React.FC = () => {
           >
             <Package className="w-5 h-5 text-purple-500" />
             <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              Add Product
+              {t('dashboard.addProduct')}
             </span>
           </Link>
           <Link 
@@ -544,7 +544,7 @@ export const Dashboard: React.FC = () => {
           >
             <Users className="w-5 h-5 text-orange-500" />
             <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              Add Customer
+              {t('dashboard.addCustomer')}
             </span>
           </Link>
           <button 
@@ -556,7 +556,7 @@ export const Dashboard: React.FC = () => {
           >
             <BarChart3 className="w-5 h-5 text-emerald-500" />
             <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              View Reports
+              {t('dashboard.viewReports')}
             </span>
           </button>
         </div>

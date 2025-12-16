@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Invoice, Customer, InvoiceItem } from '../../types/index';
 import { Printer, X, FileText } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Extended invoice item type for discounts and quick add
 interface ExtendedInvoiceItem extends InvoiceItem {
@@ -28,6 +29,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
+  const { t } = useLanguage();
 
   const handlePrint = () => {
     if (!printRef.current || !invoice) return;
@@ -471,7 +473,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
               theme === 'dark' ? 'text-white' : 'text-slate-900'
             }`}>
               <FileText className="w-5 h-5 text-cyan-500" />
-              Print Invoice
+              {t('modals.printInvoice')}
             </DialogTitle>
             <div className="flex items-center gap-2">
               <button
@@ -479,7 +481,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 text-white rounded-lg font-medium transition-all shadow-lg"
               >
                 <Printer className="w-4 h-4" />
-                Print A5
+                {t('invoice.printA5')}
               </button>
               <button
                 onClick={onClose}
