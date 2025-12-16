@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useIsMobile } from '../hooks/use-mobile';
 import { mockBrands, mockProducts } from '../data/mockData';
 import { Brand } from '../types/index';
 import { BrandFormModal } from '../components/modals/BrandFormModal';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { SearchableSelect } from '../components/ui/searchable-select';
+import { Pagination } from '../components/ui/data-table';
 import { 
   Plus, Search, Edit2, Trash2, Building, Package,
   Grid3X3, List, MoreVertical, Globe, Check, X,
@@ -57,6 +59,7 @@ const brandColors = [
 export const Brands: React.FC = () => {
   const { theme } = useTheme();
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   
   const [brands, setBrands] = useState<Brand[]>(mockBrands);
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,6 +70,8 @@ export const Brands: React.FC = () => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
 
   // Get unique countries
   const countries = [...new Set(brands.map(b => b.country))].sort();
@@ -92,6 +97,18 @@ export const Brands: React.FC = () => {
       const comparison = a.name.localeCompare(b.name);
       return sortOrder === 'asc' ? comparison : -comparison;
     });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredBrands.length / pageSize);
+  const paginatedBrands = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredBrands.slice(startIndex, startIndex + pageSize);
+  }, [filteredBrands, currentPage, pageSize]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, countryFilter, statusFilter, sortOrder]);
 
   // Stats
   const totalBrands = brands.length;
@@ -156,7 +173,7 @@ export const Brands: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${isMobile ? 'pb-20' : ''}`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -366,7 +383,7 @@ export const Brands: React.FC = () => {
       {/* Brands Grid/List */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredBrands.map((brand, index) => (
+          {paginatedBrands.map((brand, index) => (
             <div
               key={brand.id}
               className={`group p-4 rounded-xl border transition-all hover:shadow-lg ${
@@ -461,31 +478,32 @@ export const Brands: React.FC = () => {
         <div className={`rounded-xl border overflow-hidden ${
           theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
         }`}>
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr className={theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50'}>
-                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}>Brand</th>
-                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}>Country</th>
-                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}>Description</th>
-                <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider ${
+                <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}>Products</th>
-                <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider ${
+                <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}>Status</th>
-                <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider ${
+                <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}>Actions</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-100'}`}>
-              {filteredBrands.map((brand, index) => (
+              {paginatedBrands.map((brand, index) => (
                 <tr 
                   key={brand.id}
                   className={`transition-colors ${
@@ -561,7 +579,20 @@ export const Brands: React.FC = () => {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
+      )}
+
+      {/* Pagination */}
+      {filteredBrands.length > 0 && totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={filteredBrands.length}
+          pageSize={pageSize}
+          theme={theme}
+        />
       )}
 
       {/* Empty State */}

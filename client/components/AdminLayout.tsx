@@ -46,6 +46,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { path: '/categories', icon: FolderTree, label: 'nav.categories', badge: null },
     { path: '/brands', icon: Building, label: 'nav.brands', badge: null },
     { path: '/customers', icon: Users, label: 'nav.customers', badge: '3' },
+    { path: '/financial-reports', icon: TrendingUp, label: 'Financial Reports', badge: null },
   ];
 
   const bottomNavItems = [
@@ -89,7 +90,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex flex-col h-[calc(100%-4rem)] px-3 py-4">
+      <nav className="flex flex-col h-[calc(100%-4rem)] px-3 py-4 overflow-y-auto">
         {/* Main Navigation */}
         <div className="flex-1 space-y-1">
           {!sidebarCollapsed && (
@@ -169,17 +170,26 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <div className="mt-2 space-y-1">
             {bottomNavItems.map((item) => {
               const Icon = item.icon;
+              const active = isActive(item.path);
               return (
-                <button
+                <Link
                   key={item.path}
+                  to={item.path}
                   className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 ${
-                    theme === 'dark' 
-                      ? 'text-slate-400 hover:text-white hover:bg-slate-800/50' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    active
+                      ? theme === 'dark' 
+                        ? 'bg-gradient-to-r from-orange-500/20 to-rose-500/10 text-orange-400 shadow-lg shadow-orange-500/10' 
+                        : 'bg-gradient-to-r from-orange-500/10 to-rose-500/5 text-orange-600 shadow-lg shadow-orange-500/10'
+                      : theme === 'dark' 
+                        ? 'text-slate-400 hover:text-white hover:bg-slate-800/50' 
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                   title={sidebarCollapsed ? item.label : undefined}
                 >
-                  <Icon className="w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110" />
+                  {active && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-orange-500 to-rose-500 rounded-r-full" />
+                  )}
+                  <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${active ? 'text-orange-500' : ''}`} />
                   {!sidebarCollapsed && <span>{item.label}</span>}
                   
                   {sidebarCollapsed && (
@@ -189,7 +199,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       {item.label}
                     </div>
                   )}
-                </button>
+                </Link>
               );
             })}
           </div>
@@ -293,7 +303,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex flex-col h-[calc(100%-4rem)] px-3 py-4">
+        <nav className="flex flex-col h-[calc(100%-4rem)] px-3 py-4 overflow-y-auto">
           <div className="flex-1 space-y-1">
             <span className={`px-3 text-[10px] font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
               Main Menu

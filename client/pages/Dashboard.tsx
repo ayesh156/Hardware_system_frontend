@@ -6,7 +6,7 @@ import { mockInvoices, mockProducts, mockCustomers } from '../data/mockData';
 import { 
   Package, FileText, Users, TrendingUp, ArrowRight, ArrowUpRight, ArrowDownRight,
   DollarSign, ShoppingCart, Clock, AlertTriangle, CheckCircle, Eye, Calendar,
-  Activity, Zap, Target, Award, BarChart3, PieChart, Layers, RefreshCw
+  Activity, Award, BarChart3, PieChart, Layers, RefreshCw
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {

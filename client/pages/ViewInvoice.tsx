@@ -138,7 +138,10 @@ export const ViewInvoice: React.FC = () => {
   const paymentMethod = paymentMethodConfig[invoice.paymentMethod || 'cash'];
   const PaymentIcon = paymentMethod.icon;
 
-  const discountAmount = invoice.discount ? (invoice.subtotal * invoice.discount) / 100 : 0;
+  // Calculate discount amount based on type
+  const discountAmount = invoice.discountType === 'percentage' 
+    ? (invoice.subtotal * (invoice.discountValue || invoice.discount || 0)) / 100 
+    : (invoice.discountValue || invoice.discount || 0);
 
   return (
     <div className={`min-h-screen p-6 ${theme === 'dark' ? 'bg-slate-900' : 'bg-slate-50'}`}>
@@ -459,18 +462,26 @@ export const ViewInvoice: React.FC = () => {
                         Rs. {invoice.subtotal.toLocaleString()}
                       </span>
                     </div>
-                    {invoice.discount && invoice.discount > 0 && (
+                    {discountAmount > 0 && (
                       <div className="flex justify-between text-pink-400">
-                        <span>Discount ({invoice.discount}%)</span>
+                        <span>
+                          Discount {invoice.discountType === 'percentage' 
+                            ? `(${invoice.discountValue || invoice.discount}%)` 
+                            : '(Fixed)'}
+                        </span>
                         <span className="font-mono">- Rs. {discountAmount.toLocaleString()}</span>
                       </div>
                     )}
-                    <div className="flex justify-between">
-                      <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Tax</span>
-                      <span className={`font-mono ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                        Rs. {invoice.tax.toLocaleString()}
-                      </span>
-                    </div>
+                    {(invoice.enableTax || invoice.tax > 0) && (
+                      <div className="flex justify-between">
+                        <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>
+                          Tax {invoice.taxRate ? `(${invoice.taxRate}%)` : ''}
+                        </span>
+                        <span className={`font-mono ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                          Rs. {invoice.tax.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                     <div className={`flex justify-between pt-4 mt-2 border-t ${
                       theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
                     }`}>

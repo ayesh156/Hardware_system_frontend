@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIsMobile } from '../hooks/use-mobile';
 import { mockInvoices, mockCustomers, mockProducts } from '../data/mockData';
 import { Customer, Product, Invoice, InvoiceItem } from '../types/index';
 import {
@@ -14,7 +15,7 @@ import {
 // Extended Invoice Item with discount tracking
 interface ExtendedInvoiceItem extends InvoiceItem {
   originalPrice: number;
-  discountType?: 'percentage' | 'fixed' | null;
+  discountType?: 'percentage' | 'fixed';
   discountValue?: number;
   isCustomPrice?: boolean;
   isQuickAdd?: boolean;
@@ -25,6 +26,7 @@ export const EditInvoice: React.FC = () => {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   
   const [customers] = useState<Customer[]>(mockCustomers);
   const [products] = useState<Product[]>(mockProducts);
@@ -41,6 +43,9 @@ export const EditInvoice: React.FC = () => {
   const [issueDate, setIssueDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [enableTax, setEnableTax] = useState<boolean>(false);
+  const [taxRate, setTaxRate] = useState<number>(15);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'bank_transfer' | 'credit'>('cash');
   const [status, setStatus] = useState<'paid' | 'pending' | 'overdue' | 'cancelled'>('pending');
   const [notes, setNotes] = useState('');
@@ -51,7 +56,7 @@ export const EditInvoice: React.FC = () => {
   const [quantity, setQuantity] = useState<number>(1);
   const [priceMode, setPriceMode] = useState<'auto' | 'retail' | 'wholesale' | 'custom'>('auto');
   const [customPrice, setCustomPrice] = useState<number>(0);
-  const [itemDiscountType, setItemDiscountType] = useState<'percentage' | 'fixed' | null>(null);
+  const [itemDiscountType, setItemDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
   const [itemDiscountValue, setItemDiscountValue] = useState<number>(0);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddName, setQuickAddName] = useState('');
@@ -65,7 +70,10 @@ export const EditInvoice: React.FC = () => {
       setIsWalkIn(originalInvoice.customerId === 'walk-in');
       setIssueDate(originalInvoice.issueDate);
       setDueDate(originalInvoice.dueDate);
-      setDiscount(originalInvoice.discount || 0);
+      setDiscount(originalInvoice.discountValue || originalInvoice.discount || 0);
+      setDiscountType(originalInvoice.discountType || 'none');
+      setEnableTax(originalInvoice.enableTax || false);
+      setTaxRate(originalInvoice.taxRate || 15);
       setPaymentMethod(originalInvoice.paymentMethod || 'cash');
       setStatus(originalInvoice.status);
       setNotes(originalInvoice.notes || '');
@@ -120,7 +128,7 @@ export const EditInvoice: React.FC = () => {
   };
 
   const calculateFinalPrice = (basePrice: number): number => {
-    if (!itemDiscountType || itemDiscountValue === 0) return basePrice;
+    if (itemDiscountType === 'none' || itemDiscountValue === 0) return basePrice;
     
     if (itemDiscountType === 'percentage') {
       return basePrice - (basePrice * itemDiscountValue / 100);
@@ -142,8 +150,8 @@ export const EditInvoice: React.FC = () => {
       unitPrice: finalPrice,
       total: finalPrice * quantity,
       originalPrice: basePrice,
-      discountType: itemDiscountType,
-      discountValue: itemDiscountType ? itemDiscountValue : undefined,
+      discountType: itemDiscountType !== 'none' ? itemDiscountType : undefined,
+      discountValue: itemDiscountType !== 'none' ? itemDiscountValue : undefined,
       isCustomPrice: priceMode === 'custom',
       isQuickAdd: false
     };
@@ -156,7 +164,7 @@ export const EditInvoice: React.FC = () => {
     setQuantity(1);
     setPriceMode('auto');
     setCustomPrice(0);
-    setItemDiscountType(null);
+    setItemDiscountType('none');
     setItemDiscountValue(0);
   };
 
@@ -202,11 +210,11 @@ export const EditInvoice: React.FC = () => {
   }, [items]);
 
   const discountAmount = useMemo(() => {
-    return (subtotal * discount) / 100;
-  }, [subtotal, discount]);
+    return discountType === 'none' ? 0 : (discountType === 'percentage' ? (subtotal * discount) / 100 : discount);
+  }, [subtotal, discount, discountType]);
 
   const afterDiscount = subtotal - discountAmount;
-  const tax = afterDiscount * 0.15; // 15% tax
+  const tax = enableTax ? afterDiscount * (taxRate / 100) : 0;
   const total = afterDiscount + tax;
 
   const handleSave = () => {
@@ -228,7 +236,11 @@ export const EditInvoice: React.FC = () => {
         total: item.total
       })),
       subtotal,
-      discount,
+      discount: discountType !== 'none' ? parseFloat(discountAmount.toFixed(2)) : 0,
+      discountType,
+      discountValue: discount,
+      enableTax,
+      taxRate: enableTax ? taxRate : 0,
       tax: parseFloat(tax.toFixed(2)),
       total: parseFloat(total.toFixed(2)),
       issueDate,
@@ -277,7 +289,7 @@ export const EditInvoice: React.FC = () => {
   const availableStock = selectedProduct?.stock || 0;
 
   return (
-    <div className={`min-h-screen p-6 ${theme === 'dark' ? 'bg-slate-900' : 'bg-slate-50'}`}>
+    <div className={`min-h-screen p-6 ${isMobile ? 'pb-24' : ''} ${theme === 'dark' ? 'bg-slate-900' : 'bg-slate-50'}`}>
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-6">
         <div className="flex items-center justify-between">
@@ -556,154 +568,224 @@ export const EditInvoice: React.FC = () => {
                   </div>
 
                   {/* Price Mode Selection */}
-                  <div className="grid grid-cols-4 gap-2 mb-3">
-                    {[
-                      { value: 'auto', label: 'Auto', icon: Calculator },
-                      { value: 'retail', label: 'Retail', icon: Tag },
-                      { value: 'wholesale', label: 'Wholesale', icon: Box },
-                      { value: 'custom', label: 'Custom', icon: Edit3 }
-                    ].map(({ value, label, icon: Icon }) => (
+                  <div className="mb-4">
+                    <label className={`block text-xs font-medium mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Price Mode
+                    </label>
+                    <div className="flex flex-wrap gap-2">
                       <button
-                        key={value}
-                        onClick={() => setPriceMode(value as any)}
-                        className={`p-2 rounded-lg border-2 transition-all flex flex-col items-center gap-1 ${
-                          priceMode === value
-                            ? 'border-blue-500 bg-blue-500/10'
-                            : theme === 'dark'
-                            ? 'border-slate-700 hover:border-slate-600'
-                            : 'border-slate-200 hover:border-slate-300'
+                        onClick={() => setPriceMode('auto')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          priceMode === 'auto'
+                            ? 'bg-cyan-500 text-white'
+                            : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                         }`}
                       >
-                        <Icon className={`w-4 h-4 ${
-                          priceMode === value ? 'text-blue-400' : theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                        }`} />
-                        <span className={`text-xs font-medium ${
-                          priceMode === value ? 'text-blue-400' : theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                        }`}>
-                          {label}
-                        </span>
+                        Auto ({currentCustomer?.customerType === 'wholesale' ? 'Wholesale' : 'Retail'})
                       </button>
-                    ))}
+                      <button
+                        onClick={() => setPriceMode('retail')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          priceMode === 'retail'
+                            ? 'bg-emerald-500 text-white'
+                            : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        Retail: Rs. {(selectedProduct.retailPrice || selectedProduct.price || 0).toLocaleString()}
+                      </button>
+                      {selectedProduct.wholesalePrice && (
+                        <button
+                          onClick={() => setPriceMode('wholesale')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            priceMode === 'wholesale'
+                              ? 'bg-purple-500 text-white'
+                              : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          Wholesale: Rs. {selectedProduct.wholesalePrice.toLocaleString()}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setPriceMode('custom')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          priceMode === 'custom'
+                            ? 'bg-amber-500 text-white'
+                            : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        <Edit3 className="w-3 h-3 inline mr-1" />
+                        Custom
+                      </button>
+                    </div>
                   </div>
 
+                  {/* Custom Price Input */}
                   {priceMode === 'custom' && (
-                    <div className="mb-3">
-                      <input
-                        type="number"
-                        placeholder="Enter custom price"
-                        value={customPrice || ''}
-                        onChange={(e) => setCustomPrice(parseFloat(e.target.value) || 0)}
-                        className={`w-full px-3 py-2 border rounded-lg ${
-                          theme === 'dark'
-                            ? 'border-slate-600 bg-slate-700 text-white'
-                            : 'border-slate-200 bg-white text-slate-900'
-                        }`}
-                      />
-                    </div>
-                  )}
-
-                  {/* Item Discount */}
-                  <div className="mb-3">
-                    <label className={`block text-sm font-medium mb-2 ${
-                      theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                    }`}>
-                      Item Discount (Optional)
-                    </label>
-                    <div className="flex gap-2">
-                      <select
-                        value={itemDiscountType || ''}
-                        onChange={(e) => setItemDiscountType(e.target.value as any || null)}
-                        className={`px-3 py-2 border rounded-lg ${
-                          theme === 'dark'
-                            ? 'border-slate-600 bg-slate-700 text-white'
-                            : 'border-slate-200 bg-white text-slate-900'
-                        }`}
-                      >
-                        <option value="">No Discount</option>
-                        <option value="percentage">Percentage %</option>
-                        <option value="fixed">Fixed Rs.</option>
-                      </select>
-                      {itemDiscountType && (
+                    <div className="mb-4">
+                      <label className={`block text-xs font-medium mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Custom Price
+                      </label>
+                      <div className="relative">
+                        <span className={`absolute left-3 top-2.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Rs.</span>
                         <input
                           type="number"
-                          placeholder={itemDiscountType === 'percentage' ? '0-100' : 'Amount'}
-                          value={itemDiscountValue || ''}
-                          onChange={(e) => setItemDiscountValue(parseFloat(e.target.value) || 0)}
-                          className={`flex-1 px-3 py-2 border rounded-lg ${
+                          value={customPrice || ''}
+                          onChange={(e) => setCustomPrice(parseFloat(e.target.value) || 0)}
+                          className={`w-full pl-10 pr-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 ${
                             theme === 'dark'
-                              ? 'border-slate-600 bg-slate-700 text-white'
+                              ? 'border-slate-600 bg-slate-800 text-white'
                               : 'border-slate-200 bg-white text-slate-900'
                           }`}
                         />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Quantity */}
-                  <div className="mb-4">
-                    <label className={`block text-sm font-medium mb-2 ${
-                      theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                    }`}>
-                      Quantity
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max={availableStock}
-                      value={quantity}
-                      onChange={(e) => setQuantity(Math.min(availableStock, Math.max(1, parseInt(e.target.value) || 1)))}
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        theme === 'dark'
-                          ? 'border-slate-600 bg-slate-700 text-white'
-                          : 'border-slate-200 bg-white text-slate-900'
-                      }`}
-                    />
-                  </div>
-
-                  {/* Price Calculation Display */}
-                  <div className={`p-3 rounded-lg mb-3 ${
-                    theme === 'dark' ? 'bg-slate-700' : 'bg-white'
-                  }`}>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Base Price:</span>
-                        <span className={theme === 'dark' ? 'text-white' : 'text-slate-900'}>
-                          Rs. {basePrice.toLocaleString()}
-                        </span>
                       </div>
-                      {itemDiscountType && itemDiscountValue > 0 && (
-                        <div className="flex justify-between text-pink-400">
-                          <span>Discount:</span>
-                          <span>
-                            - Rs. {(basePrice - finalItemPrice).toLocaleString()}
-                          </span>
+                    </div>
+                  )}
+
+                  {/* Item Discount (for paint, etc.) */}
+                  {priceMode !== 'custom' && (
+                    <div className="mb-4">
+                      <label className={`block text-xs font-medium mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Item Discount (optional)
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setItemDiscountType('none')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            itemDiscountType === 'none'
+                              ? 'bg-slate-500 text-white'
+                              : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          None
+                        </button>
+                        <button
+                          onClick={() => setItemDiscountType('percentage')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
+                            itemDiscountType === 'percentage'
+                              ? 'bg-pink-500 text-white'
+                              : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          <Percent className="w-3 h-3" />
+                          Percentage
+                        </button>
+                        <button
+                          onClick={() => setItemDiscountType('fixed')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
+                            itemDiscountType === 'fixed'
+                              ? 'bg-pink-500 text-white'
+                              : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          <Tag className="w-3 h-3" />
+                          Fixed Amount
+                        </button>
+                      </div>
+                      {itemDiscountType !== 'none' && (
+                        <div className="mt-2 relative">
+                          {itemDiscountType === 'fixed' && (
+                            <span className={`absolute left-3 top-2.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Rs.</span>
+                          )}
+                          <input
+                            type="number"
+                            placeholder={itemDiscountType === 'percentage' ? 'Discount %' : 'Discount amount'}
+                            value={itemDiscountValue || ''}
+                            onChange={(e) => setItemDiscountValue(parseFloat(e.target.value) || 0)}
+                            className={`w-full ${itemDiscountType === 'fixed' ? 'pl-10' : 'pl-4'} pr-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 ${
+                              theme === 'dark'
+                                ? 'border-slate-600 bg-slate-800 text-white placeholder-slate-500'
+                                : 'border-slate-200 bg-white text-slate-900 placeholder-slate-400'
+                            }`}
+                          />
+                          {itemDiscountType === 'percentage' && (
+                            <span className={`absolute right-3 top-2.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>%</span>
+                          )}
                         </div>
                       )}
-                      <div className="flex justify-between">
-                        <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>
-                          Final Price × {quantity}:
-                        </span>
-                        <span className={theme === 'dark' ? 'text-white' : 'text-slate-900'}>
-                          Rs. {finalItemPrice.toLocaleString()} × {quantity}
-                        </span>
-                      </div>
-                      <div className={`flex justify-between pt-2 mt-2 border-t ${
-                        theme === 'dark' ? 'border-slate-600' : 'border-slate-200'
+                    </div>
+                  )}
+
+                  {/* Price Calculation Preview */}
+                  {(() => {
+                    const hasDiscount = itemDiscountType !== 'none' && itemDiscountValue > 0;
+                    
+                    return (
+                      <div className={`p-3 rounded-xl mb-4 ${
+                        theme === 'dark' ? 'bg-slate-900/50' : 'bg-white'
                       }`}>
-                        <span className="font-bold text-emerald-400">Item Total:</span>
-                        <span className="font-bold text-emerald-400">Rs. {itemTotal.toLocaleString()}</span>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {priceMode === 'custom' ? 'Custom Price' : `${priceMode === 'auto' ? (currentCustomer?.customerType === 'wholesale' ? 'Wholesale' : 'Retail') : priceMode.charAt(0).toUpperCase() + priceMode.slice(1)} Price`}
+                          </span>
+                          <span className={`text-sm ${hasDiscount ? 'line-through text-slate-500' : 'font-medium ' + (theme === 'dark' ? 'text-white' : 'text-slate-900')}`}>
+                            Rs. {basePrice.toLocaleString()}
+                          </span>
+                        </div>
+                        {hasDiscount && priceMode !== 'custom' && (
+                          <>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className={`text-xs text-pink-400`}>
+                                Discount ({itemDiscountType === 'percentage' ? `${itemDiscountValue}%` : `Rs. ${itemDiscountValue}`})
+                              </span>
+                              <span className="text-sm text-pink-400">
+                                - Rs. {(basePrice - finalItemPrice).toLocaleString()}
+                              </span>
+                            </div>
+                            <div className={`border-t pt-1 mt-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                              <div className="flex items-center justify-between">
+                                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                  Final Unit Price
+                                </span>
+                                <span className="text-sm font-bold text-emerald-500">
+                                  Rs. {finalItemPrice.toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        <div className={`flex items-center justify-between mt-2 pt-2 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                          <span className={`text-sm font-medium flex items-center gap-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                            <Calculator className="w-3.5 h-3.5" />
+                            Total ({quantity} × Rs. {finalItemPrice.toLocaleString()})
+                          </span>
+                          <span className="text-lg font-bold text-emerald-500">
+                            Rs. {itemTotal.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Quantity & Add */}
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="1"
+                          max={availableStock}
+                          value={quantity}
+                          onChange={(e) => setQuantity(Math.min(parseInt(e.target.value) || 1, availableStock))}
+                          className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-center text-lg font-bold ${
+                            theme === 'dark'
+                              ? 'border-slate-600 bg-slate-800 text-white'
+                              : 'border-slate-200 bg-white text-slate-900'
+                          }`}
+                        />
+                        <span className={`absolute right-3 top-3.5 text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                          / {availableStock}
+                        </span>
                       </div>
                     </div>
+                    <button
+                      onClick={addItem}
+                      disabled={quantity <= 0 || quantity > availableStock || (priceMode === 'custom' && customPrice <= 0)}
+                      className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium flex items-center gap-2 transition-all shadow-lg shadow-cyan-500/20"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Add to Cart
+                    </button>
                   </div>
-
-                  <button
-                    onClick={addItem}
-                    disabled={quantity > availableStock || (priceMode === 'custom' && customPrice <= 0)}
-                    className="w-full py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Add to Invoice
-                  </button>
                 </div>
               )}
             </div>
@@ -987,30 +1069,125 @@ export const EditInvoice: React.FC = () => {
             <div className={`p-3 rounded-lg mb-4 ${
               theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
             }`}>
-              <label className={`block text-sm font-medium mb-2 flex items-center gap-2 ${
+              <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${
                 theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
               }`}>
                 <Percent className="w-4 h-4 text-pink-400" />
                 Overall Discount
               </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={discount}
-                  onChange={(e) => setDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                  className={`w-24 px-3 py-2 border rounded-lg text-center ${
-                    theme === 'dark'
-                      ? 'border-slate-600 bg-slate-700 text-white'
-                      : 'border-slate-200 bg-white text-slate-900'
-                  }`}
-                />
-                <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>%</span>
-                {discountAmount > 0 && (
-                  <span className="text-pink-400 font-medium text-sm">
-                    - Rs. {discountAmount.toLocaleString()}
+              <div className="space-y-3">
+                {/* Discount Type Selection */}
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'none', label: 'None' },
+                    { value: 'percentage', label: '%' },
+                    { value: 'fixed', label: 'Fixed' },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      onClick={() => {
+                        setDiscountType(value as typeof discountType);
+                        if (value === 'none') setDiscount(0);
+                      }}
+                      className={`p-2 rounded-lg border-2 text-center transition-all ${
+                        discountType === value
+                          ? 'border-pink-500 bg-pink-500/10 text-pink-400'
+                          : theme === 'dark' ? 'border-slate-700 hover:border-slate-600 text-slate-400' : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                      }`}
+                    >
+                      <span className="text-xs font-medium">{label}</span>
+                    </button>
+                  ))}
+                </div>
+                {/* Discount Value Input */}
+                {discountType !== 'none' && (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min="0"
+                      max={discountType === 'percentage' ? 100 : subtotal}
+                      value={discount}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        if (discountType === 'percentage') {
+                          setDiscount(Math.min(100, Math.max(0, val)));
+                        } else {
+                          setDiscount(Math.min(subtotal, Math.max(0, val)));
+                        }
+                      }}
+                      className={`w-24 px-3 py-2 border rounded-lg text-center ${
+                        theme === 'dark'
+                          ? 'border-slate-600 bg-slate-700 text-white'
+                          : 'border-slate-200 bg-white text-slate-900'
+                      }`}
+                    />
+                    <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>
+                      {discountType === 'percentage' ? '%' : 'Rs.'}
+                    </span>
+                    {discountAmount > 0 && (
+                      <span className="text-pink-400 font-medium text-sm">
+                        - Rs. {discountAmount.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Tax Settings */}
+            <div className={`p-3 rounded-lg mb-4 ${
+              theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
+            }`}>
+              <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${
+                theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+              }`}>
+                <Calculator className="w-4 h-4 text-cyan-400" />
+                Tax Settings
+              </label>
+              <div className="space-y-3">
+                {/* Enable Tax Toggle */}
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={enableTax}
+                      onChange={(e) => setEnableTax(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={`w-10 h-5 rounded-full transition-colors ${
+                      enableTax ? 'bg-cyan-500' : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'
+                    }`}>
+                      <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md transform transition-transform ${
+                        enableTax ? 'translate-x-5' : 'translate-x-0'
+                      }`} />
+                    </div>
+                  </div>
+                  <span className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Add Tax
                   </span>
+                </label>
+                {/* Tax Rate Input */}
+                {enableTax && (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={taxRate}
+                      onChange={(e) => setTaxRate(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                      className={`w-20 px-3 py-2 text-center border rounded-lg ${
+                        theme === 'dark'
+                          ? 'border-slate-600 bg-slate-700 text-white'
+                          : 'border-slate-200 bg-white text-slate-900'
+                      }`}
+                    />
+                    <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>%</span>
+                    {tax > 0 && (
+                      <span className="text-cyan-400 font-medium text-sm">
+                        + Rs. {tax.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -1020,7 +1197,7 @@ export const EditInvoice: React.FC = () => {
             }`}>
               {discountAmount > 0 && (
                 <div className="flex justify-between text-sm text-pink-400">
-                  <span>Discount ({discount}%)</span>
+                  <span>Discount {discountType === 'percentage' ? `(${discount}%)` : '(Fixed)'}</span>
                   <span className="font-mono">- Rs. {discountAmount.toLocaleString()}</span>
                 </div>
               )}
@@ -1030,12 +1207,14 @@ export const EditInvoice: React.FC = () => {
                   Rs. {afterDiscount.toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Tax (15%)</span>
-                <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                  Rs. {tax.toFixed(2)}
-                </span>
-              </div>
+              {enableTax && (
+                <div className="flex justify-between text-sm">
+                  <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Tax ({taxRate}%)</span>
+                  <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    Rs. {tax.toFixed(2)}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className={`mt-4 pt-4 border-t ${

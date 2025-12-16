@@ -94,7 +94,7 @@ export interface Product {
   stock: number;
   minStock?: number;      // Reorder level alert
   maxStock?: number;
-  unit?: 'piece' | 'kg' | 'g' | 'meter' | 'feet' | 'liter' | 'bag' | 'box' | 'pack' | 'roll' | 'sheet' | 'pair' | 'set' | 'sqft' | 'sqm' | 'bundle';
+  unit?: 'piece' | 'kg' | 'g' | 'meter' | 'feet' | 'liter' | 'bag' | 'box' | 'pack' | 'roll' | 'sheet' | 'pair' | 'set' | 'sqft' | 'sqm' | 'bundle' | 'cube';
   
   // Product Attributes
   sizes?: string[];       // Available sizes
@@ -146,6 +146,10 @@ export interface Invoice {
   items: InvoiceItem[];
   subtotal: number;
   discount?: number;
+  discountType?: 'percentage' | 'fixed' | 'none';
+  discountValue?: number;
+  enableTax?: boolean;
+  taxRate?: number;
   tax: number;
   total: number;
   issueDate: string;

@@ -2,12 +2,14 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIsMobile } from '../hooks/use-mobile';
 import { mockInvoices, mockProducts, mockCustomers } from '../data/mockData';
 import { Package, FileText, Users, TrendingUp, ArrowRight, Zap, Shield, BarChart3 } from 'lucide-react';
 
 export const Index: React.FC = () => {
   const { t } = useLanguage();
   const { theme } = useTheme();
+  const isMobile = useIsMobile();
 
   const features = [
     {
@@ -46,7 +48,7 @@ export const Index: React.FC = () => {
   const lowStockProducts = mockProducts.filter((p) => p.stock < 50).length;
 
   return (
-    <div className="space-y-20">
+    <div className={`space-y-20 ${isMobile ? 'pb-20' : ''}`}>
       {/* Hero Section */}
       <section className="relative pt-10 pb-16">
         {/* Decorative elements */}
@@ -262,22 +264,22 @@ export const Index: React.FC = () => {
 
         <div className={`rounded-2xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[700px]">
               <thead>
                 <tr className={`border-b ${theme === 'dark' ? 'border-slate-700/50 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
-                  <th className={`px-6 py-4 text-left text-sm font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <th className={`px-6 py-4 text-left text-sm font-semibold whitespace-nowrap ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
                     {t('invoices.invoiceNumber')}
                   </th>
-                  <th className={`px-6 py-4 text-left text-sm font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <th className={`px-6 py-4 text-left text-sm font-semibold whitespace-nowrap ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
                     {t('invoices.customer')}
                   </th>
-                  <th className={`px-6 py-4 text-left text-sm font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <th className={`px-6 py-4 text-left text-sm font-semibold whitespace-nowrap ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
                     {t('invoices.totalAmount')}
                   </th>
-                  <th className={`px-6 py-4 text-left text-sm font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <th className={`px-6 py-4 text-left text-sm font-semibold whitespace-nowrap ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
                     {t('common.status')}
                   </th>
-                  <th className={`px-6 py-4 text-left text-sm font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <th className={`px-6 py-4 text-left text-sm font-semibold whitespace-nowrap ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
                     {t('invoices.dueDate')}
                   </th>
                 </tr>

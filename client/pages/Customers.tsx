@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { mockCustomers } from '../data/mockData';
@@ -27,7 +27,9 @@ import {
   Clock,
   TrendingUp,
   X,
-  Banknote
+  Banknote,
+  SortAsc,
+  SortDesc
 } from 'lucide-react';
 import { Customer, CustomerType } from '../types/index';
 import { CustomerFormModal } from '../components/modals/CustomerFormModal';
@@ -35,6 +37,7 @@ import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmation
 import { CustomerDetailsModal } from '../components/modals/CustomerDetailsModal';
 import { useIsMobile } from '../hooks/use-mobile';
 import { SearchableSelect } from '../components/ui/searchable-select';
+import { Pagination } from '../components/ui/data-table';
 
 type ViewMode = 'grid' | 'table';
 type LoanFilter = 'all' | 'no-loan' | 'has-loan' | 'overdue';
@@ -58,6 +61,9 @@ export const Customers: React.FC = () => {
   const [loanFilter, setLoanFilter] = useState<LoanFilter>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const pageSize = 12;
 
   // Check if a customer's loan is overdue
   const isLoanOverdue = (customer: Customer) => {
@@ -81,7 +87,7 @@ export const Customers: React.FC = () => {
   }, [customers]);
 
   const filteredCustomers = useMemo(() => {
-    return customers.filter((customer) => {
+    const filtered = customers.filter((customer) => {
       // Search filter
       const matchesSearch =
         customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -105,7 +111,25 @@ export const Customers: React.FC = () => {
       
       return matchesSearch && matchesType && matchesLoan && matchesStatus;
     });
-  }, [customers, searchQuery, customerTypeFilter, loanFilter, statusFilter]);
+
+    // Apply sorting
+    return filtered.sort((a, b) => {
+      const comparison = a.name.localeCompare(b.name);
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [customers, searchQuery, customerTypeFilter, loanFilter, statusFilter, sortOrder]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredCustomers.length / pageSize);
+  const paginatedCustomers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredCustomers.slice(startIndex, startIndex + pageSize);
+  }, [filteredCustomers, currentPage, pageSize]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, customerTypeFilter, loanFilter, statusFilter]);
 
   const handleAddCustomer = () => {
     setSelectedCustomer(null);
@@ -184,50 +208,24 @@ export const Customers: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${isMobile ? 'pb-20' : ''}`}>
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-orange-500/10 rounded-xl flex items-center justify-center">
-              <Users className="w-5 h-5 text-orange-400" />
-            </div>
-            <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              {t('customers.title')}
-            </h1>
-          </div>
-          <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>
+          <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            {t('customers.title')}
+          </h1>
+          <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             {t('customers.allCustomers')} ({filteredCustomers.length})
           </p>
         </div>
-        
-        {/* View Mode Toggle - Desktop Only */}
-        {!isMobile && (
-          <div className={`flex items-center gap-1 p-1 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                viewMode === 'grid'
-                  ? 'bg-orange-500 text-white shadow-md'
-                  : theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-              {t('common.grid')}
-            </button>
-            <button
-              onClick={() => setViewMode('table')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                viewMode === 'table'
-                  ? 'bg-orange-500 text-white shadow-md'
-                  : theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <List className="w-4 h-4" />
-              {t('common.table')}
-            </button>
-          </div>
-        )}
+        <button
+          onClick={handleAddCustomer}
+          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-orange-500/20"
+        >
+          <Plus className="w-4 h-4" />
+          {t('customers.addCustomer')}
+        </button>
       </div>
 
       {/* Stats Cards */}
@@ -287,9 +285,9 @@ export const Customers: React.FC = () => {
 
       {/* Toolbar */}
       <div className={`flex flex-col gap-4 p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col md:flex-row gap-4 items-center">
           {/* Search */}
-          <div className="flex-1 relative">
+          <div className="flex-1 relative w-full">
             <Search className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
             <input
               type="text"
@@ -321,14 +319,57 @@ export const Customers: React.FC = () => {
             <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
           </button>
 
-          {/* Add Button */}
+          {/* Clear Filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors border ${
+                theme === 'dark' ? 'border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700' : 'border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <X className="w-4 h-4" />
+              {t('common.clearFilters')}
+            </button>
+          )}
+
+          {/* Sort Button */}
           <button
-            onClick={handleAddCustomer}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-orange-500/20"
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all border ${
+              theme === 'dark' 
+                ? 'border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-700' 
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            {t('customers.addCustomer')}
+            {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+            {t('common.sort')}
           </button>
+
+          {/* View Mode Toggle */}
+          {!isMobile && (
+            <div className={`flex items-center gap-1 p-1 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-100 border border-slate-200'}`}>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  viewMode === 'grid'
+                    ? 'bg-orange-500 text-white shadow-md'
+                    : theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  viewMode === 'table'
+                    ? 'bg-orange-500 text-white shadow-md'
+                    : theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Expanded Filters */}
@@ -395,21 +436,6 @@ export const Customers: React.FC = () => {
                 ]}
               />
             </div>
-
-            {/* Clear Filters */}
-            {hasActiveFilters && (
-              <div className="flex items-end">
-                <button
-                  onClick={clearFilters}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    theme === 'dark' ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <X className="w-4 h-4" />
-                  {t('common.clearFilters')}
-                </button>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -420,7 +446,7 @@ export const Customers: React.FC = () => {
           {/* Grid View */}
           {(isMobile || viewMode === 'grid') && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredCustomers.map((customer, index) => {
+              {paginatedCustomers.map((customer, index) => {
                 const typeBadge = getCustomerTypeBadge(customer.customerType);
                 const TypeIcon = typeBadge.icon;
                 const overdue = isLoanOverdue(customer);
@@ -604,6 +630,18 @@ export const Customers: React.FC = () => {
             </div>
           )}
 
+          {/* Pagination for Grid View */}
+          {(isMobile || viewMode === 'grid') && totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={filteredCustomers.length}
+              pageSize={pageSize}
+              theme={theme}
+            />
+          )}
+
           {/* Table View - Desktop Only */}
           {!isMobile && viewMode === 'table' && (
             <div className={`rounded-2xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
@@ -647,7 +685,7 @@ export const Customers: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/30' : 'divide-slate-200'}`}>
-                    {filteredCustomers.map((customer) => {
+                    {paginatedCustomers.map((customer) => {
                       const typeBadge = getCustomerTypeBadge(customer.customerType);
                       const TypeIcon = typeBadge.icon;
                       const overdue = isLoanOverdue(customer);
@@ -792,6 +830,18 @@ export const Customers: React.FC = () => {
                 </table>
               </div>
             </div>
+          )}
+
+          {/* Pagination for Table View */}
+          {!isMobile && viewMode === 'table' && totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={filteredCustomers.length}
+              pageSize={pageSize}
+              theme={theme}
+            />
           )}
         </>
       ) : (

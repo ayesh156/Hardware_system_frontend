@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useIsMobile } from '../hooks/use-mobile';
 import { mockCategories, mockProducts } from '../data/mockData';
 import { Category } from '../types/index';
 import { CategoryFormModal } from '../components/modals/CategoryFormModal';
@@ -8,6 +9,7 @@ import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmation
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '../components/ui/searchable-select';
+import { Pagination } from '../components/ui/data-table';
 import { 
   Plus, Search, Edit2, Trash2, FolderTree, Package,
   Grid3X3, List, MoreVertical, Building2, Layers,
@@ -51,6 +53,7 @@ const categoryColors = [
 export const Categories: React.FC = () => {
   const { theme } = useTheme();
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   
   const [categories, setCategories] = useState<Category[]>(mockCategories);
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,6 +64,8 @@ export const Categories: React.FC = () => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
 
   // Get main categories for parent filter
   const mainCategories = useMemo(() => categories.filter(c => !c.parentId), [categories]);
@@ -92,6 +97,18 @@ export const Categories: React.FC = () => {
       const comparison = a.name.localeCompare(b.name);
       return sortOrder === 'asc' ? comparison : -comparison;
     });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredCategories.length / pageSize);
+  const paginatedCategories = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredCategories.slice(startIndex, startIndex + pageSize);
+  }, [filteredCategories, currentPage, pageSize]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, typeFilter, parentFilter, sortOrder]);
 
   // Stats
   const totalCategories = categories.length;
@@ -144,7 +161,7 @@ export const Categories: React.FC = () => {
   const getColorIndex = (index: number) => index % categoryColors.length;
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${isMobile ? 'pb-20' : ''}`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -354,7 +371,7 @@ export const Categories: React.FC = () => {
       {/* Categories Grid/List */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredCategories.map((category, index) => (
+          {paginatedCategories.map((category, index) => (
             <div
               key={category.id}
               className={`group p-4 rounded-xl border transition-all hover:shadow-lg ${
@@ -432,28 +449,29 @@ export const Categories: React.FC = () => {
         <div className={`rounded-xl border overflow-hidden ${
           theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
         }`}>
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr className={theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50'}>
-                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}>Category</th>
-                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}>Sinhala Name</th>
-                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}>Parent Category</th>
-                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
+                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}>Description</th>
-                <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider ${
+                <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}>Actions</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-100'}`}>
-              {filteredCategories.map((category, index) => (
+              {paginatedCategories.map((category, index) => (
                 <tr 
                   key={category.id}
                   className={`transition-colors ${
@@ -521,7 +539,20 @@ export const Categories: React.FC = () => {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
+      )}
+
+      {/* Pagination */}
+      {filteredCategories.length > 0 && totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={filteredCategories.length}
+          pageSize={pageSize}
+          theme={theme}
+        />
       )}
 
       {/* Empty State */}

@@ -148,6 +148,24 @@ export const translations = {
       memberSince: 'Member Since',
       daysActive: 'Days Active',
     },
+    // Settings
+    settings: {
+      title: 'Settings',
+      businessInfo: 'Business Info',
+      invoiceSettings: 'Invoice Settings',
+      notifications: 'Notifications',
+      appearance: 'Appearance',
+      dataBackup: 'Data & Backup',
+      save: 'Save Changes',
+      saved: 'Saved!',
+    },
+    // Help
+    help: {
+      title: 'Help Center',
+      searchHelp: 'Search for help...',
+      faq: 'Frequently Asked Questions',
+      contactSupport: 'Contact Support',
+    },
   },
   si: {
     // Navigation
@@ -295,6 +313,24 @@ export const translations = {
       addFirstCustomer: 'ආරම්භ කිරීමට ඔබේ පළමු පාරිභෝගිකයා එක් කරන්න',
       memberSince: 'සාමාජිකත්වය',
       daysActive: 'සක්‍රිය දින',
+    },
+    // Settings
+    settings: {
+      title: 'සැකසුම්',
+      businessInfo: 'ව්‍යාපාර තොරතුරු',
+      invoiceSettings: 'ගිණුම්පත් සැකසුම්',
+      notifications: 'දැනුම්දීම්',
+      appearance: 'පෙනුම',
+      dataBackup: 'දත්ත සහ උපස්ථ',
+      save: 'වෙනස්කම් සුරකින්න',
+      saved: 'සුරකින ලදී!',
+    },
+    // Help
+    help: {
+      title: 'උදව් මධ්‍යස්ථානය',
+      searchHelp: 'උදව් සොයන්න...',
+      faq: 'නිතර අසන ප්‍රශ්න',
+      contactSupport: 'සහාය අමතන්න',
     },
   },
 };

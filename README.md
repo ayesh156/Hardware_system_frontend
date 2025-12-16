@@ -5,11 +5,12 @@
 <h1 align="center">🔧 HardwarePro Enterprise Suite</h1>
 
 <p align="center">
-  <strong>A modern, enterprise-grade hardware business management system</strong>
+  <strong>A modern, enterprise-grade hardware business management system designed for Sri Lankan hardware stores</strong>
 </p>
 
 <p align="center">
   <a href="#features">Features</a> •
+  <a href="#sri-lankan-focus">Sri Lankan Focus</a> •
   <a href="#demo">Demo</a> •
   <a href="#installation">Installation</a> •
   <a href="#tech-stack">Tech Stack</a> •
@@ -80,7 +81,64 @@
       </ul>
     </td>
   </tr>
+  <tr>
+    <td width="50%">
+      <h3>📊 Financial Reports</h3>
+      <ul>
+        <li>Revenue & expense tracking</li>
+        <li>Profit/loss analysis</li>
+        <li>Category-wise sales breakdown</li>
+        <li>Visual charts & graphs</li>
+        <li>Exportable reports</li>
+      </ul>
+    </td>
+    <td width="50%">
+      <h3>⚙️ Settings & Configuration</h3>
+      <ul>
+        <li>Business information setup</li>
+        <li>Invoice customization</li>
+        <li>Notification preferences</li>
+        <li>Data backup & export</li>
+        <li>Theme & language settings</li>
+      </ul>
+    </td>
+  </tr>
 </table>
+
+---
+
+## 🇱🇰 Sri Lankan Focus
+
+This application is specifically designed for the Sri Lankan hardware market with support for:
+
+### Local Brands
+| Category | Supported Brands |
+|----------|------------------|
+| **Cement** | INSEE, Tokyo Cement, Holcim, Lanwa, Ultra Tech |
+| **Steel & Metal** | Lanwa, Melwa |
+| **Paint** | Nippon Paint, Dulux, Asian Paints, Multilac |
+| **Electrical** | Kelani Cables, ACL Cables, Orange Electric, Anchor |
+| **Plumbing** | National PVC, Ashoka |
+| **Tools** | Bosch, Makita, Stanley, DeWalt |
+
+### Product Categories (English & සිංහල)
+- Building Materials (ගොඩනැගිලි ද්‍රව්‍ය)
+- Steel & Metal (වානේ සහ ලෝහ)
+- Electrical (විදුලි උපකරණ)
+- Plumbing (නල කාර්මික)
+- Power Tools (විදුලි මෙවලම්)
+- Paint & Finishing (තීන්ත සහ නිම කිරීම)
+- Hardware & Fasteners (දෘඪාංග සහ තාප්ප)
+- Wood & Timber (ලී බඩු)
+- Roofing Materials (වහල ද්‍රව්‍ය)
+- Safety Equipment (ආරක්ෂක උපකරණ)
+
+### Business Features
+- **NIC/BR Support** - Customer identification
+- **Multi-Phone Support** - Multiple contact numbers per customer
+- **Credit System** - Credit limits and loan balance tracking for trusted customers
+- **Customer Types** - Regular, Wholesale, Credit customers
+- **Bilingual Interface** - Full English and Sinhala (සිංහල) support
 
 ---
 

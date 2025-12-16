@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIsMobile } from '../hooks/use-mobile';
 import { mockCustomers, mockProducts } from '../data/mockData';
 import { Customer, Product, Invoice, InvoiceItem } from '../types/index';
 import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
@@ -27,6 +28,7 @@ export const CreateInvoice: React.FC = () => {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   
   const [customers] = useState<Customer[]>(mockCustomers);
   const [products] = useState<Product[]>(mockProducts);
@@ -40,6 +42,9 @@ export const CreateInvoice: React.FC = () => {
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [discount, setDiscount] = useState<number>(0);
+  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [enableTax, setEnableTax] = useState<boolean>(false);
+  const [taxRate, setTaxRate] = useState<number>(15);
   
   // Enhanced pricing state
   const [priceMode, setPriceMode] = useState<'auto' | 'wholesale' | 'retail' | 'custom'>('auto');
@@ -224,9 +229,9 @@ export const CreateInvoice: React.FC = () => {
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  const discountAmount = (subtotal * discount) / 100;
+  const discountAmount = discountType === 'none' ? 0 : (discountType === 'percentage' ? (subtotal * discount) / 100 : discount);
   const taxableAmount = subtotal - discountAmount;
-  const tax = taxableAmount * 0.15; // 15% tax
+  const tax = enableTax ? taxableAmount * (taxRate / 100) : 0;
   const total = taxableAmount + tax;
 
   const handleCreateInvoice = () => {
@@ -243,7 +248,11 @@ export const CreateInvoice: React.FC = () => {
       customerName,
       items,
       subtotal: Math.round(subtotal * 100) / 100,
-      discount: Math.round(discountAmount * 100) / 100,
+      discount: discountType !== 'none' ? Math.round(discountAmount * 100) / 100 : 0,
+      discountType,
+      discountValue: discount,
+      enableTax,
+      taxRate: enableTax ? taxRate : 0,
       tax: Math.round(tax * 100) / 100,
       total: Math.round(total * 100) / 100,
       issueDate,
@@ -286,7 +295,7 @@ export const CreateInvoice: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${isMobile ? 'mb-20' : ''}`}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -1271,24 +1280,117 @@ export const CreateInvoice: React.FC = () => {
                     <Percent className="w-4 h-4 text-pink-400" />
                     Overall Discount
                   </h4>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={discount}
-                      onChange={(e) => setDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                      className={`w-24 px-3 py-2 text-center border rounded-lg ${
-                        theme === 'dark'
-                          ? 'border-slate-600 bg-slate-800 text-white'
-                          : 'border-slate-200 bg-slate-50 text-slate-900'
-                      }`}
-                    />
-                    <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>%</span>
-                    {discountAmount > 0 && (
-                      <span className="text-pink-400 font-medium">
-                        - Rs. {discountAmount.toLocaleString()}
+                  <div className="space-y-3">
+                    {/* Discount Type Selection */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { value: 'none', label: 'None' },
+                        { value: 'percentage', label: '%' },
+                        { value: 'fixed', label: 'Fixed' },
+                      ].map(({ value, label }) => (
+                        <button
+                          key={value}
+                          onClick={() => {
+                            setDiscountType(value as typeof discountType);
+                            if (value === 'none') setDiscount(0);
+                          }}
+                          className={`p-2 rounded-lg border-2 text-center transition-all ${
+                            discountType === value
+                              ? 'border-pink-500 bg-pink-500/10 text-pink-400'
+                              : theme === 'dark' ? 'border-slate-700 hover:border-slate-600 text-slate-400' : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                          }`}
+                        >
+                          <span className="text-sm font-medium">{label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {/* Discount Value Input */}
+                    {discountType !== 'none' && (
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          min="0"
+                          max={discountType === 'percentage' ? 100 : subtotal}
+                          value={discount}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            if (discountType === 'percentage') {
+                              setDiscount(Math.min(100, Math.max(0, val)));
+                            } else {
+                              setDiscount(Math.min(subtotal, Math.max(0, val)));
+                            }
+                          }}
+                          className={`w-28 px-3 py-2 text-center border rounded-lg ${
+                            theme === 'dark'
+                              ? 'border-slate-600 bg-slate-800 text-white'
+                              : 'border-slate-200 bg-slate-50 text-slate-900'
+                          }`}
+                        />
+                        <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>
+                          {discountType === 'percentage' ? '%' : 'Rs.'}
+                        </span>
+                        {discountAmount > 0 && (
+                          <span className="text-pink-400 font-medium">
+                            - Rs. {discountAmount.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tax Settings */}
+                <div className={`p-4 rounded-xl border ${
+                  theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
+                }`}>
+                  <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <Calculator className="w-4 h-4 text-cyan-400" />
+                    Tax Settings
+                  </h4>
+                  <div className="space-y-3">
+                    {/* Enable Tax Toggle */}
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={enableTax}
+                          onChange={(e) => setEnableTax(e.target.checked)}
+                          className="sr-only"
+                        />
+                        <div className={`w-11 h-6 rounded-full transition-colors ${
+                          enableTax ? 'bg-cyan-500' : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'
+                        }`}>
+                          <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
+                            enableTax ? 'translate-x-5' : 'translate-x-0'
+                          }`} />
+                        </div>
+                      </div>
+                      <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Add Tax
                       </span>
+                    </label>
+                    {/* Tax Rate Input */}
+                    {enableTax && (
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={taxRate}
+                          onChange={(e) => setTaxRate(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                          className={`w-20 px-3 py-2 text-center border rounded-lg ${
+                            theme === 'dark'
+                              ? 'border-slate-600 bg-slate-800 text-white'
+                              : 'border-slate-200 bg-slate-50 text-slate-900'
+                          }`}
+                        />
+                        <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>%</span>
+                        {tax > 0 && (
+                          <span className="text-cyan-400 font-medium">
+                            + Rs. {tax.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1297,7 +1399,7 @@ export const CreateInvoice: React.FC = () => {
                 <div className={`p-4 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
-                  <label className={`block text-sm font-medium mb-2 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <FileText className="w-4 h-4 text-slate-400" />
                     Notes (Optional)
                   </label>
@@ -1425,14 +1527,16 @@ export const CreateInvoice: React.FC = () => {
                         </div>
                         {discountAmount > 0 && (
                           <div className="flex justify-between py-2 text-sm text-pink-400">
-                            <span>Discount ({discount}%)</span>
+                            <span>Discount {discountType === 'percentage' ? `(${discount}%)` : '(Fixed)'}</span>
                             <span className="font-mono">- Rs. {discountAmount.toLocaleString()}</span>
                           </div>
                         )}
-                        <div className={`flex justify-between py-2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                          <span>Tax (15%)</span>
-                          <span className="font-mono">Rs. {tax.toFixed(2)}</span>
-                        </div>
+                        {enableTax && (
+                          <div className={`flex justify-between py-2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Tax ({taxRate}%)</span>
+                            <span className="font-mono">Rs. {tax.toFixed(2)}</span>
+                          </div>
+                        )}
                         <div className={`flex justify-between py-3 mt-2 border-t-2 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                           <span className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Total</span>
                           <span className="text-xl font-bold text-emerald-500">Rs. {total.toLocaleString()}</span>

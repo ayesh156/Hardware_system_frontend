@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -6,13 +6,14 @@ import { mockInvoices, mockCustomers, mockProducts } from '../data/mockData';
 import { 
   FileText, Search, Plus, Eye, Edit2, Trash2, Printer, Calendar, User, Receipt, 
   Clock, CheckCircle, AlertTriangle, XCircle, Filter, Grid, List, RefreshCw,
-  TrendingUp, CreditCard, Building2
+  TrendingUp, CreditCard, Building2, SortAsc, SortDesc, ChevronDown
 } from 'lucide-react';
 import { Invoice } from '../types/index';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
 import { useIsMobile } from '../hooks/use-mobile';
 import { SearchableSelect } from '../components/ui/searchable-select';
+import { Pagination } from '../components/ui/data-table';
 
 type ViewMode = 'grid' | 'table';
 
@@ -33,6 +34,10 @@ export const Invoices: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showFilters, setShowFilters] = useState(false);
+  const pageSize = 10;
 
   // Get unique customers from invoices
   const invoiceCustomers = useMemo(() => {
@@ -42,7 +47,7 @@ export const Invoices: React.FC = () => {
 
   // Filter invoices
   const filteredInvoices = useMemo(() => {
-    return invoices.filter((invoice) => {
+    const filtered = invoices.filter((invoice) => {
       const matchesSearch =
         invoice.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         invoice.customerName.toLowerCase().includes(searchQuery.toLowerCase());
@@ -78,7 +83,26 @@ export const Invoices: React.FC = () => {
       
       return matchesSearch && matchesStatus && matchesCustomer && matchesDate;
     });
-  }, [invoices, searchQuery, statusFilter, customerFilter, dateFilter]);
+
+    // Apply sorting by date
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.issueDate).getTime();
+      const dateB = new Date(b.issueDate).getTime();
+      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+    });
+  }, [invoices, searchQuery, statusFilter, customerFilter, dateFilter, sortOrder]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredInvoices.length / pageSize);
+  const paginatedInvoices = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredInvoices.slice(startIndex, startIndex + pageSize);
+  }, [filteredInvoices, currentPage, pageSize]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, customerFilter, dateFilter]);
 
   // Stats
   const stats = useMemo(() => {
@@ -151,25 +175,20 @@ export const Invoices: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${isMobile ? 'pb-20' : ''}`}>
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center">
-              <FileText className="w-5 h-5 text-blue-400" />
-            </div>
-            <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              {t('invoices.title')}
-            </h1>
-          </div>
-          <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>
+          <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            {t('invoices.title')}
+          </h1>
+          <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             Manage your invoices, track payments, and view sales history
           </p>
         </div>
         <button
           onClick={() => navigate('/invoices/create')}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-blue-500/20"
+          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-orange-500/20"
         >
           <Plus className="w-4 h-4" />
           {t('invoices.addInvoice')}
@@ -224,37 +243,108 @@ export const Invoices: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters & Toolbar */}
-      <div className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
-        <div className="flex flex-col gap-4">
-          {/* Search and View Mode */}
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+      {/* Toolbar */}
+      <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+          <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
+            {/* Search */}
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
               <input
                 type="text"
-                placeholder="Search by invoice number or customer..."
+                placeholder="Search invoices..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500' : 'border-slate-200 bg-white text-slate-900 placeholder-slate-400'}`}
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${
+                  theme === 'dark' 
+                    ? 'bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500' 
+                    : 'bg-slate-50 border-slate-200'
+                }`}
               />
             </div>
-            <div className={`flex rounded-xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
-              <button onClick={() => setViewMode('grid')} className={`p-2.5 transition-colors ${viewMode === 'grid' ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-slate-800/50 text-slate-400 hover:bg-slate-700' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
+
+            {/* Filter Toggle */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all border ${
+                hasActiveFilters
+                  ? 'bg-orange-500 text-white border-orange-500'
+                  : theme === 'dark' 
+                    ? 'border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-700' 
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              {t('common.filter')}
+              {hasActiveFilters && (
+                <span className="w-5 h-5 bg-white/20 rounded-full text-xs flex items-center justify-center">
+                  {[statusFilter !== 'all', customerFilter !== 'all', dateFilter !== 'all'].filter(Boolean).length}
+                </span>
+              )}
+              <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Clear Filters */}
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  theme === 'dark' ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Clear
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Sort Button */}
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className={`p-2 rounded-lg border transition-colors ${
+                theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+            </button>
+
+            {/* View Mode Toggle */}
+            <div className={`flex items-center rounded-lg border p-1 ${
+              theme === 'dark' ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'
+            }`}>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === 'grid' 
+                    ? 'bg-orange-500 text-white' 
+                    : theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
                 <Grid className="w-4 h-4" />
               </button>
-              <button onClick={() => setViewMode('table')} className={`p-2.5 transition-colors ${viewMode === 'table' ? 'bg-blue-500 text-white' : theme === 'dark' ? 'bg-slate-800/50 text-slate-400 hover:bg-slate-700' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === 'table' 
+                    ? 'bg-orange-500 text-white' 
+                    : theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
                 <List className="w-4 h-4" />
               </button>
             </div>
           </div>
-          {/* Filters */}
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <Filter className="w-4 h-4" />
-              <span>Filters:</span>
-            </div>
-            <div className="min-w-[140px]">
+        </div>
+
+        {/* Expanded Filters */}
+        {showFilters && (
+          <div className={`flex flex-wrap gap-4 pt-4 mt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+            {/* Status Filter */}
+            <div className="flex-1 min-w-[150px]">
+              <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                Status
+              </label>
               <SearchableSelect
                 value={statusFilter}
                 onValueChange={(value) => setStatusFilter(value)}
@@ -270,7 +360,12 @@ export const Invoices: React.FC = () => {
                 ]}
               />
             </div>
-            <div className="min-w-[160px]">
+
+            {/* Customer Filter */}
+            <div className="flex-1 min-w-[180px]">
+              <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                Customer
+              </label>
               <SearchableSelect
                 value={customerFilter}
                 onValueChange={(value) => setCustomerFilter(value)}
@@ -284,7 +379,12 @@ export const Invoices: React.FC = () => {
                 ]}
               />
             </div>
-            <div className="min-w-[140px]">
+
+            {/* Date Filter */}
+            <div className="flex-1 min-w-[150px]">
+              <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                Time Period
+              </label>
               <SearchableSelect
                 value={dateFilter}
                 onValueChange={(value) => setDateFilter(value)}
@@ -300,25 +400,17 @@ export const Invoices: React.FC = () => {
                 ]}
               />
             </div>
-            {hasActiveFilters && (
-              <button onClick={clearFilters} className="flex items-center gap-1.5 px-3 py-2 text-sm text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors">
-                <RefreshCw className="w-3.5 h-3.5" />
-                Clear
-              </button>
-            )}
-            <div className={`ml-auto text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-              {filteredInvoices.length} of {invoices.length}
-            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Invoices Display */}
       {filteredInvoices.length > 0 ? (
-        viewMode === 'grid' || isMobile ? (
+        viewMode === 'grid' ? (
           /* Grid/Card View */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredInvoices.map((invoice) => (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {paginatedInvoices.map((invoice) => (
               <div
                 key={invoice.id}
                 className={`group rounded-2xl border overflow-hidden transition-all duration-300 ${
@@ -393,24 +485,38 @@ export const Invoices: React.FC = () => {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+            {/* Pagination for Grid View */}
+            {totalPages > 1 && (
+              <div className={`mt-4 rounded-2xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalItems={filteredInvoices.length}
+                  pageSize={pageSize}
+                  theme={theme}
+                />
+              </div>
+            )}
+          </>
         ) : (
           /* Table View */
           <div className={`rounded-2xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[800px]">
                 <thead className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>
                   <tr>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Invoice</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Customer</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Date</th>
-                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Amount</th>
-                    <th className={`px-4 py-3 text-center text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Status</th>
-                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Actions</th>
+                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Invoice</th>
+                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Customer</th>
+                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Date</th>
+                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Amount</th>
+                    <th className={`px-4 py-3 text-center text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Status</th>
+                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Actions</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-200'}`}>
-                  {filteredInvoices.map((invoice) => (
+                  {paginatedInvoices.map((invoice) => (
                     <tr key={invoice.id} className={theme === 'dark' ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'}>
                       <td className="px-4 py-3">
                         <button onClick={() => navigate(`/invoices/${invoice.id}`)} className={`font-mono font-bold text-sm ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}>
@@ -447,6 +553,17 @@ export const Invoices: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            {/* Pagination for Table View */}
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={filteredInvoices.length}
+                pageSize={pageSize}
+                theme={theme}
+              />
+            )}
           </div>
         )
       ) : (
