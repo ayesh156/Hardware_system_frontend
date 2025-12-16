@@ -82,12 +82,14 @@ export const InvoiceWizardModal: React.FC<InvoiceWizardModalProps> = ({
     const product = products.find((p) => p.id === selectedProductId);
     if (!product) return;
 
+    const unitPrice = product.retailPrice || product.price || 0;
     const newItem: InvoiceItem = {
       id: `item-${Date.now()}`,
       productId: product.id,
       productName: product.name,
       quantity,
-      unitPrice: product.price,
+      unitPrice,
+      total: quantity * unitPrice,
     };
 
     const existingItem = items.find((i) => i.productId === selectedProductId);
@@ -95,7 +97,7 @@ export const InvoiceWizardModal: React.FC<InvoiceWizardModalProps> = ({
       setItems(
         items.map((i) =>
           i.productId === selectedProductId
-            ? { ...i, quantity: i.quantity + quantity }
+            ? { ...i, quantity: i.quantity + quantity, total: (i.quantity + quantity) * i.unitPrice }
             : i
         )
       );
@@ -359,7 +361,7 @@ export const InvoiceWizardModal: React.FC<InvoiceWizardModalProps> = ({
                           </div>
                           <div className="text-right">
                             <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                              Rs. {p.price.toLocaleString()}
+                              Rs. {(p.retailPrice || p.price || 0).toLocaleString()}
                             </p>
                             <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Stock: {p.stock}</p>
                           </div>

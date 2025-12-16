@@ -364,7 +364,7 @@ export const Index: React.FC = () => {
                 <div>
                   <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Price</p>
                   <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    Rs. {product.price.toLocaleString()}
+                    Rs. {(product.retailPrice || product.price || 0).toLocaleString()}
                   </p>
                 </div>
                 <div className="text-right">

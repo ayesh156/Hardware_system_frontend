@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Invoice, Customer, Product, InvoiceItem } from '../../types/index';
 import { X, Plus, Trash2, Search, Save, Calendar, User, FileText } from 'lucide-react';
+import { SearchableSelect } from '../ui/searchable-select';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface InvoiceEditModalProps {
   isOpen: boolean;
@@ -20,6 +23,8 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   products,
   onSave,
 }) => {
+  const { theme } = useTheme();
+  const { t } = useLanguage();
   const [editedInvoice, setEditedInvoice] = useState<Invoice | null>(null);
   const [productSearch, setProductSearch] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -69,12 +74,14 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
     const product = products.find((p) => p.id === selectedProductId);
     if (!product) return;
 
+    const unitPrice = product.retailPrice || product.price || 0;
     const newItem: InvoiceItem = {
       id: `item-${Date.now()}`,
       productId: product.id,
       productName: product.name,
       quantity,
-      unitPrice: product.price,
+      unitPrice,
+      total: quantity * unitPrice,
     };
 
     const existingItemIndex = editedInvoice.items.findIndex(
@@ -85,7 +92,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
     if (existingItemIndex >= 0) {
       updatedItems = editedInvoice.items.map((item, index) =>
         index === existingItemIndex
-          ? { ...item, quantity: item.quantity + quantity }
+          ? { ...item, quantity: item.quantity + quantity, total: (item.quantity + quantity) * item.unitPrice }
           : item
       );
     } else {
@@ -190,17 +197,19 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                 <User className="w-4 h-4" />
                 Customer
               </label>
-              <select
+              <SearchableSelect
                 value={editedInvoice.customerId}
-                onChange={(e) => handleCustomerChange(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-              >
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name} - {customer.businessName}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(value) => handleCustomerChange(value)}
+                placeholder="Select Customer"
+                searchPlaceholder={t('common.search')}
+                emptyMessage="No customers found"
+                theme={theme}
+                options={customers.map(customer => ({
+                  value: customer.id,
+                  label: `${customer.name} - ${customer.businessName}`,
+                  icon: <User className="w-4 h-4" />
+                }))}
+              />
             </div>
 
             {/* Status Selection */}
@@ -304,7 +313,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                         {p.name}
                       </span>
                       <span className="text-sm text-slate-600 dark:text-slate-400">
-                        Rs. {p.price.toLocaleString()}
+                        Rs. {(p.retailPrice || p.price || 0).toLocaleString()}
                       </span>
                     </div>
                   </button>

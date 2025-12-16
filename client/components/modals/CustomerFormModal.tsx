@@ -1,9 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { Customer } from '../../types/index';
+import React, { useState, useEffect, useRef } from 'react';
+import { Customer, CustomerType } from '../../types/index';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Dialog, DialogContent } from '../ui/dialog';
-import { User, Building2, Mail, Phone, MapPin, Calendar, CreditCard, Save, Plus, UserPlus } from 'lucide-react';
+import { 
+  User, 
+  Building2, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Calendar, 
+  CreditCard, 
+  Save, 
+  Plus, 
+  UserPlus,
+  Camera,
+  Crown,
+  ShoppingBag,
+  Wallet,
+  Clock,
+  IdCard,
+  X
+} from 'lucide-react';
 
 interface CustomerFormModalProps {
   isOpen: boolean;
@@ -20,14 +38,24 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 }) => {
   const { t } = useLanguage();
   const { theme } = useTheme();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [formData, setFormData] = useState<Omit<Customer, 'id'>>({
     name: '',
     businessName: '',
     email: '',
     phone: '',
+    phone2: '',
+    nic: '',
     address: '',
+    photo: '',
     registrationDate: new Date().toISOString().split('T')[0],
     totalSpent: 0,
+    customerType: 'regular',
+    isActive: true,
+    loanBalance: 0,
+    loanDueDate: '',
+    creditLimit: 0,
   });
 
   useEffect(() => {
@@ -37,9 +65,17 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         businessName: customer.businessName,
         email: customer.email,
         phone: customer.phone,
+        phone2: customer.phone2 || '',
+        nic: customer.nic || '',
         address: customer.address,
+        photo: customer.photo || '',
         registrationDate: customer.registrationDate,
         totalSpent: customer.totalSpent,
+        customerType: customer.customerType,
+        isActive: customer.isActive,
+        loanBalance: customer.loanBalance,
+        loanDueDate: customer.loanDueDate || '',
+        creditLimit: customer.creditLimit || 0,
       });
     } else {
       setFormData({
@@ -47,9 +83,17 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         businessName: '',
         email: '',
         phone: '',
+        phone2: '',
+        nic: '',
         address: '',
+        photo: '',
         registrationDate: new Date().toISOString().split('T')[0],
         totalSpent: 0,
+        customerType: 'regular',
+        isActive: true,
+        loanBalance: 0,
+        loanDueDate: '',
+        creditLimit: 0,
       });
     }
   }, [customer, isOpen]);
@@ -59,18 +103,47 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     const newCustomer: Customer = {
       id: customer?.id || `cust-${Date.now()}`,
       ...formData,
+      phone2: formData.phone2 || undefined,
+      nic: formData.nic || undefined,
+      photo: formData.photo || undefined,
+      loanDueDate: formData.loanDueDate || undefined,
+      creditLimit: formData.creditLimit || undefined,
     };
     onSave(newCustomer);
     onClose();
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, photo: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removePhoto = () => {
+    setFormData({ ...formData, photo: '' });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   if (!isOpen) return null;
 
   const isEditing = !!customer;
 
+  const customerTypeOptions: { value: CustomerType; label: string; icon: React.ElementType; color: string }[] = [
+    { value: 'regular', label: t('customers.regular'), icon: ShoppingBag, color: 'text-blue-500' },
+    { value: 'wholesale', label: t('customers.wholesale'), icon: Crown, color: 'text-amber-500' },
+    { value: 'credit', label: t('customers.credit'), icon: CreditCard, color: 'text-purple-500' },
+  ];
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`max-w-4xl max-h-[85vh] overflow-y-auto p-0 ${
+      <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 ${
         theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
         {/* Gradient Header */}
@@ -84,21 +157,64 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             </div>
             <div>
               <h2 className="text-2xl font-bold">
-                {isEditing ? t('common.edit') + ' Customer' : t('customers.addCustomer')}
+                {isEditing ? t('common.edit') + ' ' + t('customers.customer') : t('customers.addCustomer')}
               </h2>
               <p className={`text-sm ${isEditing ? 'text-amber-100' : 'text-orange-100'}`}>
-                {isEditing ? 'Update customer information' : 'Add a new customer to your database'}
+                {isEditing ? t('customers.updateInfo') : t('customers.addNewCustomer')}
               </p>
             </div>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Photo Upload Section */}
+          <div className="flex justify-center">
+            <div className="relative">
+              {formData.photo ? (
+                <div className="relative">
+                  <img 
+                    src={formData.photo} 
+                    alt={t('customers.customerPhoto')}
+                    className="w-24 h-24 rounded-2xl object-cover border-4 border-orange-200 dark:border-orange-500/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={removePhoto}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`w-24 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                    theme === 'dark' 
+                      ? 'border-slate-600 hover:border-orange-500 bg-slate-800/50' 
+                      : 'border-slate-300 hover:border-orange-500 bg-slate-50'
+                  }`}
+                >
+                  <Camera className={`w-6 h-6 mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
+                  <span className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {t('customers.addPhoto')}
+                  </span>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
+            </div>
+          </div>
+
           {/* Personal Information Section */}
           <div className="space-y-4">
             <div className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
               <User className="w-4 h-4" />
-              <span className="text-sm font-semibold uppercase tracking-wide">Personal Information</span>
+              <span className="text-sm font-semibold uppercase tracking-wide">{t('customers.personalInfo')}</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -116,7 +232,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
                       : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400'
                   }`}
-                  placeholder="Enter customer name"
+                  placeholder={t('customers.enterName')}
                 />
               </div>
 
@@ -135,7 +251,42 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
                       : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400'
                   }`}
-                  placeholder="Enter business name"
+                  placeholder={t('customers.enterBusinessName')}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={`flex items-center gap-2 text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <IdCard className="w-4 h-4 text-indigo-500" />
+                  {t('customers.nic')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.nic}
+                  onChange={(e) => setFormData({ ...formData, nic: e.target.value })}
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
+                    theme === 'dark'
+                      ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
+                      : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400'
+                  }`}
+                  placeholder="e.g., 123456789V"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={`flex items-center gap-2 text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <Calendar className="w-4 h-4 text-cyan-500" />
+                  {t('customers.registrationDate')}
+                </label>
+                <input
+                  type="date"
+                  value={formData.registrationDate}
+                  onChange={(e) => setFormData({ ...formData, registrationDate: e.target.value })}
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
+                    theme === 'dark'
+                      ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
+                      : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400'
+                  }`}
                 />
               </div>
             </div>
@@ -145,7 +296,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           <div className="space-y-4">
             <div className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
               <Phone className="w-4 h-4" />
-              <span className="text-sm font-semibold uppercase tracking-wide">Contact Information</span>
+              <span className="text-sm font-semibold uppercase tracking-wide">{t('customers.contactInfo')}</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -185,6 +336,24 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                   placeholder="+94 71 234 5678"
                 />
               </div>
+
+              <div className="space-y-2">
+                <label className={`flex items-center gap-2 text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <Phone className="w-4 h-4 text-emerald-500" />
+                  {t('customers.phone2')}
+                </label>
+                <input
+                  type="tel"
+                  value={formData.phone2}
+                  onChange={(e) => setFormData({ ...formData, phone2: e.target.value })}
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
+                    theme === 'dark'
+                      ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
+                      : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400'
+                  }`}
+                  placeholder="+94 11 234 5678"
+                />
+              </div>
             </div>
           </div>
 
@@ -192,13 +361,9 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           <div className="space-y-4">
             <div className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
               <MapPin className="w-4 h-4" />
-              <span className="text-sm font-semibold uppercase tracking-wide">Address</span>
+              <span className="text-sm font-semibold uppercase tracking-wide">{t('common.address')}</span>
             </div>
             <div className="space-y-2">
-              <label className={`flex items-center gap-2 text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                <MapPin className="w-4 h-4 text-red-500" />
-                {t('common.address')} *
-              </label>
               <textarea
                 required
                 value={formData.address}
@@ -209,9 +374,131 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                     ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
                     : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400'
                 }`}
-                placeholder="Enter complete address"
+                placeholder={t('customers.enterAddress')}
               />
             </div>
+          </div>
+
+          {/* Customer Type Section */}
+          <div className="space-y-4">
+            <div className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+              <Crown className="w-4 h-4" />
+              <span className="text-sm font-semibold uppercase tracking-wide">{t('customers.customerType')}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {customerTypeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, customerType: option.value })}
+                  className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
+                    formData.customerType === option.value
+                      ? 'border-orange-500 bg-orange-500/10'
+                      : theme === 'dark'
+                        ? 'border-slate-700 hover:border-slate-600'
+                        : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <option.icon className={`w-6 h-6 ${option.color}`} />
+                  <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    {option.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Credit/Loan Section - Only show for credit or wholesale customers */}
+          {(formData.customerType === 'credit' || formData.customerType === 'wholesale') && (
+            <div className="space-y-4">
+              <div className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                <Wallet className="w-4 h-4" />
+                <span className="text-sm font-semibold uppercase tracking-wide">{t('customers.creditInfo')}</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className={`flex items-center gap-2 text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <CreditCard className="w-4 h-4 text-amber-500" />
+                    {t('customers.creditLimit')}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.creditLimit}
+                    onChange={(e) => setFormData({ ...formData, creditLimit: Number(e.target.value) })}
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
+                      theme === 'dark'
+                        ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
+                        : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400'
+                    }`}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className={`flex items-center gap-2 text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <Wallet className="w-4 h-4 text-purple-500" />
+                    {t('customers.loanBalance')}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.loanBalance}
+                    onChange={(e) => setFormData({ ...formData, loanBalance: Number(e.target.value) })}
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
+                      theme === 'dark'
+                        ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
+                        : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400'
+                    }`}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className={`flex items-center gap-2 text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <Clock className="w-4 h-4 text-red-500" />
+                    {t('customers.dueDate')}
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.loanDueDate}
+                    onChange={(e) => setFormData({ ...formData, loanDueDate: e.target.value })}
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
+                      theme === 'dark'
+                        ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
+                        : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400'
+                    }`}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Active Status Toggle */}
+          <div className={`flex items-center justify-between p-4 rounded-xl border ${
+            theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div>
+              <label className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {t('customers.activeStatus')}
+              </label>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                {t('customers.activeStatusDesc')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, isActive: !formData.isActive })}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                formData.isActive ? 'bg-emerald-500' : theme === 'dark' ? 'bg-slate-600' : 'bg-slate-300'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  formData.isActive ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
 
           {/* Preview Card */}
@@ -223,16 +510,33 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             }`}>
               <p className={`text-xs font-semibold uppercase tracking-wide mb-3 ${
                 theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-              }`}>Preview</p>
+              }`}>{t('common.preview')}</p>
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-rose-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-orange-500/20">
-                  {formData.name.charAt(0).toUpperCase()}
-                </div>
+                {formData.photo ? (
+                  <img src={formData.photo} alt="" className="w-16 h-16 rounded-xl object-cover" />
+                ) : (
+                  <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-rose-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-orange-500/20">
+                    {formData.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div className="flex-1">
-                  <h4 className={`font-semibold text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{formData.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className={`font-semibold text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{formData.name}</h4>
+                    {customerTypeOptions.find(o => o.value === formData.customerType) && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        formData.customerType === 'wholesale' 
+                          ? 'bg-amber-500/10 text-amber-500'
+                          : formData.customerType === 'credit'
+                            ? 'bg-purple-500/10 text-purple-500'
+                            : 'bg-blue-500/10 text-blue-500'
+                      }`}>
+                        {customerTypeOptions.find(o => o.value === formData.customerType)?.label}
+                      </span>
+                    )}
+                  </div>
                   <p className={`text-sm flex items-center gap-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     <Building2 className="w-3.5 h-3.5" />
-                    {formData.businessName || 'Business Name'}
+                    {formData.businessName || t('customers.businessName')}
                   </p>
                   <div className={`flex items-center gap-4 mt-2 text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
                     {formData.email && (
@@ -249,11 +553,11 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                     )}
                   </div>
                 </div>
-                {isEditing && customer && (
+                {(formData.customerType === 'credit' || formData.customerType === 'wholesale') && formData.creditLimit > 0 && (
                   <div className="text-right">
-                    <p className={`text-xs mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Spent</p>
-                    <p className="text-lg font-bold text-orange-400">
-                      Rs. {customer.totalSpent.toLocaleString()}
+                    <p className={`text-xs mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('customers.creditLimit')}</p>
+                    <p className="text-lg font-bold text-amber-400">
+                      Rs. {formData.creditLimit.toLocaleString()}
                     </p>
                   </div>
                 )}
@@ -272,7 +576,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               }`}
             >
               {isEditing ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-              {isEditing ? 'Save Changes' : t('common.add') + ' Customer'}
+              {isEditing ? t('common.saveChanges') : t('customers.addCustomer')}
             </button>
             <button
               type="button"

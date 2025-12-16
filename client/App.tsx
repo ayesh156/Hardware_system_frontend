@@ -8,10 +8,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { Layout } from "./components/Layout";
-import { Index } from "./pages/Index";
+import { AdminLayout } from "./components/AdminLayout";
+import { Dashboard } from "./pages/Dashboard";
 import { Invoices } from "./pages/Invoices";
+import { CreateInvoice } from "./pages/CreateInvoice";
+import { ViewInvoice } from "./pages/ViewInvoice";
+import { EditInvoice } from "./pages/EditInvoice";
 import { Products } from "./pages/Products";
+import { Categories } from "./pages/Categories";
+import { Brands } from "./pages/Brands";
 import { Customers } from "./pages/Customers";
 import NotFound from "./pages/NotFound";
 
@@ -25,16 +30,21 @@ const App = () => (
       <ThemeProvider>
         <LanguageProvider>
           <BrowserRouter>
-            <Layout>
+            <AdminLayout>
               <Routes>
-                <Route path="/" element={<Index />} />
+                <Route path="/" element={<Dashboard />} />
                 <Route path="/invoices" element={<Invoices />} />
+                <Route path="/invoices/create" element={<CreateInvoice />} />
+                <Route path="/invoices/:id" element={<ViewInvoice />} />
+                <Route path="/invoices/:id/edit" element={<EditInvoice />} />
                 <Route path="/products" element={<Products />} />
+                <Route path="/categories" element={<Categories />} />
+                <Route path="/brands" element={<Brands />} />
                 <Route path="/customers" element={<Customers />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </Layout>
+            </AdminLayout>
           </BrowserRouter>
         </LanguageProvider>
       </ThemeProvider>
