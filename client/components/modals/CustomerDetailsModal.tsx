@@ -1,6 +1,6 @@
 import React from 'react';
 import { Customer } from '../../types/index';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent } from '../ui/dialog';
 import { 
   User, 
@@ -38,7 +38,7 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
   onClose,
   onEdit,
 }) => {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
 
   if (!isOpen || !customer) return null;
 

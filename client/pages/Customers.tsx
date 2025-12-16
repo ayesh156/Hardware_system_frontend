@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { mockCustomers } from '../data/mockData';
 import { 
@@ -43,7 +43,7 @@ type ViewMode = 'grid' | 'table';
 type LoanFilter = 'all' | 'no-loan' | 'has-loan' | 'overdue';
 
 export const Customers: React.FC = () => {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const [customers, setCustomers] = useState<Customer[]>(mockCustomers);

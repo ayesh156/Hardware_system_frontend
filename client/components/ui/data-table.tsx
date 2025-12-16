@@ -1,7 +1,7 @@
 import * as React from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useTranslation } from 'react-i18next';
 
 // ============================================================================
 // DataTable Types
@@ -70,7 +70,7 @@ export function Pagination({
   showPageNumbers = true,
   maxVisiblePages = 5,
 }: PaginationProps) {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const startItem = totalItems > 0 ? (currentPage - 1) * pageSize + 1 : 0;
   const endItem = Math.min(currentPage * pageSize, totalItems);
 

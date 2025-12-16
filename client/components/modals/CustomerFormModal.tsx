@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Customer, CustomerType } from '../../types/index';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Dialog, DialogContent } from '../ui/dialog';
 import { 
@@ -36,7 +36,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
   

@@ -1,13 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { mockInvoices, mockProducts, mockCustomers } from '../data/mockData';
 import { Package, FileText, Users, TrendingUp, ArrowRight, Zap, Shield, BarChart3 } from 'lucide-react';
 
 export const Index: React.FC = () => {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const isMobile = useIsMobile();
 

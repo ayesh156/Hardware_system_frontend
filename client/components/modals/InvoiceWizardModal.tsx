@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Customer, Product, Invoice, InvoiceItem } from '../../types/index';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Search, FileText, User, Package, Calendar, CheckCircle } from 'lucide-react';
 import { PrintInvoiceModal } from './PrintInvoiceModal';
@@ -30,7 +30,7 @@ export const InvoiceWizardModal: React.FC<InvoiceWizardModalProps> = ({
   onClose,
   onCreateInvoice,
 }) => {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const [step, setStep] = useState<Step>(1);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');

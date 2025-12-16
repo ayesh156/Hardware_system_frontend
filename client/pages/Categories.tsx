@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useIsMobile } from '../hooks/use-mobile';
 import { mockCategories, mockProducts } from '../data/mockData';
 import { Category } from '../types/index';
@@ -52,7 +52,7 @@ const categoryColors = [
 
 export const Categories: React.FC = () => {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
   
   const [categories, setCategories] = useState<Category[]>(mockCategories);

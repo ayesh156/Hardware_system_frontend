@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { mockCustomers, mockProducts } from '../data/mockData';
@@ -25,7 +25,7 @@ interface ExtendedInvoiceItem extends InvoiceItem {
 type Step = 1 | 2 | 3;
 
 export const CreateInvoice: React.FC = () => {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const isMobile = useIsMobile();

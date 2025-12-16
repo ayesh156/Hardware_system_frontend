@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useIsMobile } from '../hooks/use-mobile';
 import {
   Settings as SettingsIcon,
@@ -65,7 +65,7 @@ interface NotificationSettings {
 
 export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
-  const { language, setLanguage } = useLanguage();
+  const { i18n } = useTranslation();
   const isMobile = useIsMobile();
 
   const [activeTab, setActiveTab] = useState<'business' | 'invoice' | 'notifications' | 'appearance' | 'backup'>('business');
@@ -666,29 +666,29 @@ export const Settings: React.FC = () => {
                 </p>
                 <div className="flex gap-4">
                   <button
-                    onClick={() => setLanguage('en')}
+                    onClick={() => i18n.changeLanguage('en')}
                     className={`flex-1 p-4 rounded-xl border-2 transition-all ${
-                      language === 'en'
+                      i18n.language === 'en'
                         ? 'border-orange-500 bg-orange-500/10'
                         : theme === 'dark' ? 'border-slate-600 hover:border-slate-500' : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
                     <div className="flex items-center justify-center gap-2">
                       <span className="text-xl">🇬🇧</span>
-                      <span className={language === 'en' ? 'text-orange-500 font-medium' : theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>English</span>
+                      <span className={i18n.language === 'en' ? 'text-orange-500 font-medium' : theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>English</span>
                     </div>
                   </button>
                   <button
-                    onClick={() => setLanguage('si')}
+                    onClick={() => i18n.changeLanguage('si')}
                     className={`flex-1 p-4 rounded-xl border-2 transition-all ${
-                      language === 'si'
+                      i18n.language === 'si'
                         ? 'border-orange-500 bg-orange-500/10'
                         : theme === 'dark' ? 'border-slate-600 hover:border-slate-500' : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
                     <div className="flex items-center justify-center gap-2">
                       <span className="text-xl">🇱🇰</span>
-                      <span className={language === 'si' ? 'text-orange-500 font-medium' : theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>සිංහල</span>
+                      <span className={i18n.language === 'si' ? 'text-orange-500 font-medium' : theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>සිංහල</span>
                     </div>
                   </button>
                 </div>

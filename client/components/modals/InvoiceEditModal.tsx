@@ -4,7 +4,7 @@ import { Invoice, Customer, Product, InvoiceItem } from '../../types/index';
 import { X, Plus, Trash2, Search, Save, Calendar, User, FileText } from 'lucide-react';
 import { SearchableSelect } from '../ui/searchable-select';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 
 interface InvoiceEditModalProps {
   isOpen: boolean;
@@ -24,7 +24,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   onSave,
 }) => {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const [editedInvoice, setEditedInvoice] = useState<Invoice | null>(null);
   const [productSearch, setProductSearch] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');

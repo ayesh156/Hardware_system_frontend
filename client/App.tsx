@@ -6,7 +6,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { LanguageProvider } from "./contexts/LanguageContext";
+import "./lib/i18n";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AdminLayout } from "./components/AdminLayout";
 import { Dashboard } from "./pages/Dashboard";
@@ -31,8 +31,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <ThemeProvider>
-        <LanguageProvider>
-          <BrowserRouter>
+        <BrowserRouter>
             <AdminLayout>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
@@ -52,7 +51,6 @@ const App = () => (
               </Routes>
             </AdminLayout>
           </BrowserRouter>
-        </LanguageProvider>
       </ThemeProvider>
     </TooltipProvider>
   </QueryClientProvider>

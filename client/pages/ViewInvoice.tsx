@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { mockInvoices, mockCustomers, mockProducts } from '../data/mockData';
 import { Invoice, Customer, InvoiceItem } from '../types/index';
@@ -24,7 +24,7 @@ interface ExtendedInvoiceItem extends InvoiceItem {
 export const ViewInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const { theme } = useTheme();
 
   const [showPrintModal, setShowPrintModal] = useState(false);

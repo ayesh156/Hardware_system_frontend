@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { Category } from '../../types/index';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,7 +49,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   categories,
 }) => {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const isEditing = !!category;
 
   const [formData, setFormData] = useState<Partial<Category>>({

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useIsMobile } from '../hooks/use-mobile';
 import { mockBrands, mockProducts } from '../data/mockData';
 import { Brand } from '../types/index';
@@ -58,7 +58,7 @@ const brandColors = [
 
 export const Brands: React.FC = () => {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
   
   const [brands, setBrands] = useState<Brand[]>(mockBrands);
@@ -178,10 +178,10 @@ export const Brands: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-            Brands
+            {t('brands.title')}
           </h1>
           <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            Manage your product brands and manufacturers
+            {t('brands.subtitle')}
           </p>
         </div>
         <Button 
@@ -189,7 +189,7 @@ export const Brands: React.FC = () => {
           className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white shadow-lg shadow-orange-500/20"
         >
           <Plus className="w-4 h-4 mr-2" />
-          Add Brand
+          {t('brands.addBrand')}
         </Button>
       </div>
 
@@ -205,7 +205,7 @@ export const Brands: React.FC = () => {
               <Building className="w-5 h-5 text-blue-500" />
             </div>
             <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Total Brands</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('brands.totalBrands')}</p>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {totalBrands}
               </p>
@@ -223,7 +223,7 @@ export const Brands: React.FC = () => {
               <Check className="w-5 h-5 text-emerald-500" />
             </div>
             <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Active Brands</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('brands.activeBrands')}</p>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {activeBrands}
               </p>
@@ -241,7 +241,7 @@ export const Brands: React.FC = () => {
               <Star className="w-5 h-5 text-amber-500" />
             </div>
             <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Local Brands</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('brands.localBrands')}</p>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {localBrands}
               </p>
@@ -259,7 +259,7 @@ export const Brands: React.FC = () => {
               <Globe className="w-5 h-5 text-purple-500" />
             </div>
             <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>International</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('brands.internationalBrands')}</p>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {internationalBrands}
               </p>
@@ -281,7 +281,7 @@ export const Brands: React.FC = () => {
                 theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
               }`} />
               <Input
-                placeholder="Search brands..."
+                placeholder={t('brands.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`pl-10 ${
@@ -296,12 +296,12 @@ export const Brands: React.FC = () => {
               <SearchableSelect
                 value={countryFilter}
                 onValueChange={setCountryFilter}
-                placeholder="All Countries"
+                placeholder={t('brands.allCountries')}
                 searchPlaceholder={t('common.search')}
-                emptyMessage="No countries found"
+                emptyMessage={t('brands.noCountriesFound')}
                 theme={theme}
                 options={[
-                  { value: 'all', label: 'All Countries', count: brands.length, icon: <Globe className="w-4 h-4" /> },
+                  { value: 'all', label: t('brands.allCountries'), count: brands.length, icon: <Globe className="w-4 h-4" /> },
                   ...countries.map(country => ({
                     value: country,
                     label: country,
@@ -602,12 +602,12 @@ export const Brands: React.FC = () => {
         }`}>
           <Building className={`w-12 h-12 mx-auto mb-4 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
           <h3 className={`text-lg font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-            No brands found
+            {t('brands.noBrandsFound')}
           </h3>
           <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             {searchQuery || countryFilter !== 'all' || statusFilter !== 'all' 
-              ? 'Try adjusting your filters' 
-              : 'Get started by adding your first brand'}
+              ? t('brands.adjustFilters') 
+              : t('brands.getStarted')}
           </p>
           {!searchQuery && countryFilter === 'all' && statusFilter === 'all' && (
             <Button 
@@ -634,8 +634,8 @@ export const Brands: React.FC = () => {
         isOpen={isDeleteModalOpen}
         onCancel={() => setIsDeleteModalOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Brand"
-        message={`Are you sure you want to delete "${selectedBrand?.name}"? This action cannot be undone and may affect products from this brand.`}
+        title={t('brands.deleteBrand')}
+        message={t('brands.deleteBrandMessage', { name: selectedBrand?.name })}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { mockProducts, mockBrands, mockCategories } from '../data/mockData';
@@ -17,7 +17,7 @@ type ViewMode = 'grid' | 'table';
 type PriceDisplayMode = 'retail' | 'wholesale' | 'both';
 
 export const Products: React.FC = () => {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const [products, setProducts] = useState<Product[]>(mockProducts);
@@ -462,7 +462,7 @@ export const Products: React.FC = () => {
                       {mockCategories.find(c => c.id === product.categoryId)?.name || product.category}
                     </span>
                     <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                      SKU: {product.sku}
+                      {t('products.sku')}: {product.sku}
                     </span>
                   </div>
                 </div>
@@ -505,7 +505,7 @@ export const Products: React.FC = () => {
                 <div className="p-5 flex-1 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                      Stock ({product.unit || 'pcs'})
+                      {t('products.stock')} ({product.unit || 'pcs'})
                     </span>
                     <div className="flex items-center gap-2">
                       <span className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
@@ -515,7 +515,7 @@ export const Products: React.FC = () => {
                         {getStockStatus(product.stock, product.minStock) === 'inStock' && <CheckCircle className="w-3 h-3" />}
                         {getStockStatus(product.stock, product.minStock) === 'lowStock' && <AlertTriangle className="w-3 h-3" />}
                         {getStockStatus(product.stock, product.minStock) === 'outOfStock' && <XCircle className="w-3 h-3" />}
-                        {getStockStatus(product.stock, product.minStock) === 'inStock' ? 'In Stock' : getStockStatus(product.stock, product.minStock) === 'lowStock' ? 'Low' : 'Out'}
+                        {getStockStatus(product.stock, product.minStock) === 'inStock' ? t('products.inStock') : getStockStatus(product.stock, product.minStock) === 'lowStock' ? t('products.lowStock') : t('products.outOfStock')}
                       </span>
                     </div>
                   </div>
@@ -643,7 +643,7 @@ export const Products: React.FC = () => {
                       <td className="px-4 py-3">
                         <div>
                           <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{product.name}</p>
-                          <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>SKU: {product.sku}</p>
+                          <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('products.sku')}: {product.sku}</p>
                         </div>
                       </td>
                       <td className="px-4 py-3">

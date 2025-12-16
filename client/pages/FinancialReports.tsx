@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useIsMobile } from '../hooks/use-mobile';
 import { 
   TrendingUp, TrendingDown, DollarSign, Calendar, Download, 
@@ -24,7 +24,7 @@ type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export const FinancialReports: React.FC = () => {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
   const printRef = useRef<HTMLDivElement>(null);
   

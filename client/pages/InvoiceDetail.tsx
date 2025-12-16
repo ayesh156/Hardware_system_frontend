@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Invoice, Customer } from '../types/index';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { FileText, ArrowLeft, Printer, Download } from 'lucide-react';
 import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
@@ -14,7 +14,7 @@ interface InvoiceDetailProps {
 export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoices, customers = [] }) => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const [showPrintModal, setShowPrintModal] = useState(false);
 

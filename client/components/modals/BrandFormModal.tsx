@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { Brand } from '../../types/index';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,7 +54,7 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
   brand,
 }) => {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const isEditing = !!brand;
 
   const [formData, setFormData] = useState<Partial<Brand>>({
@@ -92,11 +92,11 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
     const newErrors: Record<string, string> = {};
     
     if (!formData.name?.trim()) {
-      newErrors.name = 'Brand name is required';
+      newErrors.name = t('brands.brandNameRequired');
     }
     
     if (!formData.country?.trim()) {
-      newErrors.country = 'Country is required';
+      newErrors.country = t('brands.countryRequired');
     }
     
     setErrors(newErrors);
@@ -135,12 +135,12 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
               <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-rose-500">
                 <Building className="w-4 h-4 text-white" />
               </div>
-              {isEditing ? 'Edit Brand' : 'Add New Brand'}
+              {isEditing ? t('brands.editBrand') : t('brands.addBrand')}
             </DialogTitle>
             <DialogDescription className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>
               {isEditing 
-                ? 'Update the brand details below.'
-                : 'Register a new brand or manufacturer for your products.'}
+                ? t('brands.editBrandDesc')
+                : t('brands.addBrandDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -149,13 +149,13 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
             <div className="space-y-2">
               <Label htmlFor="name" className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                 <Building className="w-4 h-4" />
-                Brand Name <span className="text-red-500">*</span>
+                {t('brands.brandName')} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
-                placeholder="e.g., INSEE, Nippon Paint, Bosch"
+                placeholder={t('brands.brandNamePlaceholder')}
                 className={`${
                   theme === 'dark' 
                     ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' 
@@ -171,14 +171,14 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
             <div className="space-y-2">
               <Label className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                 <Globe className="w-4 h-4" />
-                Country of Origin <span className="text-red-500">*</span>
+                {t('brands.countryOfOrigin')} <span className="text-red-500">*</span>
               </Label>
               <SearchableSelect
                 value={formData.country}
                 onValueChange={(value) => handleChange('country', value)}
-                placeholder="Select country"
+                placeholder={t('brands.selectCountry')}
                 searchPlaceholder={t('common.search')}
-                emptyMessage="No countries found"
+                emptyMessage={t('brands.noCountriesFound')}
                 theme={theme}
                 options={countries.map(country => ({
                   value: country.name,
@@ -195,7 +195,7 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
             <div className="space-y-2">
               <Label htmlFor="logo" className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                 <Image className="w-4 h-4" />
-                Logo URL
+                {t('brands.logoUrl')}
               </Label>
               <Input
                 id="logo"
@@ -209,7 +209,7 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
                 }
               />
               <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                Optional: Add a URL to the brand's logo image
+                {t('brands.logoUrlHelp')}
               </p>
             </div>
 
@@ -217,13 +217,13 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
             <div className="space-y-2">
               <Label htmlFor="description" className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                 <FileText className="w-4 h-4" />
-                Description
+                {t('brands.description')}
               </Label>
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={(e) => handleChange('description', e.target.value)}
-                placeholder="Brief description of the brand..."
+                placeholder={t('brands.descriptionPlaceholder')}
                 rows={3}
                 className={`resize-none ${
                   theme === 'dark' 
@@ -242,10 +242,10 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
               <div className="space-y-0.5">
                 <Label className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                   <Check className="w-4 h-4" />
-                  Active Status
+                  {t('brands.activeStatus')}
                 </Label>
                 <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Inactive brands won't appear in product forms
+                  {t('brands.activeStatusHelp')}
                 </p>
               </div>
               <Switch
@@ -262,14 +262,10 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
                   : 'bg-blue-50 border-blue-200'
               }`}>
                 <p className={`text-sm font-medium mb-2 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-700'}`}>
-                  💡 Popular Hardware Brands in Sri Lanka
+                  {t('brands.popularBrandsTitle')}
                 </p>
-                <p className={`text-xs ${theme === 'dark' ? 'text-blue-300/80' : 'text-blue-600'}`}>
-                  <strong>Cement:</strong> INSEE, Tokyo Cement, Holcim<br />
-                  <strong>Steel:</strong> Lanwa, Melwa<br />
-                  <strong>Paint:</strong> Nippon Paint, Dulux, Asian Paints<br />
-                  <strong>Electrical:</strong> Kelani Cables, ACL, Orange Electric<br />
-                  <strong>Tools:</strong> Bosch, Makita, Stanley, DeWalt
+                <p className={`text-xs whitespace-pre-line ${theme === 'dark' ? 'text-blue-300/80' : 'text-blue-600'}`}>
+                  {t('brands.popularBrandsContent')}
                 </p>
               </div>
             )}
@@ -282,13 +278,13 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
               onClick={onClose}
               className={theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : ''}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white"
             >
-              {isEditing ? 'Update Brand' : 'Create Brand'}
+              {isEditing ? t('brands.updateBrand') : t('brands.createBrand')}
             </Button>
           </DialogFooter>
         </form>

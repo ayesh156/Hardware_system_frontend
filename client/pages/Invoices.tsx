@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { mockInvoices, mockCustomers, mockProducts } from '../data/mockData';
@@ -18,7 +18,7 @@ import { Pagination } from '../components/ui/data-table';
 type ViewMode = 'grid' | 'table';
 
 export const Invoices: React.FC = () => {
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const isMobile = useIsMobile();

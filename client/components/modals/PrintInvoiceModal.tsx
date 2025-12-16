@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Invoice, Customer, InvoiceItem } from '../../types/index';
 import { Printer, X, FileText } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useTranslation } from 'react-i18next';
 
 // Extended invoice item type for discounts and quick add
 interface ExtendedInvoiceItem extends InvoiceItem {
@@ -29,7 +29,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
 
   const handlePrint = () => {
     if (!printRef.current || !invoice) return;
