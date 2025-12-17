@@ -166,10 +166,10 @@ export const Categories: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-            Categories
+            {t('categories.title')}
           </h1>
           <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            Manage your product categories and subcategories
+            {t('categories.subtitle')}
           </p>
         </div>
         <Button 
@@ -177,7 +177,7 @@ export const Categories: React.FC = () => {
           className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white shadow-lg shadow-orange-500/20"
         >
           <Plus className="w-4 h-4 mr-2" />
-          Add Category
+          {t('categories.addCategory')}
         </Button>
       </div>
 
@@ -193,7 +193,7 @@ export const Categories: React.FC = () => {
               <FolderTree className="w-5 h-5 text-blue-500" />
             </div>
             <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Total Categories</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('categories.totalCategories')}</p>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {totalCategories}
               </p>
@@ -211,7 +211,7 @@ export const Categories: React.FC = () => {
               <Package className="w-5 h-5 text-emerald-500" />
             </div>
             <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>With Products</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('categories.withProducts')}</p>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {categoriesWithProducts}
               </p>
@@ -229,7 +229,7 @@ export const Categories: React.FC = () => {
               <Layers className="w-5 h-5 text-purple-500" />
             </div>
             <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Main Categories</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('categories.mainCategories')}</p>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {categories.filter(c => !c.parentId).length}
               </p>
@@ -247,7 +247,7 @@ export const Categories: React.FC = () => {
               <Tag className="w-5 h-5 text-amber-500" />
             </div>
             <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Sub Categories</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('categories.subCategories')}</p>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {categories.filter(c => c.parentId).length}
               </p>
@@ -269,7 +269,7 @@ export const Categories: React.FC = () => {
                 theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
               }`} />
               <Input
-                placeholder="Search categories..."
+                placeholder={t('categories.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`pl-10 ${
@@ -284,14 +284,14 @@ export const Categories: React.FC = () => {
               <SearchableSelect
                 value={typeFilter}
                 onValueChange={(v) => setTypeFilter(v as 'all' | 'main' | 'sub')}
-                placeholder="All Types"
+                placeholder={t('categories.allTypes')}
                 searchPlaceholder={t('common.search')}
                 emptyMessage="No options found"
                 theme={theme}
                 options={[
-                  { value: 'all', label: 'All Types', count: totalCategories, icon: <FolderTree className="w-4 h-4" /> },
-                  { value: 'main', label: 'Main Categories', count: mainCategories.length, icon: <Layers className="w-4 h-4 text-blue-500" /> },
-                  { value: 'sub', label: 'Sub Categories', count: totalCategories - mainCategories.length, icon: <Tag className="w-4 h-4 text-purple-500" /> },
+                  { value: 'all', label: t('categories.allTypes'), count: totalCategories, icon: <FolderTree className="w-4 h-4" /> },
+                  { value: 'main', label: t('categories.mainCategories'), count: mainCategories.length, icon: <Layers className="w-4 h-4 text-blue-500" /> },
+                  { value: 'sub', label: t('categories.subCategories'), count: totalCategories - mainCategories.length, icon: <Tag className="w-4 h-4 text-purple-500" /> },
                 ]}
               />
             </div>
@@ -300,12 +300,12 @@ export const Categories: React.FC = () => {
               <SearchableSelect
                 value={parentFilter}
                 onValueChange={setParentFilter}
-                placeholder="All Parents"
+                placeholder={t('categories.allParents')}
                 searchPlaceholder={t('common.search')}
-                emptyMessage="No categories found"
+                emptyMessage={t('categories.noCategoriesFound')}
                 theme={theme}
                 options={[
-                  { value: 'all', label: 'All Parents', icon: <FolderTree className="w-4 h-4" /> },
+                  { value: 'all', label: t('categories.allParents'), icon: <FolderTree className="w-4 h-4" /> },
                   ...mainCategories.map(cat => ({
                     value: cat.id,
                     label: cat.name,
@@ -325,7 +325,7 @@ export const Categories: React.FC = () => {
                 }`}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                Clear
+                {t('common.clear')}
               </button>
             )}
           </div>
@@ -415,7 +415,7 @@ export const Categories: React.FC = () => {
                       : 'bg-orange-100 text-orange-700 border border-orange-200'
                   }`}>
                     <Layers className="w-3 h-3" />
-                    {categories.find(c => c.id === category.parentId)?.name || 'Unknown'}
+                    {categories.find(c => c.id === category.parentId)?.name || t('common.unknown')}
                   </span>
                 </div>
               )}
@@ -499,7 +499,7 @@ export const Categories: React.FC = () => {
                           : 'bg-orange-100 text-orange-700 border border-orange-200'
                       }`}>
                         <Layers className="w-3 h-3" />
-                        {categories.find(c => c.id === category.parentId)?.name || 'Unknown'}
+                        {categories.find(c => c.id === category.parentId)?.name || t('common.unknown')}
                       </span>
                     ) : (
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -508,7 +508,7 @@ export const Categories: React.FC = () => {
                           : 'bg-blue-100 text-blue-700 border border-blue-200'
                       }`}>
                         <FolderTree className="w-3 h-3" />
-                        Main Category
+                        {t('categories.mainCategory')}
                       </span>
                     )}
                   </td>
@@ -562,10 +562,10 @@ export const Categories: React.FC = () => {
         }`}>
           <FolderTree className={`w-12 h-12 mx-auto mb-4 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
           <h3 className={`text-lg font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-            No categories found
+            {t('categories.noCategoriesFound')}
           </h3>
           <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            {searchQuery ? 'Try adjusting your search query' : 'Get started by adding your first category'}
+            {searchQuery ? t('categories.adjustSearch') : t('categories.addFirstCategory')}
           </p>
           {!searchQuery && (
             <Button 
@@ -573,7 +573,7 @@ export const Categories: React.FC = () => {
               className="mt-4 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Category
+              {t('categories.addCategory')}
             </Button>
           )}
         </div>
@@ -593,8 +593,8 @@ export const Categories: React.FC = () => {
         isOpen={isDeleteModalOpen}
         onCancel={() => setIsDeleteModalOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Category"
-        message={`Are you sure you want to delete "${selectedCategory?.name}"? This action cannot be undone and may affect products in this category.`}
+        title={t('categories.deleteCategory')}
+        message={t('categories.deleteConfirmationMessage', { name: selectedCategory?.name })}
       />
     </div>
   );

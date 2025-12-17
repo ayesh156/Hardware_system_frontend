@@ -119,6 +119,9 @@ export interface Product {
   tags?: string[];
   images?: string[];
   
+  // Payment Types - Cash and/or Credit
+  paymentTypes?: ('cash' | 'credit')[];
+  
   // Status
   isActive?: boolean;
   isFeatured?: boolean;

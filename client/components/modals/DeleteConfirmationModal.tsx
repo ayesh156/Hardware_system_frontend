@@ -74,7 +74,7 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
             disabled={isLoading}
             className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 disabled:opacity-50 text-white rounded-xl font-medium transition-all"
           >
-            {isLoading ? 'Deleting...' : 'Delete'}
+            {isLoading ? t('common.deleting') : t('common.delete')}
           </button>
           <button
             onClick={onCancel}

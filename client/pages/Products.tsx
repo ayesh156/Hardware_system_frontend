@@ -5,7 +5,8 @@ import { useIsMobile } from '../hooks/use-mobile';
 import { mockProducts, mockBrands, mockCategories } from '../data/mockData';
 import { 
   Package, Search, Plus, Edit2, Trash2, ChevronDown, AlertTriangle, CheckCircle, XCircle, 
-  Filter, Grid, List, Building2, Tag, Layers, BarChart3, Box, RefreshCw, DollarSign, SortAsc, SortDesc, X
+  Filter, Grid, List, Building2, Tag, Layers, BarChart3, Box, RefreshCw, DollarSign, SortAsc, SortDesc, X,
+  Banknote, CreditCard
 } from 'lucide-react';
 import { Product } from '../types/index';
 import { ProductFormModal } from '../components/modals/ProductFormModal';
@@ -15,6 +16,7 @@ import { Pagination } from '../components/ui/data-table';
 
 type ViewMode = 'grid' | 'table';
 type PriceDisplayMode = 'retail' | 'wholesale' | 'both';
+type PaymentTypeFilter = 'all' | 'cash' | 'credit' | 'both';
 
 export const Products: React.FC = () => {
   const { t } = useTranslation();
@@ -25,6 +27,7 @@ export const Products: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [brandFilter, setBrandFilter] = useState<string>('all');
   const [stockFilter, setStockFilter] = useState<string>('all');
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState<PaymentTypeFilter>('all');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showFormModal, setShowFormModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
@@ -66,8 +69,21 @@ export const Products: React.FC = () => {
       } else if (stockFilter === 'in') {
         matchesStock = product.stock > (product.minStock || 10);
       }
+
+      // Payment type filter
+      let matchesPaymentType = true;
+      if (paymentTypeFilter !== 'all') {
+        const productPaymentTypes = product.paymentTypes || ['cash', 'credit']; // Default to both if not set
+        if (paymentTypeFilter === 'cash') {
+          matchesPaymentType = productPaymentTypes.includes('cash') && !productPaymentTypes.includes('credit');
+        } else if (paymentTypeFilter === 'credit') {
+          matchesPaymentType = productPaymentTypes.includes('credit') && !productPaymentTypes.includes('cash');
+        } else if (paymentTypeFilter === 'both') {
+          matchesPaymentType = productPaymentTypes.includes('cash') && productPaymentTypes.includes('credit');
+        }
+      }
       
-      return matchesSearch && matchesCategory && matchesBrand && matchesStock;
+      return matchesSearch && matchesCategory && matchesBrand && matchesStock && matchesPaymentType;
     });
 
     // Apply sorting
@@ -75,7 +91,7 @@ export const Products: React.FC = () => {
       const comparison = a.name.localeCompare(b.name);
       return sortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [products, searchQuery, categoryFilter, brandFilter, stockFilter, sortOrder]);
+  }, [products, searchQuery, categoryFilter, brandFilter, stockFilter, paymentTypeFilter, sortOrder]);
 
   // Pagination
   const totalPages = Math.ceil(filteredProducts.length / pageSize);
@@ -87,7 +103,7 @@ export const Products: React.FC = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, categoryFilter, brandFilter, stockFilter]);
+  }, [searchQuery, categoryFilter, brandFilter, stockFilter, paymentTypeFilter]);
 
   // Stats
   const stats = useMemo(() => {
@@ -109,9 +125,10 @@ export const Products: React.FC = () => {
     setCategoryFilter('all');
     setBrandFilter('all');
     setStockFilter('all');
+    setPaymentTypeFilter('all');
   };
 
-  const hasActiveFilters = searchQuery || categoryFilter !== 'all' || brandFilter !== 'all' || stockFilter !== 'all';
+  const hasActiveFilters = searchQuery || categoryFilter !== 'all' || brandFilter !== 'all' || stockFilter !== 'all' || paymentTypeFilter !== 'all';
 
   const formatPrice = (price: number) => `${t('common.currency')} ${price.toLocaleString()}`;
 
@@ -417,6 +434,27 @@ export const Products: React.FC = () => {
                 ]}
               />
             </div>
+
+            {/* Supplier Payment Filter */}
+            <div className="flex-1 min-w-[180px]">
+              <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                {t('products.supplierPayment')}
+              </label>
+              <SearchableSelect
+                value={paymentTypeFilter}
+                onValueChange={(value) => setPaymentTypeFilter(value as PaymentTypeFilter)}
+                placeholder={t('filters.allPaymentTypes')}
+                searchPlaceholder={t('common.search')}
+                emptyMessage={t('filters.noOptions')}
+                theme={theme}
+                options={[
+                  { value: 'all', label: t('filters.allPaymentTypes'), icon: <DollarSign className="w-4 h-4" /> },
+                  { value: 'cash', label: t('products.cashOnly'), icon: <Banknote className="w-4 h-4 text-green-500" /> },
+                  { value: 'credit', label: t('products.creditOnly'), icon: <CreditCard className="w-4 h-4 text-blue-500" /> },
+                  { value: 'both', label: t('products.cashAndCredit'), icon: <DollarSign className="w-4 h-4 text-purple-500" /> },
+                ]}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -461,6 +499,25 @@ export const Products: React.FC = () => {
                     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
                       {mockCategories.find(c => c.id === product.categoryId)?.name || product.category}
                     </span>
+                    {/* Supplier Payment Status Badges */}
+                    {(product.paymentTypes || ['cash', 'credit']).includes('cash') && !(product.paymentTypes || ['cash', 'credit']).includes('credit') && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-green-500/10 text-green-500 border border-green-500/20">
+                        <Banknote className="w-3 h-3" />
+                        {t('products.cash')}
+                      </span>
+                    )}
+                    {(product.paymentTypes || ['cash', 'credit']).includes('credit') && !(product.paymentTypes || ['cash', 'credit']).includes('cash') && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                        <CreditCard className="w-3 h-3" />
+                        {t('products.credit')}
+                      </span>
+                    )}
+                    {(product.paymentTypes || ['cash', 'credit']).includes('cash') && (product.paymentTypes || ['cash', 'credit']).includes('credit') && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                        <Banknote className="w-3 h-3" />
+                        {t('products.cashAndCredit')}
+                      </span>
+                    )}
                     <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
                       {t('products.sku')}: {product.sku}
                     </span>

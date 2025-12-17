@@ -184,12 +184,17 @@ export const FinancialReports: React.FC = () => {
 
   // Month options for SearchableSelect
   const monthOptions: SearchableSelectOption[] = useMemo(() => {
+    const months = [
+      'january', 'february', 'march', 'april', 'may', 'june',
+      'july', 'august', 'september', 'october', 'november', 'december'
+    ];
+
     return Array.from({ length: 12 }, (_, i) => ({
       value: i.toString(),
-      label: new Date(2024, i, 1).toLocaleDateString('en-US', { month: 'long' }),
+      label: t(`financial.${months[i]}`),
       icon: <CalendarDays className="w-4 h-4 text-blue-500" />
     }));
-  }, []);
+  }, [t]);
 
   // Year options for SearchableSelect
   const yearOptions: SearchableSelectOption[] = useMemo(() => {
@@ -208,12 +213,16 @@ export const FinancialReports: React.FC = () => {
   // Creative PDF Export - All Records
   const handleExportPDF = () => {
     const periodLabel = periodLabels[period];
-    const monthName = new Date(selectedYear, selectedMonth, 1).toLocaleDateString('en-US', { month: 'long' });
+    const months = [
+      'january', 'february', 'march', 'april', 'may', 'june',
+      'july', 'august', 'september', 'october', 'november', 'december'
+    ];
+    const monthName = t(`financial.${months[selectedMonth]}`) + ` ${selectedYear}`;
     const reportTitle = period === 'yearly' 
-      ? `Annual Financial Report - ${selectedYear}`
+      ? `${t('financial.annualReport')} - ${selectedYear}`
       : period === 'monthly'
-      ? `${monthName} ${selectedYear} Financial Report`
-      : `${periodLabel} Financial Report`;
+      ? `${monthName} ${t('financial.report')}`
+      : `${periodLabel} ${t('financial.report')}`;
 
     // Generate transaction rows HTML
     const transactionRows = filteredTransactions.map((t, index) => `
