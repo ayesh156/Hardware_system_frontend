@@ -420,6 +420,7 @@ export default function Suppliers() {
                     }`}
                   >
                     <Filter className="w-4 h-4" />
+                    {t('common.filter')}
                     {(locationFilter !== 'all' || creditStatusFilter !== 'all') && (
                       <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">
                         {[locationFilter !== 'all', creditStatusFilter !== 'all'].filter(Boolean).length}
@@ -565,6 +566,7 @@ export default function Suppliers() {
                 }`}
               >
                 <Filter className="w-4 h-4" />
+                {t('common.filter')}
                 {(locationFilter !== 'all' || creditStatusFilter !== 'all') && (
                   <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">
                     {[locationFilter !== 'all', creditStatusFilter !== 'all'].filter(Boolean).length}
