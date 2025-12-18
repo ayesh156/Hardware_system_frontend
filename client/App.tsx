@@ -18,6 +18,7 @@ import { FinancialReports } from "./pages/FinancialReports";
 import { Products } from "./pages/Products";
 import { Categories } from "./pages/Categories";
 import { Brands } from "./pages/Brands";
+import Suppliers from "./pages/Suppliers";
 import { Customers } from "./pages/Customers";
 import { Settings } from "./pages/Settings";
 import { Help } from "./pages/Help";
@@ -31,7 +32,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <ThemeProvider>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AdminLayout>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
@@ -43,6 +44,7 @@ const App = () => (
                 <Route path="/products" element={<Products />} />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/brands" element={<Brands />} />
+                <Route path="/suppliers" element={<Suppliers />} />
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/help" element={<Help />} />

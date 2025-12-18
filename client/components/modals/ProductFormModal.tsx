@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Product, ProductVariant } from '../../types/index';
-import { mockBrands, mockCategories } from '../../data/mockData';
+import { mockBrands, mockCategories, mockSuppliers } from '../../data/mockData';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Dialog, DialogContent } from '../ui/dialog';
-import { Package, Tag, DollarSign, Boxes, FileText, Grid3X3, Save, Plus, Building2, Layers, Trash2, ChevronDown, ChevronUp, Scale, Box, Banknote, CreditCard } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
+import { Package, Tag, DollarSign, Boxes, FileText, Grid3X3, Save, Plus, Building2, Layers, Trash2, ChevronDown, ChevronUp, Scale, Box, Truck } from 'lucide-react';
 import { SearchableSelect } from '../ui/searchable-select';
 
 interface ProductFormModalProps {
@@ -38,7 +38,7 @@ interface ProductFormData {
   warranty?: string;
   countryOfOrigin?: string;
   isFeatured: boolean;
-  paymentTypes: ('cash' | 'credit')[];
+  supplierId?: string;
 }
 
 export const ProductFormModal: React.FC<ProductFormModalProps> = ({
@@ -76,7 +76,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     warranty: '',
     countryOfOrigin: 'Sri Lanka',
     isFeatured: false,
-    paymentTypes: ['cash', 'credit'],
+    supplierId: '',
   });
 
   const [newVariant, setNewVariant] = useState<Partial<ProductVariant>>({
@@ -116,7 +116,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         warranty: product.warranty || '',
         countryOfOrigin: product.countryOfOrigin || 'Sri Lanka',
         isFeatured: product.isFeatured || false,
-        paymentTypes: product.paymentTypes || ['cash', 'credit'],
+        supplierId: product.supplierId || '',
       });
       setShowVariants(product.hasVariants || false);
     } else {
@@ -144,7 +144,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         warranty: '',
         countryOfOrigin: 'Sri Lanka',
         isFeatured: false,
-        paymentTypes: ['cash', 'credit'],
+        supplierId: '',
       });
       setShowAdvanced(false);
       setShowVariants(false);
@@ -241,7 +241,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       warranty: formData.warranty,
       countryOfOrigin: formData.countryOfOrigin,
       isFeatured: formData.isFeatured,
-      paymentTypes: formData.paymentTypes,
+      supplierId: formData.supplierId,
       isActive: true,
       createdAt: product?.createdAt || new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
@@ -270,11 +270,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 ${
         theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
+        <DialogHeader className="sr-only">
+          <DialogTitle>{isEditing ? t('productsForm.editProduct') : t('productsForm.addNewProduct')}</DialogTitle>
+          <DialogDescription>
+            {isEditing ? t('productsForm.updateInfo') : t('productsForm.addInfo')}
+          </DialogDescription>
+        </DialogHeader>
         {/* Gradient Header */}
         <div className={`p-5 text-white ${isEditing 
           ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-red-500' 
           : 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600'
-        }`}>
+        }`} aria-hidden="true">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
               <Package className="w-6 h-6" />
@@ -515,70 +521,21 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </div>
           </div>
 
-          {/* Supplier Payment Status Section */}
-          <div className="space-y-3">
-            <div className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
-              <Banknote className="w-4 h-4" />
-              <span className="text-sm font-semibold">{t('products.supplierPayment')}</span>
-            </div>
-            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-              {t('products.supplierPaymentHelp')}
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <label className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${
-                formData.paymentTypes.includes('cash')
-                  ? theme === 'dark' 
-                    ? 'border-green-500 bg-green-500/10 text-green-400' 
-                    : 'border-green-500 bg-green-50 text-green-700'
-                  : theme === 'dark'
-                    ? 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-              }`}>
-                <input
-                  type="checkbox"
-                  checked={formData.paymentTypes.includes('cash')}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setFormData({ ...formData, paymentTypes: [...formData.paymentTypes, 'cash'] });
-                    } else {
-                      setFormData({ ...formData, paymentTypes: formData.paymentTypes.filter(t => t !== 'cash') });
-                    }
-                  }}
-                  className="sr-only"
-                />
-                <Banknote className="w-5 h-5" />
-                <span className="font-medium">{t('products.cash')}</span>
-              </label>
-              <label className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${
-                formData.paymentTypes.includes('credit')
-                  ? theme === 'dark' 
-                    ? 'border-blue-500 bg-blue-500/10 text-blue-400' 
-                    : 'border-blue-500 bg-blue-50 text-blue-700'
-                  : theme === 'dark'
-                    ? 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-              }`}>
-                <input
-                  type="checkbox"
-                  checked={formData.paymentTypes.includes('credit')}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setFormData({ ...formData, paymentTypes: [...formData.paymentTypes, 'credit'] });
-                    } else {
-                      setFormData({ ...formData, paymentTypes: formData.paymentTypes.filter(t => t !== 'credit') });
-                    }
-                  }}
-                  className="sr-only"
-                />
-                <CreditCard className="w-5 h-5" />
-                <span className="font-medium">{t('products.credit')}</span>
-              </label>
-            </div>
-            {formData.paymentTypes.length === 0 && (
-              <p className="text-xs text-amber-500">
-                {t('products.supplierPaymentWarning')}
-              </p>
-            )}
+          {/* Supplier Selection */}
+          <div className="space-y-1.5">
+            <label className={`${labelClasses} flex items-center gap-1`}>
+              <Truck className="w-3.5 h-3.5" /> {t('productsForm.supplier')}
+            </label>
+            <SearchableSelect
+              value={formData.supplierId || ''}
+              onValueChange={(value) => setFormData({ ...formData, supplierId: value })}
+              options={mockSuppliers.filter(s => s.isActive).map(supplier => ({
+                value: supplier.id,
+                label: supplier.name,
+              }))}
+              placeholder={t('productsForm.selectSupplier')}
+              theme={theme}
+            />
           </div>
 
           {/* Description */}

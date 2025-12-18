@@ -2,11 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
-import { mockProducts, mockBrands, mockCategories } from '../data/mockData';
+import { mockProducts, mockBrands, mockCategories, mockSuppliers } from '../data/mockData';
 import { 
   Package, Search, Plus, Edit2, Trash2, ChevronDown, AlertTriangle, CheckCircle, XCircle, 
-  Filter, Grid, List, Building2, Tag, Layers, BarChart3, Box, RefreshCw, DollarSign, SortAsc, SortDesc, X,
-  Banknote, CreditCard
+  Filter, Grid, List, Building2, Tag, Layers, BarChart3, Box, RefreshCw, DollarSign, SortAsc, SortDesc, X, Truck, Banknote, CreditCard
 } from 'lucide-react';
 import { Product } from '../types/index';
 import { ProductFormModal } from '../components/modals/ProductFormModal';
@@ -15,8 +14,66 @@ import { SearchableSelect } from '../components/ui/searchable-select';
 import { Pagination } from '../components/ui/data-table';
 
 type ViewMode = 'grid' | 'table';
+// Simple Code39 barcode renderer (sufficient for scannable barcodes for alphanumerics)
+// Encodes characters using Code39 patterns and renders an SVG of black bars on white background.
+const CODE39_MAP: Record<string, string> = {
+  '0': 'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw','5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn',
+  'A':'wnnnnwnnw','B':'nnwnnwnnw','C':'wnwnnwnnn','D':'nnnnwwnnw','E':'wnnnwwnnn','F':'nnwnwwnnn','G':'nnnnnwwnw','H':'wnnnnwwnn','I':'nnwnnwwnn','J':'nnnnwwwnn',
+  'K':'wnnnnnnww','L':'nnwnnnnww','M':'wnwnnnnwn','N':'nnnnwnnww','O':'wnnnwnnwn','P':'nnwnwnnwn','Q':'nnnnnnwww','R':'wnnnnnwwn','S':'nnwnnnwwn','T':'nnnnwnwwn',
+  'U':'wwnnnnnnw','V':'nwwnnnnnw','W':'wwwnnnnnn','X':'nwnnwnnnw','Y':'wwnnwnnnn','Z':'nwwnwnnnn','-':'nwnnnnwnw','.':'wwnnnnwnn',' ':'nwwnnnwnn','$':'nwnwnwnnn','/':'nwnwnnnwn','+':'nwnnnwnwn','%':'nnnwnwnwn','*':'nwnnwnwnn'
+};
+
+interface BarcodeProps {
+  value: string;
+  height?: number;
+  narrow?: number;
+  wide?: number;
+  margin?: number;
+}
+
+const Code39Barcode: React.FC<BarcodeProps> = ({ value, height = 64, narrow = 2, wide = 6, margin = 8 }) => {
+  // Prepare text with start/stop '*'
+  const text = `*${String(value || '')
+    .toUpperCase()
+    .replace(/[^0-9A-Z\-\. \$\/\+\%]/g, '')}*`;
+
+  let x = 0;
+  const bars: React.ReactNode[] = [];
+
+  const appendPattern = (pattern: string, charIndex: number) => {
+    for (let i = 0; i < pattern.length; i++) {
+      const isBar = i % 2 === 0; // bars are even positions in pattern
+      const w = pattern[i] === 'n' ? narrow : wide;
+      if (isBar) {
+        bars.push(
+          <rect key={`bar-${charIndex}-${i}-${x}`} x={x} y={0} width={w} height={height} fill="#000" />
+        );
+      }
+      x += w;
+    }
+    // inter-character gap (narrow white space)
+    x += narrow;
+  };
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const pattern = CODE39_MAP[ch] || CODE39_MAP['-'];
+    appendPattern(pattern, i);
+  }
+
+  const totalWidth = x + margin * 2;
+
+  return (
+    <svg width={totalWidth} height={height + margin * 2} viewBox={`0 0 ${totalWidth} ${height + margin * 2}`} role="img" aria-label={`Barcode for ${value}`}>
+      <rect x={0} y={0} width={totalWidth} height={height + margin * 2} fill="#fff" rx={4} />
+      <g transform={`translate(${margin}, ${margin})`}>
+        {bars}
+      </g>
+    </svg>
+  );
+};
+
 type PriceDisplayMode = 'retail' | 'wholesale' | 'both';
-type PaymentTypeFilter = 'all' | 'cash' | 'credit' | 'both';
 
 export const Products: React.FC = () => {
   const { t } = useTranslation();
@@ -26,8 +83,8 @@ export const Products: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [brandFilter, setBrandFilter] = useState<string>('all');
+  const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [stockFilter, setStockFilter] = useState<string>('all');
-  const [paymentTypeFilter, setPaymentTypeFilter] = useState<PaymentTypeFilter>('all');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showFormModal, setShowFormModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
@@ -50,6 +107,11 @@ export const Products: React.FC = () => {
     return mockBrands.filter(b => b.isActive);
   }, []);
 
+  // Get all suppliers
+  const allSuppliers = useMemo(() => {
+    return mockSuppliers;
+  }, []);
+
   const filteredProducts = useMemo(() => {
     const filtered = products.filter((product) => {
       const matchesSearch =
@@ -60,6 +122,7 @@ export const Products: React.FC = () => {
       
       const matchesCategory = categoryFilter === 'all' || product.categoryId === categoryFilter || product.category === categoryFilter;
       const matchesBrand = brandFilter === 'all' || product.brandId === brandFilter;
+      const matchesSupplier = supplierFilter === 'all' || product.supplierId === supplierFilter;
       
       let matchesStock = true;
       if (stockFilter === 'low') {
@@ -69,21 +132,8 @@ export const Products: React.FC = () => {
       } else if (stockFilter === 'in') {
         matchesStock = product.stock > (product.minStock || 10);
       }
-
-      // Payment type filter
-      let matchesPaymentType = true;
-      if (paymentTypeFilter !== 'all') {
-        const productPaymentTypes = product.paymentTypes || ['cash', 'credit']; // Default to both if not set
-        if (paymentTypeFilter === 'cash') {
-          matchesPaymentType = productPaymentTypes.includes('cash') && !productPaymentTypes.includes('credit');
-        } else if (paymentTypeFilter === 'credit') {
-          matchesPaymentType = productPaymentTypes.includes('credit') && !productPaymentTypes.includes('cash');
-        } else if (paymentTypeFilter === 'both') {
-          matchesPaymentType = productPaymentTypes.includes('cash') && productPaymentTypes.includes('credit');
-        }
-      }
       
-      return matchesSearch && matchesCategory && matchesBrand && matchesStock && matchesPaymentType;
+      return matchesSearch && matchesCategory && matchesBrand && matchesSupplier && matchesStock;
     });
 
     // Apply sorting
@@ -91,7 +141,7 @@ export const Products: React.FC = () => {
       const comparison = a.name.localeCompare(b.name);
       return sortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [products, searchQuery, categoryFilter, brandFilter, stockFilter, paymentTypeFilter, sortOrder]);
+  }, [products, searchQuery, categoryFilter, brandFilter, supplierFilter, stockFilter, sortOrder]);
 
   // Pagination
   const totalPages = Math.ceil(filteredProducts.length / pageSize);
@@ -103,7 +153,7 @@ export const Products: React.FC = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, categoryFilter, brandFilter, stockFilter, paymentTypeFilter]);
+  }, [searchQuery, categoryFilter, brandFilter, supplierFilter, stockFilter]);
 
   // Stats
   const stats = useMemo(() => {
@@ -124,11 +174,11 @@ export const Products: React.FC = () => {
     setSearchQuery('');
     setCategoryFilter('all');
     setBrandFilter('all');
+    setSupplierFilter('all');
     setStockFilter('all');
-    setPaymentTypeFilter('all');
   };
 
-  const hasActiveFilters = searchQuery || categoryFilter !== 'all' || brandFilter !== 'all' || stockFilter !== 'all' || paymentTypeFilter !== 'all';
+  const hasActiveFilters = searchQuery || categoryFilter !== 'all' || brandFilter !== 'all' || supplierFilter !== 'all' || stockFilter !== 'all';
 
   const formatPrice = (price: number) => `${t('common.currency')} ${price.toLocaleString()}`;
 
@@ -289,7 +339,7 @@ export const Products: React.FC = () => {
               {t('common.filter')}
               {hasActiveFilters && (
                 <span className="w-5 h-5 bg-white/20 rounded-full text-xs flex items-center justify-center">
-                  {[categoryFilter !== 'all', brandFilter !== 'all', stockFilter !== 'all'].filter(Boolean).length}
+                  {[categoryFilter !== 'all', brandFilter !== 'all', supplierFilter !== 'all', stockFilter !== 'all'].filter(Boolean).length}
                 </span>
               )}
               <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
@@ -311,7 +361,7 @@ export const Products: React.FC = () => {
 
           <div className="flex items-center gap-2">
             {/* Price Display */}
-            <div className="w-36">
+            <div className="min-w-[140px]">
               <SearchableSelect
                 value={priceDisplay}
                 onValueChange={(value) => setPriceDisplay(value as PriceDisplayMode)}
@@ -414,6 +464,29 @@ export const Products: React.FC = () => {
               />
             </div>
 
+            {/* Supplier Filter */}
+            <div className="flex-1 min-w-[180px]">
+              <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                {t('filters.supplier')}
+              </label>
+              <SearchableSelect
+                value={supplierFilter}
+                onValueChange={(value) => setSupplierFilter(value)}
+                placeholder={t('filters.allSuppliers')}
+                searchPlaceholder={t('common.search')}
+                emptyMessage={t('filters.noSuppliers')}
+                theme={theme}
+                options={[
+                  { value: 'all', label: t('filters.allSuppliers'), count: allSuppliers.length, icon: <Truck className="w-4 h-4" /> },
+                  ...allSuppliers.map(supplier => ({
+                    value: supplier.id,
+                    label: `${supplier.name} ${supplier.contactPerson ? `(${supplier.contactPerson})` : ''}`,
+                    icon: <Truck className="w-4 h-4" />
+                  }))
+                ]}
+              />
+            </div>
+
             {/* Stock Filter */}
             <div className="flex-1 min-w-[180px]">
               <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -431,27 +504,6 @@ export const Products: React.FC = () => {
                   { value: 'in', label: t('products.inStock'), icon: <CheckCircle className="w-4 h-4 text-green-500" /> },
                   { value: 'low', label: t('products.lowStock'), icon: <AlertTriangle className="w-4 h-4 text-yellow-500" /> },
                   { value: 'out', label: t('products.outOfStock'), icon: <XCircle className="w-4 h-4 text-red-500" /> },
-                ]}
-              />
-            </div>
-
-            {/* Supplier Payment Filter */}
-            <div className="flex-1 min-w-[180px]">
-              <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                {t('products.supplierPayment')}
-              </label>
-              <SearchableSelect
-                value={paymentTypeFilter}
-                onValueChange={(value) => setPaymentTypeFilter(value as PaymentTypeFilter)}
-                placeholder={t('filters.allPaymentTypes')}
-                searchPlaceholder={t('common.search')}
-                emptyMessage={t('filters.noOptions')}
-                theme={theme}
-                options={[
-                  { value: 'all', label: t('filters.allPaymentTypes'), icon: <DollarSign className="w-4 h-4" /> },
-                  { value: 'cash', label: t('products.cashOnly'), icon: <Banknote className="w-4 h-4 text-green-500" /> },
-                  { value: 'credit', label: t('products.creditOnly'), icon: <CreditCard className="w-4 h-4 text-blue-500" /> },
-                  { value: 'both', label: t('products.cashAndCredit'), icon: <DollarSign className="w-4 h-4 text-purple-500" /> },
                 ]}
               />
             </div>
@@ -482,14 +534,40 @@ export const Products: React.FC = () => {
                           {product.nameAlt}
                         </p>
                       )}
+                      
                     </div>
-                    {product.isFeatured && (
-                      <span className="ml-2 px-2 py-0.5 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full">
-                        {t('products.featured')}
+
+                    <div className="flex flex-col items-end gap-2 ml-2">
+                      {product.isFeatured && (
+                        <span className="ml-2 px-2 py-0.5 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full">
+                          {t('products.featured')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Full-width Barcode below product name */}
+                  {(product.barcode || product.sku) && (
+                    <div className="mt-3 w-full">
+                      <div className="bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm w-full flex items-center justify-center">
+                        <Code39Barcode value={product.barcode || product.sku} height={40} narrow={1.5} wide={4} margin={4} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 flex-wrap mt-3">
+                    {/* Barcode Badge */}
+                    {(product.barcode || product.sku) && (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'}`}>
+                        <Package className="w-3 h-3" />
+                        Barcode: {product.barcode || product.sku}
                       </span>
                     )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* SKU Badge - separate from barcode */}
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${theme === 'dark' ? 'bg-slate-700/50 text-slate-300 border border-slate-600' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>
+                      <Tag className="w-3 h-3" />
+                      SKU: {product.sku}
+                    </span>
                     {product.brand && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
                         <Building2 className="w-3 h-3" />
@@ -499,28 +577,26 @@ export const Products: React.FC = () => {
                     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
                       {mockCategories.find(c => c.id === product.categoryId)?.name || product.category}
                     </span>
-                    {/* Supplier Payment Status Badges */}
-                    {(product.paymentTypes || ['cash', 'credit']).includes('cash') && !(product.paymentTypes || ['cash', 'credit']).includes('credit') && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-green-500/10 text-green-500 border border-green-500/20">
-                        <Banknote className="w-3 h-3" />
-                        {t('products.cash')}
-                      </span>
-                    )}
-                    {(product.paymentTypes || ['cash', 'credit']).includes('credit') && !(product.paymentTypes || ['cash', 'credit']).includes('cash') && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                        <CreditCard className="w-3 h-3" />
-                        {t('products.credit')}
-                      </span>
-                    )}
-                    {(product.paymentTypes || ['cash', 'credit']).includes('cash') && (product.paymentTypes || ['cash', 'credit']).includes('credit') && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
-                        <Banknote className="w-3 h-3" />
-                        {t('products.cashAndCredit')}
-                      </span>
-                    )}
-                    <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                      {t('products.sku')}: {product.sku}
-                    </span>
+                    {/* Supplier Badge (creative) */}
+                    {product.supplierId && (() => {
+                      const supplier = mockSuppliers.find(s => s.id === product.supplierId);
+                      const supplierName = (product as any).supplierName || supplier?.name;
+                      if (!supplierName) return null;
+                      const initials = supplierName.split(' ').slice(0,2).map(n => n[0]).join('').toUpperCase();
+                      const statusClass = supplier?.paymentType === 'cash'
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                        : 'bg-orange-500/10 text-orange-400 border border-orange-500/20';
+
+                      return (
+                        <span className="inline-flex items-center gap-2 px-2 py-0.5 rounded-md text-xs font-medium" title={supplierName}>
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold ${statusClass}`}>
+                            {initials}
+                          </span>
+                          <span className="truncate max-w-[110px]">{supplierName}</span>
+                          {supplier?.paymentType === 'cash' ? <Banknote className="w-3 h-3 text-green-400" /> : supplier?.paymentType === 'credit' ? <CreditCard className="w-3 h-3 text-orange-400" /> : <Truck className="w-3 h-3 text-slate-400" />}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -687,7 +763,7 @@ export const Products: React.FC = () => {
                     <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.product')}</th>
                     <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.brand')}</th>
                     <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.category')}</th>
-                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.wholesale')}</th>
+                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.supplier')}</th>
                     <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.retail')}</th>
                     <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.stock')}</th>
                     <th className={`px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{t('tableHeaders.variants')}</th>
@@ -712,7 +788,7 @@ export const Products: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-blue-500 font-medium">{product.wholesalePrice ? formatPrice(product.wholesalePrice) : '-'}</span>
+                        <span className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{product.supplierName || '-'}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-green-500 font-medium">{formatPrice(product.retailPrice || product.price || 0)}</span>

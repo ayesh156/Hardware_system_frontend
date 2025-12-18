@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Customer, CustomerType } from '../../types/index';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { 
   User, 
   Building2, 
@@ -146,11 +146,17 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 ${
         theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
+        <DialogHeader className="sr-only">
+          <DialogTitle>{isEditing ? t('common.edit') + ' ' + t('customers.customer') : t('customers.addCustomer')}</DialogTitle>
+          <DialogDescription>
+            {isEditing ? t('customers.updateInfo') : t('customers.addNewCustomer')}
+          </DialogDescription>
+        </DialogHeader>
         {/* Gradient Header */}
         <div className={`p-6 text-white ${isEditing 
           ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-red-500' 
           : 'bg-gradient-to-r from-orange-500 via-rose-500 to-pink-600'
-        }`}>
+        }`} aria-hidden="true">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
               {isEditing ? <User className="w-7 h-7" /> : <UserPlus className="w-7 h-7" />}

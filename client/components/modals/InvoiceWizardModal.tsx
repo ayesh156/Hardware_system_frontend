@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Search, FileText, User, Package, Calendar, CheckCircle } from 'lucide-react';
 import { PrintInvoiceModal } from './PrintInvoiceModal';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 
 interface InvoiceWizardModalProps {
   isOpen: boolean;
@@ -178,8 +178,12 @@ export const InvoiceWizardModal: React.FC<InvoiceWizardModalProps> = ({
       <DialogContent className={`max-w-5xl max-h-[90vh] overflow-y-auto p-0 ${
         theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
+        <DialogHeader className="sr-only">
+          <DialogTitle>{t('invoices.addInvoice')}</DialogTitle>
+          <DialogDescription>Create a new invoice in 3 easy steps</DialogDescription>
+        </DialogHeader>
         {/* Gradient Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-600 p-6 text-white">
+        <div className="bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-600 p-6 text-white" aria-hidden="true">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
               <FileText className="w-7 h-7" />

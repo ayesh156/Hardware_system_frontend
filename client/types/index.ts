@@ -119,8 +119,9 @@ export interface Product {
   tags?: string[];
   images?: string[];
   
-  // Payment Types - Cash and/or Credit
-  paymentTypes?: ('cash' | 'credit')[];
+  // Supplier relationship
+  supplierId?: string;
+  supplierName?: string;
   
   // Status
   isActive?: boolean;
@@ -163,6 +164,21 @@ export interface Invoice {
 }
 
 // Supplier Management
+export type SupplierPaymentType = 'cash' | 'credit';
+
+export interface SupplierDelivery {
+  id: string;
+  supplierId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  deliveryDate: string;
+  invoiceNumber?: string;
+  notes?: string;
+}
+
 export interface Supplier {
   id: string;
   name: string;
@@ -174,5 +190,14 @@ export interface Supplier {
   categories?: string[];
   paymentTerms?: string;
   isActive: boolean;
+  // Payment type - Cash or Credit supplier
+  paymentType: SupplierPaymentType;
+  // Credit-specific fields
+  creditBalance?: number;       // Outstanding amount owed
+  creditLimit?: number;         // Maximum credit allowed
+  creditDueDate?: string;       // When credit payment is due
+  lastPaymentDate?: string;     // Last payment made to supplier
+  // Delivery records
+  deliveries?: SupplierDelivery[];
 }
 

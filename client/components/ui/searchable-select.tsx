@@ -81,7 +81,7 @@ export function SearchableSelect({
             "w-full justify-between font-normal h-10",
             theme === 'dark' 
               ? "border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white" 
-              : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
+              : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50 hover:text-slate-900",
             !value && "text-muted-foreground",
             triggerClassName
           )}
@@ -141,8 +141,8 @@ export function SearchableSelect({
                   className={cn(
                     "cursor-pointer",
                     theme === 'dark' 
-                      ? "text-slate-200 hover:bg-slate-700 data-[selected=true]:bg-slate-700 aria-selected:bg-slate-700" 
-                      : "text-slate-900 hover:bg-slate-100 data-[selected=true]:bg-slate-100 aria-selected:bg-slate-100"
+                      ? "text-slate-200 hover:bg-slate-700 hover:text-white data-[selected=true]:bg-slate-700 data-[selected=true]:text-white aria-selected:bg-slate-700 aria-selected:text-white" 
+                      : "text-slate-900 hover:bg-slate-100 hover:text-slate-900 data-[selected=true]:bg-slate-100 data-[selected=true]:text-slate-900 aria-selected:bg-slate-100 aria-selected:text-slate-900"
                   )}
                 >
                   <Check
