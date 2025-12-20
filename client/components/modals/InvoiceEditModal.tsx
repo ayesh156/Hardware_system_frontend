@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Invoice, Customer, Product, InvoiceItem } from '../../types/index';
 import { X, Plus, Trash2, Search, Save, Calendar, User, FileText } from 'lucide-react';
 import { SearchableSelect } from '../ui/searchable-select';
@@ -172,6 +172,10 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Edit Invoice</DialogTitle>
+          <DialogDescription>Edit invoice details, customer information, and line items</DialogDescription>
+        </DialogHeader>
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white">
           <div className="flex items-start justify-between">

@@ -72,15 +72,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       <div className={`flex items-center h-16 px-4 border-b ${theme === 'dark' ? 'border-slate-800/50' : 'border-slate-200'}`}>
         <Link to="/" className="flex items-center gap-3 group">
           <div className="relative flex-shrink-0">
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-rose-500 rounded-xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
-            <div className="relative w-10 h-10 bg-gradient-to-br from-orange-500 to-rose-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Package className="w-5 h-5 text-white" />
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
+            <div className="relative w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
+              {/* Wrench / hammer creative icon */}
+              <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+              </svg>
             </div>
           </div>
           {!sidebarCollapsed && (
             <div className="flex flex-col overflow-hidden">
               <span className={`text-lg font-bold whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Hardware<span className="text-orange-500">Pro</span>
+                Liyanage<span className="text-amber-500"> Hardware</span>
               </span>
               <span className={`text-[10px] -mt-0.5 tracking-wider uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
                 {t('sidebar.adminPanel')}
@@ -493,7 +496,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       Admin User
                     </p>
                     <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                      admin@hardwarepro.lk
+                      admin@liyanage.lk
                     </p>
                   </div>
                   <ChevronDown className={`hidden lg:block w-4 h-4 transition-transform ${
@@ -513,7 +516,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         Admin User
                       </p>
                       <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                        admin@hardwarepro.lk
+                        admin@liyanage.lk
                       </p>
                     </div>
                     <div className="py-1">

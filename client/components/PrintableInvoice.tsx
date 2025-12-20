@@ -397,13 +397,13 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
         {/* Header */}
         <div className="invoice-header">
           <div className="company-info">
-            <h1>HardwarePro</h1>
+            <h1>Liyanage Hardware</h1>
             <div className="tagline">Professional Hardware Solutions</div>
             <div className="details">
               No. 45, Galle Road, Colombo 03, Sri Lanka<br />
               Tel: +94 11 234 5678 | Mobile: +94 77 123 4567<br />
-              Email: billing@hardwarepro.lk<br />
-              Web: www.hardwarepro.lk
+              Email: billing@liyanage.lk<br />
+              Web: www.liyanage.lk
             </div>
           </div>
           <div className="invoice-title">
@@ -496,7 +496,7 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
             <li>Payment is due within 30 days of invoice date.</li>
             <li>Please include invoice number with your payment.</li>
             <li>Late payments may incur additional charges.</li>
-            <li>Goods remain property of HardwarePro until full payment is received.</li>
+            <li>Goods remain property of Liyanage Hardware until full payment is received.</li>
           </ul>
         </div>
 
@@ -504,7 +504,7 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
         <div className="footer">
           <div className="thank-you">Thank you for your business!</div>
           <div className="contact">
-            Questions? Contact us at <a href="mailto:support@hardwarepro.lk">support@hardwarepro.lk</a> or call <a href="tel:+94112345678">+94 11 234 5678</a>
+            Questions? Contact us at <a href="mailto:info@liyanage.lk">info@liyanage.lk</a> or call <a href="tel:+94112345678">+94 11 234 5678</a>
           </div>
           <div className="tagline-footer">
             Quality Products • Fast Delivery • Customer Satisfaction Guaranteed

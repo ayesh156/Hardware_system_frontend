@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Invoice, Customer, InvoiceItem } from '../../types/index';
 import { Printer, X, FileText } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -475,6 +475,9 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
               <FileText className="w-5 h-5 text-cyan-500" />
               {t('modals.printInvoice')}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Preview and print invoice details
+            </DialogDescription>
             <div className="flex items-center gap-2">
               <button
                 onClick={handlePrint}
@@ -546,7 +549,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                       color: '#0f172a',
                       marginBottom: '2px',
                       letterSpacing: '-0.3px'
-                    }}>COSMOS HARDWARE</h1>
+                    }}>LIYANAGE HARDWARE</h1>
                     <p style={{ 
                       fontSize: '8px', 
                       color: '#64748b', 
@@ -555,8 +558,8 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                       marginBottom: '6px'
                     }}>Quality Building Materials</p>
                     <p style={{ fontSize: '9px', color: '#475569', lineHeight: 1.4 }}>
-                      📍 123 Main Street, Colombo<br/>
-                      📞 011-2345678 | ✉️ info@cosmos.lk
+                      📍 Hakmana Rd, Deiyandara<br/>
+                      📞 0773751805 / 0412268217 | ✉️ info@liyanage.lk
                     </p>
                   </div>
                   
@@ -853,16 +856,16 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                   <p style={{
                     fontSize: '11px',
                     fontWeight: 700,
-                    background: 'linear-gradient(135deg, #0ea5e9, #8b5cf6)',
+                    background: 'linear-gradient(135deg, #f59e0b, #ea580c)',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     marginBottom: '4px'
                   }}>Thank you for your business!</p>
                   <p style={{ fontSize: '8px', color: '#64748b' }}>
-                    Questions? Contact us at info@cosmos.lk or 011-2345678
+                    Questions? Contact us at info@liyanage.lk or 0773751805 / 0412268217
                   </p>
                   <p style={{ fontSize: '7px', color: '#94a3b8', marginTop: '6px', letterSpacing: '0.5px' }}>
-                    Powered by Cosmos POS System
+                    © 2025 Powered by Nebulainfinite
                   </p>
                 </div>
               </div>

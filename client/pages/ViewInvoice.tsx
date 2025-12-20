@@ -257,15 +257,15 @@ export const ViewInvoice: React.FC = () => {
             theme === 'dark' ? 'shadow-black/50' : 'shadow-slate-300/50'
           }`}>
             {/* Invoice Header */}
-            <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 p-8 text-white">
+            <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 p-8 text-white">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-3xl font-bold tracking-tight">COSMOS HARDWARE</h2>
-                  <p className="text-blue-200 text-sm mt-1 tracking-widest">QUALITY BUILDING MATERIALS</p>
-                  <div className="mt-4 text-blue-100 text-sm space-y-1">
-                    <p className="flex items-center gap-2"><MapPin className="w-4 h-4" /> 123 Main Street, Colombo</p>
-                    <p className="flex items-center gap-2"><Phone className="w-4 h-4" /> 011-2345678</p>
-                    <p className="flex items-center gap-2"><Mail className="w-4 h-4" /> info@cosmos.lk</p>
+                  <h2 className="text-3xl font-bold tracking-tight">LIYANAGE HARDWARE</h2>
+                  <p className="text-amber-200 text-sm mt-1 tracking-widest">QUALITY BUILDING MATERIALS</p>
+                  <div className="mt-4 text-amber-100 text-sm space-y-1">
+                    <p className="flex items-center gap-2"><MapPin className="w-4 h-4" /> Hakmana Rd, Deiyandara</p>
+                    <p className="flex items-center gap-2"><Phone className="w-4 h-4" /> 0773751805 • 0412268217</p>
+                    <p className="flex items-center gap-2"><Mail className="w-4 h-4" /> info@liyanage.lk</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -516,12 +516,15 @@ export const ViewInvoice: React.FC = () => {
               theme === 'dark' ? 'bg-slate-800/50 border-t border-slate-700' : 'bg-slate-50 border-t border-slate-200'
             }`}>
               <p className={`text-center text-sm font-medium ${
-                theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+                theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
               }`}>
                 Thank you for your business!
               </p>
               <p className={`text-center text-xs mt-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                Cosmos Hardware • 123 Main Street, Colombo • 📞 011-2345678 • info@cosmos.lk
+                Liyanage Hardware • Hakmana Rd, Deiyandara • 📞 0773751805 / 0412268217 • info@liyanage.lk
+              </p>
+              <p className={`text-center text-[10px] mt-2 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
+                © 2025 Powered by <span className="font-semibold">Nebulainfinite</span>
               </p>
             </div>
           </div>

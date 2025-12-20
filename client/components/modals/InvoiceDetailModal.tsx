@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Invoice, Customer } from '../../types/index';
 import { useTheme } from '../../contexts/ThemeContext';
 import { 
@@ -69,6 +69,10 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
       <DialogContent className={`max-w-5xl max-h-[90vh] overflow-y-auto p-0 ${
         theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
+        <DialogHeader className="sr-only">
+          <DialogTitle>{invoice.invoiceNumber}</DialogTitle>
+          <DialogDescription>View complete invoice details and information</DialogDescription>
+        </DialogHeader>
         {/* Header with gradient */}
         <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6 text-white">
           <div className="flex items-start justify-between">

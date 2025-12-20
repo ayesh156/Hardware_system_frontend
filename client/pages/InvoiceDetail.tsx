@@ -80,11 +80,11 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoices, customer
         <div className={`p-8 border-b ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
           <div className="flex items-start justify-between mb-8">
             <div>
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-rose-500 bg-clip-text text-transparent mb-2">
-                HardwarePro
+              <h2 className="text-3xl font-bold bg-clip-text text-amber-400 mb-2">
+                LIYANAGE HARDWARE
               </h2>
-              <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>
-                Professional Hardware Management System
+              <p className={theme === 'dark' ? 'text-slate-400' : 'text-amber-600'}>
+                Liyanage Hardware Management System
               </p>
             </div>
             <div className="text-right">
@@ -148,13 +148,13 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoices, customer
                 Company Details
               </p>
               <p className={`text-sm mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                HardwarePro Management System
+                Liyanage Hardware Management System
               </p>
               <p className={`text-sm mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                 Colombo, Sri Lanka
               </p>
               <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                support@hardwarepro.lk
+                info@liyanage.lk
               </p>
             </div>
           </div>
@@ -228,7 +228,7 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoices, customer
           <p>Thank you for your business!</p>
           <p>
             If you have any questions about this invoice, please contact us at
-            support@hardwarepro.lk
+            info@liyanage.lk
           </p>
           <p className={`text-xs mt-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
             This is a computer-generated invoice. No signature is required.

@@ -52,16 +52,19 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {/* Logo and Brand */}
             <Link to="/" className="flex items-center gap-3 group">
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-rose-500 rounded-xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
-                <div className="relative w-10 h-10 bg-gradient-to-br from-orange-500 to-rose-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Package className="w-5 h-5 text-white" />
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
+                <div className="relative w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
+                  {/* Creative hardware wrench/hammer logo */}
+                  <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                  </svg>
                 </div>
               </div>
               <div className="flex flex-col">
                 <span className="text-xl font-bold dark:text-white text-slate-900">
-                  Hardware<span className="text-orange-500">Pro</span>
+                  Liyanage<span className="text-amber-500"> Hardware</span>
                 </span>
-                <span className="text-[10px] dark:text-slate-500 text-slate-400 -mt-1 tracking-wider uppercase">Enterprise Suite</span>
+                <span className="text-[10px] dark:text-slate-500 text-slate-400 -mt-1 tracking-wider uppercase">Quality Building Materials</span>
               </div>
             </Link>
 
@@ -208,15 +211,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {/* Brand */}
             <div className="md:col-span-1">
               <Link to="/" className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-rose-600 rounded-xl flex items-center justify-center">
-                  <Package className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                  </svg>
                 </div>
                 <span className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                  Hardware<span className="text-orange-500">Pro</span>
+                  Liyanage<span className="text-amber-500"> Hardware</span>
                 </span>
               </Link>
               <p className={`text-sm leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                Enterprise-grade hardware management solution for modern Sri Lankan businesses.
+                Your trusted partner for quality building materials and hardware solutions in Sri Lanka.
               </p>
             </div>
 
@@ -265,7 +270,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div>
               <h3 className={`text-sm font-semibold mb-4 uppercase tracking-wider ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Contact</h3>
               <ul className={`space-y-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                <li>support@hardwarepro.lk</li>
+                <li>info@liyanage.lk</li>
                 <li>+94 71 000 0000</li>
                 <li>Colombo, Sri Lanka</li>
               </ul>
@@ -282,9 +287,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {/* Bottom bar */}
           <div className={`pt-8 border-t flex flex-col sm:flex-row justify-between items-center gap-4 ${theme === 'dark' ? 'border-slate-800/50' : 'border-slate-200'}`}>
-            <p className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-              © 2024 HardwarePro. All rights reserved.
-            </p>
+            <div className="flex items-center gap-2">
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                © 2025 <span className="font-semibold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">Nebulainfinite</span>. All rights reserved.
+              </p>
+            </div>
             <div className={`flex items-center gap-6 text-sm ${theme === 'dark' ? 'text-slate-500 hover:[&>span]:text-slate-400' : 'text-slate-500 hover:[&>span]:text-slate-700'}`}>
               <span className="cursor-pointer transition-colors">Privacy Policy</span>
               <span className="cursor-pointer transition-colors">Terms of Service</span>

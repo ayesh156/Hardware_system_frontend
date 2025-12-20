@@ -1423,11 +1423,11 @@ export const CreateInvoice: React.FC = () => {
                   theme === 'dark' ? 'shadow-black/50' : 'shadow-slate-300/50'
                 }`}>
                   {/* Invoice Preview Header */}
-                  <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 p-6 text-white">
+                  <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 p-6 text-white">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h2 className="text-2xl font-bold tracking-tight">COSMOS HARDWARE</h2>
-                        <p className="text-blue-200 text-xs mt-1 tracking-widest">QUALITY BUILDING MATERIALS</p>
+                        <h2 className="text-2xl font-bold tracking-tight">LIYANAGE HARDWARE</h2>
+                        <p className="text-amber-200 text-xs mt-1 tracking-widest">QUALITY BUILDING MATERIALS</p>
                       </div>
                       <div className="text-right">
                         <p className="text-3xl font-bold tracking-wider">{t('tableHeaders.invoice').toUpperCase()}</p>
@@ -1575,7 +1575,10 @@ export const CreateInvoice: React.FC = () => {
                   {/* Invoice Footer */}
                   <div className={`px-6 py-4 ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'} border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                     <p className={`text-center text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                      {t('invoice.thankYouMessage')} • Cosmos Hardware • 📞 011-2345678
+                      {t('invoice.thankYouMessage')} • Liyanage Hardware • 📞 0773751805 / 0412268217
+                    </p>
+                    <p className={`text-center text-[10px] mt-1 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
+                      © 2025 Powered by Nebulainfinite
                     </p>
                   </div>
                 </div>

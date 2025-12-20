@@ -1,0 +1,908 @@
+import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from '../contexts/ThemeContext';
+import { useIsMobile } from '../hooks/use-mobile';
+import { mockProducts, mockCategories } from '../data/mockData';
+import { Product, Category } from '../types';
+import { 
+  ArrowLeft, 
+  Printer, 
+  Package, 
+  Tag, 
+  Plus, 
+  Minus, 
+  Trash2, 
+  X,
+  Barcode,
+  ScanLine,
+  Settings2,
+  Layers,
+  ShoppingCart
+} from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import { SearchableSelect, SearchableSelectOption } from '../components/ui/searchable-select';
+import { toast } from 'sonner';
+
+// ============================================================================
+// CODE39 BARCODE GENERATOR - Scannable barcode SVG renderer
+// ============================================================================
+const CODE39_MAP: Record<string, string> = {
+  '0': 'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw','5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn',
+  'A':'wnnnnwnnw','B':'nnwnnwnnw','C':'wnwnnwnnn','D':'nnnnwwnnw','E':'wnnnwwnnn','F':'nnwnwwnnn','G':'nnnnnwwnw','H':'wnnnnwwnn','I':'nnwnnwwnn','J':'nnnnwwwnn',
+  'K':'wnnnnnnww','L':'nnwnnnnww','M':'wnwnnnnwn','N':'nnnnwnnww','O':'wnnnwnnwn','P':'nnwnwnnwn','Q':'nnnnnnwww','R':'wnnnnnwwn','S':'nnwnnnwwn','T':'nnnnwnwwn',
+  'U':'wwnnnnnnw','V':'nwwnnnnnw','W':'wwwnnnnnn','X':'nwnnwnnnw','Y':'wwnnwnnnn','Z':'nwwnwnnnn','-':'nwnnnnwnw','.':'wwnnnnwnn',' ':'nwwnnnwnn','$':'nwnwnwnnn','/':'nwnwnnnwn','+':'nwnnnwnwn','%':'nnnwnwnwn','*':'nwnnwnwnn'
+};
+
+interface BarcodeProps {
+  value: string;
+  height?: number;
+  narrow?: number;
+  wide?: number;
+  margin?: number;
+}
+
+const Code39Barcode: React.FC<BarcodeProps> = ({ value, height = 50, narrow = 1.5, wide = 4, margin = 4 }) => {
+  const text = `*${String(value || '')
+    .toUpperCase()
+    .replace(/[^0-9A-Z\-\. \$\/\+\%]/g, '')}*`;
+
+  let x = 0;
+  const bars: React.ReactNode[] = [];
+
+  const appendPattern = (pattern: string, charIndex: number) => {
+    for (let i = 0; i < pattern.length; i++) {
+      const isBar = i % 2 === 0;
+      const w = pattern[i] === 'n' ? narrow : wide;
+      if (isBar) {
+        bars.push(
+          <rect key={`bar-${charIndex}-${i}-${x}`} x={x} y={0} width={w} height={height} fill="#000" />
+        );
+      }
+      x += w;
+    }
+    x += narrow;
+  };
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const pattern = CODE39_MAP[ch] || CODE39_MAP['-'];
+    appendPattern(pattern, i);
+  }
+
+  const totalWidth = x + margin * 2;
+
+  return (
+    <svg width={totalWidth} height={height + margin * 2} viewBox={`0 0 ${totalWidth} ${height + margin * 2}`} role="img" aria-label={`Barcode for ${value}`}>
+      <rect x={0} y={0} width={totalWidth} height={height + margin * 2} fill="#fff" />
+      <g transform={`translate(${margin}, ${margin})`}>
+        {bars}
+      </g>
+    </svg>
+  );
+};
+
+// Generate Code39 barcode as SVG string for print
+const generateCode39SVG = (value: string, height: number = 50, narrow: number = 1.5, wide: number = 4, margin: number = 4): string => {
+  const text = `*${String(value || '')
+    .toUpperCase()
+    .replace(/[^0-9A-Z\-\. \$\/\+\%]/g, '')}*`;
+
+  let x = 0;
+  const bars: string[] = [];
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const pattern = CODE39_MAP[ch] || CODE39_MAP['-'];
+    
+    for (let j = 0; j < pattern.length; j++) {
+      const isBar = j % 2 === 0;
+      const w = pattern[j] === 'n' ? narrow : wide;
+      if (isBar) {
+        bars.push(`<rect x="${x}" y="0" width="${w}" height="${height}" fill="#000"/>`);
+      }
+      x += w;
+    }
+    x += narrow;
+  }
+
+  const totalWidth = x + margin * 2;
+
+  return `<svg width="${totalWidth}" height="${height + margin * 2}" viewBox="0 0 ${totalWidth} ${height + margin * 2}" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="${totalWidth}" height="${height + margin * 2}" fill="#fff"/><g transform="translate(${margin}, ${margin})">${bars.join('')}</g></svg>`;
+};
+
+// ============================================================================
+// INTERFACES
+// ============================================================================
+
+interface LabelConfig {
+  labelHeight: 'compact' | 'standard' | 'large';
+  showPrice: boolean;
+  showSku: boolean;
+  showCategory: boolean;
+}
+
+interface SelectedProduct {
+  product: Product;
+  quantity: number;
+  barcodes: string[];
+}
+
+interface CategoryGroup {
+  category: Category | null;
+  categoryName: string;
+  products: SelectedProduct[];
+  totalLabels: number;
+}
+
+const DEFAULT_CONFIG: LabelConfig = {
+  labelHeight: 'standard',
+  showPrice: true,
+  showSku: true,
+  showCategory: false,
+};
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export const BarcodeLabels: React.FC = () => {
+  const { t } = useTranslation();
+  const { theme } = useTheme();
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const printRef = useRef<HTMLDivElement>(null);
+
+  // State
+  const [products] = useState<Product[]>(mockProducts);
+  const [categories] = useState<Category[]>(mockCategories);
+  const [selectedProducts, setSelectedProducts] = useState<Map<string, SelectedProduct>>(new Map());
+  const [labelConfig, setLabelConfig] = useState<LabelConfig>(DEFAULT_CONFIG);
+  const [showConfig, setShowConfig] = useState(false);
+  const [isPrintPreview, setIsPrintPreview] = useState(false);
+  const [productSelectValue, setProductSelectValue] = useState<string>('');
+
+  const isDark = theme === 'dark';
+
+  // Get category name by ID
+  const getCategoryName = useCallback((categoryId?: string): string => {
+    if (!categoryId) return t('barcodeLabels.uncategorized');
+    const cat = categories.find(c => c.id === categoryId);
+    return cat?.name || categoryId;
+  }, [categories, t]);
+
+  // Get all barcodes for a product (only actual barcodes, no SKU fallback)
+  const getProductBarcodes = useCallback((product: Product): string[] => {
+    const barcodes: string[] = [];
+    
+    if (product.barcode) {
+      barcodes.push(product.barcode);
+    }
+    
+    if (product.variants && product.variants.length > 0) {
+      product.variants.forEach(variant => {
+        if (variant.barcode && !barcodes.includes(variant.barcode)) {
+          barcodes.push(variant.barcode);
+        }
+      });
+    }
+    
+    return barcodes;
+  }, []);
+
+  // Products with barcodes only for selection
+  const productsWithBarcodes = useMemo(() => {
+    return products.filter(p => {
+      const barcodes = getProductBarcodes(p);
+      return barcodes.length > 0;
+    });
+  }, [products, getProductBarcodes]);
+
+  // SearchableSelect options for products
+  const productOptions: SearchableSelectOption[] = useMemo(() => {
+    return productsWithBarcodes.map(product => {
+      const barcodes = getProductBarcodes(product);
+      return {
+        value: product.id,
+        label: `${product.name} (${product.sku})`,
+        icon: <Barcode className="w-4 h-4 text-indigo-500" />,
+        count: barcodes.length,
+        disabled: selectedProducts.has(product.id),
+      };
+    });
+  }, [productsWithBarcodes, getProductBarcodes, selectedProducts]);
+
+  // Handle product selection from SearchableSelect
+  const handleProductSelect = useCallback((productId: string) => {
+    if (!productId || selectedProducts.has(productId)) return;
+    
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    
+    const barcodes = getProductBarcodes(product);
+    if (barcodes.length === 0) {
+      toast.error(t('barcodeLabels.noBarcode'));
+      return;
+    }
+    
+    setSelectedProducts(prev => {
+      const newMap = new Map(prev);
+      newMap.set(product.id, {
+        product,
+        quantity: 1,
+        barcodes,
+      });
+      return newMap;
+    });
+    
+    setProductSelectValue('');
+    toast.success(`${product.name} ${t('barcodeLabels.added')}`);
+  }, [products, selectedProducts, getProductBarcodes, t]);
+
+  // Update label quantity for a product
+  const updateQuantity = useCallback((productId: string, delta: number) => {
+    setSelectedProducts(prev => {
+      const newMap = new Map(prev);
+      const item = newMap.get(productId);
+      if (item) {
+        const newQty = Math.max(1, Math.min(100, item.quantity + delta));
+        newMap.set(productId, { ...item, quantity: newQty });
+      }
+      return newMap;
+    });
+  }, []);
+
+  // Set exact quantity
+  const setQuantity = useCallback((productId: string, quantity: number) => {
+    setSelectedProducts(prev => {
+      const newMap = new Map(prev);
+      const item = newMap.get(productId);
+      if (item) {
+        const newQty = Math.max(1, Math.min(100, quantity));
+        newMap.set(productId, { ...item, quantity: newQty });
+      }
+      return newMap;
+    });
+  }, []);
+
+  // Remove product from selection
+  const removeProduct = useCallback((productId: string) => {
+    setSelectedProducts(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(productId);
+      return newMap;
+    });
+  }, []);
+
+  // Clear all selections
+  const clearSelection = useCallback(() => {
+    setSelectedProducts(new Map());
+    toast.info(t('barcodeLabels.selectionCleared'));
+  }, [t]);
+
+  // Calculate total labels
+  const totalLabels = useMemo(() => {
+    let total = 0;
+    selectedProducts.forEach(item => {
+      total += item.quantity * item.barcodes.length;
+    });
+    return total;
+  }, [selectedProducts]);
+
+  // Organize labels by category for printing
+  const labelGroups = useMemo((): CategoryGroup[] => {
+    const groups = new Map<string, CategoryGroup>();
+    
+    selectedProducts.forEach(item => {
+      const catKey = item.product.categoryId || item.product.category || 'other';
+      
+      if (!groups.has(catKey)) {
+        const category = categories.find(c => c.id === catKey) || null;
+        groups.set(catKey, {
+          category,
+          categoryName: getCategoryName(catKey),
+          products: [],
+          totalLabels: 0,
+        });
+      }
+      
+      const group = groups.get(catKey)!;
+      group.products.push(item);
+      group.totalLabels += item.quantity * item.barcodes.length;
+    });
+
+    return Array.from(groups.values()).sort((a, b) => 
+      a.categoryName.localeCompare(b.categoryName)
+    );
+  }, [selectedProducts, categories, getCategoryName]);
+
+  // Print labels
+  const handlePrint = useCallback(() => {
+    if (selectedProducts.size === 0) {
+      toast.error(t('barcodeLabels.noProductsSelected'));
+      return;
+    }
+    setIsPrintPreview(true);
+  }, [selectedProducts.size, t]);
+
+  // Execute print with 3-column A4 layout and real Code39 barcodes
+  const executePrint = useCallback(() => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error(t('barcodeLabels.printBlocked'));
+      return;
+    }
+
+    const labelHeightPx = labelConfig.labelHeight === 'compact' ? '78px' : 
+                          labelConfig.labelHeight === 'standard' ? '98px' : '118px';
+
+    // Generate all label HTML with real Code39 barcodes
+    let labelsHTML = '';
+    
+    labelGroups.forEach(group => {
+      labelsHTML += `<div class="category-section">`;
+      labelsHTML += `<div class="category-header">${group.categoryName} (${group.totalLabels} labels)</div>`;
+      labelsHTML += `<div class="labels-grid">`;
+      
+      group.products.forEach(({ product, quantity, barcodes }) => {
+        barcodes.forEach(barcode => {
+          for (let i = 0; i < quantity; i++) {
+            const barcodeSVG = generateCode39SVG(barcode, 38, 1.2, 3.5, 2);
+            
+            labelsHTML += `
+              <div class="label-item" style="height: ${labelHeightPx}">
+                <div class="product-name">${product.name}</div>
+                <div class="barcode-container">
+                  ${barcodeSVG}
+                  <div class="barcode-text">${barcode}</div>
+                </div>
+                ${labelConfig.showPrice ? `<div class="price">Rs. ${(product.retailPrice || product.price || 0).toLocaleString()}</div>` : ''}
+                ${labelConfig.showSku ? `<div class="sku">${product.sku}</div>` : ''}
+                ${labelConfig.showCategory ? `<div class="category-tag">${group.categoryName}</div>` : ''}
+              </div>
+            `;
+          }
+        });
+      });
+      
+      labelsHTML += `</div></div>`;
+    });
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${t('barcodeLabels.printTitle')}</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 6mm; /* reduced margin to fit more labels */
+          }
+          
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: 'Arial', sans-serif;
+            font-size: 10px;
+            line-height: 1.18;
+            background: #fff;
+          }
+          
+          .category-section {
+            margin-bottom: 8px;
+            page-break-inside: avoid;
+          }
+          
+          /* Simple black section title with bottom rule */
+          .category-header {
+            color: #0f172a;
+            padding: 4px 6px;
+            margin-bottom: 6px;
+            font-weight: 700;
+            font-size: 11px;
+            border-bottom: 1px solid #0f172a;
+          }
+          
+          .labels-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+          }
+          
+          /* Tighter label spacing to fit more rows on A4 */
+          .label-item {
+            width: calc(33.333% - 3px);
+            border: 1px dashed #e5e7eb;
+            border-radius: 4px;
+            padding: 3px 2px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            overflow: hidden;
+            page-break-inside: avoid;
+            background: #fff;
+          }
+          
+          .product-name {
+            font-weight: 700;
+            font-size: 9px;
+            margin-bottom: 4px;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.05;
+            color: #0f172a;
+            padding: 0 2px; /* small horizontal inset so text doesn't touch border */
+          }
+          
+          .barcode-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            margin: 2px 0;
+          }
+          
+          .barcode-container svg {
+            max-width: 100%;
+            height: auto;
+            max-height: 34px; /* slightly smaller to free vertical space */
+          }
+          
+          .barcode-text {
+            font-family: 'Courier New', monospace;
+            font-size: 8.5px;
+            margin-top: 2px;
+            letter-spacing: 1.2px;
+            font-weight: 500;
+            color: #374151;
+          }
+          
+          .price {
+            font-weight: bold;
+            font-size: 12px;
+            color: #059669;
+            margin-top: 3px;
+          }
+          
+          .sku {
+            font-size: 8px;
+            color: #6b7280;
+            margin-top: 1px;
+          }
+          
+          .category-tag {
+            font-size: 7px;
+            background: #e5e7eb;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #4b5563;
+            margin-top: 2px;
+          }
+          
+          @media print {
+            body {
+              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        ${labelsHTML}
+      </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 300);
+
+    setIsPrintPreview(false);
+    toast.success(t('barcodeLabels.printSuccess'));
+  }, [labelConfig, labelGroups, t]);
+
+  return (
+    <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-slate-50'} ${isMobile ? 'pb-20' : ''}`}>
+      {/* Header */}
+      <div className={`sticky top-0 z-40 px-4 py-3 ${isDark ? 'bg-slate-800/95 backdrop-blur border-b border-slate-700' : 'bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm'}`}>
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/products')}
+              className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <ScanLine className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  {t('barcodeLabels.title')}
+                </h1>
+                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {t('barcodeLabels.subtitle')}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {totalLabels > 0 && (
+              <Badge variant="secondary" className="gap-1 px-3 py-1.5 bg-indigo-500/20 text-indigo-600 dark:text-indigo-400">
+                <Tag className="w-3.5 h-3.5" />
+                {totalLabels} {t('barcodeLabels.labels')}
+              </Badge>
+            )}
+            
+            <button
+              onClick={() => setShowConfig(!showConfig)}
+              className={`p-2 rounded-lg transition-colors ${
+                showConfig 
+                  ? 'bg-indigo-500 text-white' 
+                  : isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+              }`}
+              title={t('barcodeLabels.settings')}
+            >
+              <Settings2 className="w-5 h-5" />
+            </button>
+            
+            <Button
+              onClick={handlePrint}
+              disabled={selectedProducts.size === 0}
+              className="gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+            >
+              <Printer className="w-4 h-4" />
+              {!isMobile && t('barcodeLabels.print')}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto p-4">
+        {/* Configuration Panel */}
+        {showConfig && (
+          <div className={`mb-4 p-4 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+            <h3 className={`font-semibold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <Settings2 className="w-4 h-4" />
+              {t('barcodeLabels.labelSettings')}
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Label height */}
+              <div>
+                <label className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {t('barcodeLabels.labelHeight')}
+                </label>
+                <Select
+                  value={labelConfig.labelHeight}
+                  onValueChange={(v) => setLabelConfig(prev => ({ ...prev, labelHeight: v as 'compact' | 'standard' | 'large' }))}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="compact">{t('barcodeLabels.compact')}</SelectItem>
+                    <SelectItem value="standard">{t('barcodeLabels.standard')}</SelectItem>
+                    <SelectItem value="large">{t('barcodeLabels.large')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Show price toggle */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showPrice"
+                  checked={labelConfig.showPrice}
+                  onChange={(e) => setLabelConfig(prev => ({ ...prev, showPrice: e.target.checked }))}
+                  className="rounded border-slate-300"
+                />
+                <label htmlFor="showPrice" className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  {t('barcodeLabels.showPrice')}
+                </label>
+              </div>
+              
+              {/* Show SKU toggle */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showSku"
+                  checked={labelConfig.showSku}
+                  onChange={(e) => setLabelConfig(prev => ({ ...prev, showSku: e.target.checked }))}
+                  className="rounded border-slate-300"
+                />
+                <label htmlFor="showSku" className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  {t('barcodeLabels.showSku')}
+                </label>
+              </div>
+              
+              {/* Show category toggle */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showCategory"
+                  checked={labelConfig.showCategory}
+                  onChange={(e) => setLabelConfig(prev => ({ ...prev, showCategory: e.target.checked }))}
+                  className="rounded border-slate-300"
+                />
+                <label htmlFor="showCategory" className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  {t('barcodeLabels.showCategoryOnLabel')}
+                </label>
+              </div>
+            </div>
+            
+            {/* Layout info */}
+            <div className={`mt-3 p-2 rounded-lg text-xs ${isDark ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+              <strong>{t('barcodeLabels.layoutInfo')}:</strong> 3 {t('barcodeLabels.columnsPerPage')} (A4)
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Left Panel - Product Selection with SearchableSelect */}
+          <div className="space-y-4">
+            <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <h3 className={`font-semibold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <ShoppingCart className="w-4 h-4" />
+                {t('barcodeLabels.selectProducts')}
+              </h3>
+              
+              {/* SearchableSelect for product selection */}
+              <div className="mb-4">
+                <SearchableSelect
+                  options={productOptions}
+                  value={productSelectValue}
+                  onValueChange={handleProductSelect}
+                  placeholder={t('barcodeLabels.searchAndSelect')}
+                  searchPlaceholder={t('barcodeLabels.searchProducts')}
+                  emptyMessage={t('barcodeLabels.noProductsWithBarcode')}
+                  theme={isDark ? 'dark' : 'light'}
+                />
+              </div>
+              
+              {/* Stats */}
+              <div className={`flex items-center justify-between text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <span>{productsWithBarcodes.length} {t('barcodeLabels.productsWithBarcodes')}</span>
+                {selectedProducts.size > 0 && (
+                  <button
+                    onClick={clearSelection}
+                    className="text-red-500 hover:text-red-600 text-xs flex items-center gap-1"
+                  >
+                    <X className="w-3 h-3" />
+                    {t('barcodeLabels.clearAll')}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Add - Recently used or popular products */}
+            <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <h4 className={`text-sm font-medium mb-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                {t('barcodeLabels.quickAdd')}
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {productsWithBarcodes.slice(0, 8).map(product => {
+                  const isSelected = selectedProducts.has(product.id);
+                  return (
+                    <button
+                      key={product.id}
+                      onClick={() => !isSelected && handleProductSelect(product.id)}
+                      disabled={isSelected}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        isSelected
+                          ? isDark ? 'bg-indigo-500/30 text-indigo-300 cursor-not-allowed' : 'bg-indigo-100 text-indigo-600 cursor-not-allowed'
+                          : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {product.name.length > 20 ? product.name.slice(0, 20) + '...' : product.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Panel - Selected Products & Quantities */}
+          <div className="space-y-4">
+            <div className={`rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <div className={`px-4 py-3 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <Layers className="w-4 h-4" />
+                  {t('barcodeLabels.selectedProducts')} ({selectedProducts.size})
+                </h3>
+              </div>
+              
+              <div className="max-h-[500px] overflow-y-auto">
+                {selectedProducts.size === 0 ? (
+                  <div className="p-8 text-center">
+                    <Tag className={`w-12 h-12 mx-auto mb-3 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                    <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {t('barcodeLabels.noSelection')}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3 space-y-3">
+                    {Array.from(selectedProducts.values()).map(({ product, quantity, barcodes }) => (
+                      <div
+                        key={product.id}
+                        className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-medium text-sm truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                              {product.name}
+                            </p>
+                            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                              SKU: {product.sku}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => removeProduct(product.id)}
+                            className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-100 text-red-500'}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        
+                        {/* Barcode preview */}
+                        <div className={`mb-3 rounded-lg ${isDark ? 'bg-white' : 'bg-white border border-slate-200'} flex items-center justify-center px-3 py-2`} style={{ minHeight: 64 }}>
+                          <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                            <Code39Barcode value={barcodes[0]} height={35} narrow={1} wide={3} margin={2} />
+                            <p className="text-center text-xs font-mono text-slate-600 mt-1">{barcodes[0]}</p>
+                          </div>
+                        </div>
+                        
+                        {/* Quantity controls */}
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {t('barcodeLabels.labelsQty')}:
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => updateQuantity(product.id, -1)}
+                              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-600'}`}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={quantity}
+                              onChange={(e) => setQuantity(product.id, parseInt(e.target.value) || 1)}
+                              className={`w-16 px-2 py-1.5 text-center text-sm font-bold rounded-lg border ${
+                                isDark 
+                                  ? 'bg-slate-700 border-slate-600 text-white' 
+                                  : 'bg-white border-slate-300 text-slate-900'
+                              }`}
+                            />
+                            <button
+                              onClick={() => updateQuantity(product.id, 1)}
+                              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-600'}`}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Total labels for this product */}
+                        <div className={`mt-2 pt-2 border-t text-xs text-right ${isDark ? 'border-slate-700 text-indigo-400' : 'border-slate-200 text-indigo-600'}`}>
+                          {barcodes.length > 1 && <span>{barcodes.length} barcodes × </span>}
+                          {quantity} = <strong>{quantity * barcodes.length} {t('barcodeLabels.labels')}</strong>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {/* Summary Footer */}
+              {selectedProducts.size > 0 && (
+                <div className={`px-4 py-4 border-t ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {t('barcodeLabels.totalLabels')}:
+                    </span>
+                    <span className="text-2xl font-bold text-indigo-500">
+                      {totalLabels}
+                    </span>
+                  </div>
+                  <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {t('barcodeLabels.estimatedPages')}: ~{Math.ceil(totalLabels / 21)} {t('barcodeLabels.pages')} (3×7 per page)
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Print Preview Modal */}
+      {isPrintPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className={`w-full max-w-4xl max-h-[90vh] overflow-auto m-4 rounded-2xl ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+            <div className={`sticky top-0 px-4 py-3 border-b flex items-center justify-between ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                {t('barcodeLabels.printPreview')}
+              </h3>
+              <div className="flex items-center gap-2">
+                <Button onClick={executePrint} className="gap-2">
+                  <Printer className="w-4 h-4" />
+                  {t('barcodeLabels.confirmPrint')}
+                </Button>
+                <Button variant="outline" onClick={() => setIsPrintPreview(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Preview Content */}
+            <div className="p-6 bg-white">
+              {labelGroups.map(group => (
+                <div key={group.categoryName} className="mb-6">
+                  <div className="text-black px-1 pb-2 mb-3 text-sm font-semibold border-b border-slate-300">
+                    {group.categoryName} ({group.totalLabels} {t('barcodeLabels.labels')})
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {group.products.flatMap(({ product, quantity, barcodes }) => 
+                      barcodes.flatMap(barcode => 
+                        Array.from({ length: Math.min(quantity, 3) }).map((_, idx) => (
+                          <div 
+                            key={`${product.id}-${barcode}-${idx}`}
+                            className="border border-dashed border-slate-300 rounded-md px-2 py-1 flex flex-col items-center text-center"
+                          >
+                            <p className="text-xs font-semibold text-slate-800 w-full mb-2" style={{ display: '-webkit-box' as any, WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>
+                              {product.name}
+                            </p>
+                            <Code39Barcode value={barcode} height={36} narrow={1} wide={3} margin={1} />
+                            <p className="text-xs font-mono text-slate-600 mt-1">{barcode}</p>
+                            {labelConfig.showPrice && (
+                              <p className="text-sm font-bold text-emerald-600 mt-1">
+                                Rs. {(product.retailPrice || product.price || 0).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        ))
+                      )
+                    )}
+                  </div>
+                  {group.totalLabels > 9 && (
+                    <p className="text-xs text-slate-400 text-center mt-2">
+                      +{group.totalLabels - Math.min(group.products.reduce((acc, p) => acc + Math.min(p.quantity, 3) * p.barcodes.length, 0), 9)} more labels...
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default BarcodeLabels;

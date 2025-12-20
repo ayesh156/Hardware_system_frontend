@@ -642,7 +642,7 @@ export const FinancialReports: React.FC = () => {
               <div class="logo-section">
                 <div class="logo">🔧</div>
                 <div class="company-info">
-                  <div class="company-name">HardwarePro</div>
+                  <div class="company-name">Liyanage Hardware</div>
                   <div class="company-tagline">Hardware & Construction Materials</div>
                 </div>
               </div>
@@ -737,7 +737,7 @@ export const FinancialReports: React.FC = () => {
                 })}
               </div>
               <div class="footer-right">
-                HardwarePro Financial Management System
+                Liyanage Hardware Financial Management System
               </div>
             </div>
           </div>

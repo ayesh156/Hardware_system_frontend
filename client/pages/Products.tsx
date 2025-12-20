@@ -5,8 +5,9 @@ import { useIsMobile } from '../hooks/use-mobile';
 import { mockProducts, mockBrands, mockCategories, mockSuppliers } from '../data/mockData';
 import { 
   Package, Search, Plus, Edit2, Trash2, ChevronDown, AlertTriangle, CheckCircle, XCircle, 
-  Filter, Grid, List, Building2, Tag, Layers, BarChart3, Box, RefreshCw, DollarSign, SortAsc, SortDesc, X, Truck, Banknote, CreditCard
+  Filter, Grid, List, Building2, Tag, Layers, BarChart3, Box, RefreshCw, DollarSign, SortAsc, SortDesc, X, Truck, Banknote, CreditCard, ScanLine
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Product } from '../types/index';
 import { ProductFormModal } from '../components/modals/ProductFormModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
@@ -78,6 +79,7 @@ type PriceDisplayMode = 'retail' | 'wholesale' | 'both';
 export const Products: React.FC = () => {
   const { t } = useTranslation();
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [products, setProducts] = useState<Product[]>(mockProducts);
   const [searchQuery, setSearchQuery] = useState('');
@@ -247,13 +249,22 @@ export const Products: React.FC = () => {
             {t('products.description')}
           </p>
         </div>
-        <button
-          onClick={handleAddProduct}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-orange-500/20"
-        >
-          <Plus className="w-4 h-4" />
-          {t('products.addProduct')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/products/barcode-labels')}
+            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all border ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-indigo-400 hover:bg-slate-700' : 'bg-white border-slate-200 text-indigo-600 hover:bg-indigo-50 shadow-sm'}`}
+          >
+            <ScanLine className="w-4 h-4" />
+            {t('barcodeLabels.title')}
+          </button>
+          <button
+            onClick={handleAddProduct}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-orange-500/20"
+          >
+            <Plus className="w-4 h-4" />
+            {t('products.addProduct')}
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}

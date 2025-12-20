@@ -6,7 +6,7 @@ import { mockInvoices, mockProducts, mockCustomers } from '../data/mockData';
 import { 
   Package, FileText, Users, TrendingUp, ArrowRight, ArrowUpRight, ArrowDownRight,
   DollarSign, ShoppingCart, Clock, AlertTriangle, CheckCircle, Eye, Calendar,
-  Activity, Award, BarChart3, PieChart, Layers, RefreshCw
+  Activity, Award, BarChart3, PieChart, Layers, RefreshCw, Zap
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -507,9 +507,40 @@ export const Dashboard: React.FC = () => {
         <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
           {t('dashboard.quickActions')}
         </h3>
+        
+        {/* Quick Checkout - Featured Action */}
+        <Link 
+          to="/invoices/quick-checkout"
+          className={`flex items-center justify-between p-4 mb-4 rounded-xl border-2 transition-all hover:scale-[1.01] ${
+            theme === 'dark' 
+              ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-500/40 hover:border-amber-400' 
+              : 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300 hover:border-amber-400'
+          }`}
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">
+              <Zap className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <span className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {t('quickCheckout.title')}
+              </span>
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                {t('quickCheckout.subtitle')}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <kbd className={`hidden sm:inline px-2 py-1 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>
+              F2
+            </kbd>
+            <ArrowRight className={`w-5 h-5 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`} />
+          </div>
+        </Link>
+        
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Link 
-            to="/invoices"
+            to="/invoices/create"
             className={`flex items-center gap-3 p-4 rounded-xl border transition-all hover:scale-[1.02] ${
               theme === 'dark' 
                 ? 'bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/20' 

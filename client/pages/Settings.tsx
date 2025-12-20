@@ -73,14 +73,14 @@ export const Settings: React.FC = () => {
 
   // Business Settings
   const [businessSettings, setBusinessSettings] = useState<BusinessSettings>({
-    businessName: 'Cosmos Hardware',
-    businessNameSinhala: 'කොස්මොස් දෘඪාංග',
-    tagline: 'Your One-Stop Hardware Solution',
-    address: 'No. 45, Main Street, Colombo 10, Sri Lanka',
-    phone: '+94 11 234 5678',
-    phone2: '+94 77 123 4567',
-    email: 'info@cosmoshardware.lk',
-    website: 'www.cosmoshardware.lk',
+    businessName: 'Liyanage Hardware',
+    businessNameSinhala: 'ලියනගේ දෘඪාංග',
+    tagline: 'Quality Building Materials',
+    address: 'Hakmana Rd, Deiyandara',
+    phone: '0773751805',
+    phone2: '0412268217',
+    email: 'info@liyanage.lk',
+    website: 'www.liyanage.lk',
     registrationNo: 'PV00012345',
     taxNo: '123456789-7000'
   });

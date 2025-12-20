@@ -12,6 +12,8 @@ import { AdminLayout } from "./components/AdminLayout";
 import { Dashboard } from "./pages/Dashboard";
 import { Invoices } from "./pages/Invoices";
 import { CreateInvoice } from "./pages/CreateInvoice";
+import { QuickCheckout } from "./pages/QuickCheckout";
+import { BarcodeLabels } from "./pages/BarcodeLabels";
 import { ViewInvoice } from "./pages/ViewInvoice";
 import { EditInvoice } from "./pages/EditInvoice";
 import { FinancialReports } from "./pages/FinancialReports";
@@ -38,10 +40,12 @@ const App = () => (
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/invoices" element={<Invoices />} />
                 <Route path="/invoices/create" element={<CreateInvoice />} />
+                <Route path="/invoices/quick-checkout" element={<QuickCheckout />} />
                 <Route path="/invoices/:id" element={<ViewInvoice />} />
                 <Route path="/invoices/:id/edit" element={<EditInvoice />} />
                 <Route path="/financial-reports" element={<FinancialReports />} />
                 <Route path="/products" element={<Products />} />
+                <Route path="/products/barcode-labels" element={<BarcodeLabels />} />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/brands" element={<Brands />} />
                 <Route path="/suppliers" element={<Suppliers />} />

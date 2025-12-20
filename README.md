@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://img.icons8.com/fluency/96/warehouse.png" alt="HardwarePro Logo" width="80" height="80"/>
+  <img src="https://img.icons8.com/fluency/96/warehouse.png" alt="Liyanage Hardware Logo" width="80" height="80"/>
 </p>
 
-<h1 align="center">🔧 HardwarePro Enterprise Suite</h1>
+<h1 align="center">🔧 Liyanage Hardware Enterprise Suite</h1>
 
 <p align="center">
   <strong>A modern, enterprise-grade hardware business management system designed for Sri Lankan hardware stores</strong>

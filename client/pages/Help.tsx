@@ -104,7 +104,7 @@ export const Help: React.FC = () => {
   });
 
   const quickLinks = [
-    { title: 'Getting Started Guide', icon: Book, description: 'Learn the basics of HardwarePro' },
+    { title: 'Getting Started Guide', icon: Book, description: 'Learn the basics of Liyanage Hardware' },
     { title: 'Video Tutorials', icon: Video, description: 'Watch step-by-step tutorials' },
     { title: 'Documentation', icon: FileText, description: 'Detailed feature documentation' }
   ];
@@ -120,7 +120,7 @@ export const Help: React.FC = () => {
           Help Center
         </h1>
         <p className={`mt-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-          Find answers to common questions and learn how to use HardwarePro
+          Find answers to common questions and learn how to use Liyanage Hardware
         </p>
       </div>
 
@@ -254,7 +254,7 @@ export const Help: React.FC = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <a
-            href="mailto:support@hardwarepro.lk"
+            href="mailto:info@liyanage.lk"
             className={`flex items-center gap-3 p-4 rounded-xl border transition-all hover:border-orange-500/50 ${
               theme === 'dark'
                 ? 'bg-slate-800/50 border-slate-700'
@@ -266,7 +266,7 @@ export const Help: React.FC = () => {
             </div>
             <div>
               <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Email Support</p>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>support@hardwarepro.lk</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>info@liyanage.lk</p>
             </div>
           </a>
 

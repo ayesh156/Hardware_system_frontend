@@ -6,7 +6,7 @@ import { mockInvoices, mockCustomers, mockProducts } from '../data/mockData';
 import { 
   FileText, Search, Plus, Eye, Edit2, Trash2, Printer, Calendar, User, Receipt, 
   Clock, CheckCircle, AlertTriangle, XCircle, Filter, Grid, List, RefreshCw,
-  TrendingUp, CreditCard, Building2, SortAsc, SortDesc, ChevronDown
+  TrendingUp, CreditCard, Building2, SortAsc, SortDesc, ChevronDown, Zap
 } from 'lucide-react';
 import { Invoice } from '../types/index';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
@@ -186,13 +186,28 @@ export const Invoices: React.FC = () => {
             {t('invoices.description')}
           </p>
         </div>
-        <button
-          onClick={() => navigate('/invoices/create')}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-orange-500/20"
-        >
-          <Plus className="w-4 h-4" />
-          {t('invoices.addInvoice')}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Quick Checkout Button */}
+          <button
+            onClick={() => navigate('/invoices/quick-checkout')}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-amber-500/20"
+          >
+            <Zap className="w-4 h-4" />
+            <span className="hidden sm:inline">{t('quickCheckout.title')}</span>
+          </button>
+          {/* Create Invoice Button */}
+          <button
+            onClick={() => navigate('/invoices/create')}
+            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
+              theme === 'dark' 
+                ? 'bg-slate-700 hover:bg-slate-600 text-white' 
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">{t('invoices.addInvoice')}</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}

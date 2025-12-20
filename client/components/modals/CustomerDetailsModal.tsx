@@ -1,7 +1,7 @@
 import React from 'react';
 import { Customer } from '../../types/index';
 import { useTranslation } from 'react-i18next';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { 
   User, 
   Building2, 
@@ -94,6 +94,10 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-hidden bg-white dark:bg-slate-900 border-0 shadow-2xl flex flex-col">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{customer.name}</DialogTitle>
+          <DialogDescription>View customer details, statistics, and recent invoices</DialogDescription>
+        </DialogHeader>
         {/* Animated Background Header */}
         <div className={`relative h-36 flex-shrink-0 overflow-hidden ${
           overdue 
