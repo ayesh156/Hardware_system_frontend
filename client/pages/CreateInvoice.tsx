@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
@@ -6,12 +6,15 @@ import { useIsMobile } from '../hooks/use-mobile';
 import { mockCustomers, mockProducts } from '../data/mockData';
 import { Customer, Product, Invoice, InvoiceItem } from '../types/index';
 import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
+import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
 import {
   FileText, User, Package, CheckCircle, ChevronLeft, ChevronRight,
   Search, Plus, Trash2, Calendar, ArrowLeft, UserX, CreditCard,
   AlertTriangle, Building2, Phone, DollarSign, ShoppingCart, Receipt,
-  Percent, Tag, Box, Edit3, PackagePlus, Boxes, Calculator, Zap
+  Percent, Tag, Box, Edit3, PackagePlus, Boxes, Calculator, Zap,
+  Keyboard, Barcode
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 // Extended Invoice Item with discount tracking
 interface ExtendedInvoiceItem extends InvoiceItem {
@@ -23,6 +26,10 @@ interface ExtendedInvoiceItem extends InvoiceItem {
 }
 
 type Step = 1 | 2 | 3;
+
+// Price mode options for arrow key cycling
+const PRICE_MODES: ('auto' | 'retail' | 'wholesale' | 'custom')[] = ['auto', 'retail', 'wholesale', 'custom'];
+const DISCOUNT_TYPES: ('none' | 'percentage' | 'fixed')[] = ['none', 'percentage', 'fixed'];
 
 export const CreateInvoice: React.FC = () => {
   const { t } = useTranslation();
@@ -52,6 +59,14 @@ export const CreateInvoice: React.FC = () => {
   const [itemDiscountType, setItemDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
   const [itemDiscountValue, setItemDiscountValue] = useState<number>(0);
   
+  // Focus mode state
+  const [currentMode, setCurrentMode] = useState<CheckoutMode>('search');
+  const [showShortcutMap, setShowShortcutMap] = useState(false);
+  const [isPriceModeFocused, setIsPriceModeFocused] = useState(false);
+  const [isItemDiscountFocused, setIsItemDiscountFocused] = useState(false);
+  const [selectedCustomerIndex, setSelectedCustomerIndex] = useState(-1);
+  const [selectedProductIndex, setSelectedProductIndex] = useState(-1);
+  
   // Quick add product state
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddName, setQuickAddName] = useState('');
@@ -67,6 +82,20 @@ export const CreateInvoice: React.FC = () => {
   
   const [createdInvoice, setCreatedInvoice] = useState<Invoice | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  
+  // Refs for keyboard navigation
+  const customerSearchRef = useRef<HTMLInputElement>(null);
+  const productSearchRef = useRef<HTMLInputElement>(null);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const quantityInputRef = useRef<HTMLInputElement>(null);
+  const discountInputRef = useRef<HTMLInputElement>(null);
+  const notesInputRef = useRef<HTMLTextAreaElement>(null);
+  // Walk-in button ref for quick focus
+  const walkInButtonRef = useRef<HTMLButtonElement>(null);
+  // Step 3 quick-focus refs
+  const paymentMethodFirstRef = useRef<HTMLButtonElement>(null);
+  const discountNoneRef = useRef<HTMLButtonElement>(null);
+  const taxToggleRef = useRef<HTMLInputElement>(null);
 
   const currentCustomer = customers.find((c) => c.id === selectedCustomer);
   const currentProduct = products.find((p) => p.id === selectedProductId);
@@ -274,6 +303,346 @@ export const CreateInvoice: React.FC = () => {
   const canProceedToStep2 = selectedCustomer || isWalkIn;
   const canProceedToStep3 = items.length > 0;
 
+  // Map step number to InvoiceStep for shortcut overlay
+  const getStepName = (): InvoiceStep => {
+    switch (step) {
+      case 1: return 'customer';
+      case 2: return 'products';
+      case 3: return 'review';
+      default: return 'customer';
+    }
+  };
+
+  // Keyboard event handler for stepped navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInInput = target.tagName === 'INPUT' || 
+                       target.tagName === 'TEXTAREA' || 
+                       target.tagName === 'SELECT' ||
+                       target.isContentEditable;
+      
+      // Show shortcut map with ? key
+      if (e.key === '?' && !isInInput) {
+        e.preventDefault();
+        setShowShortcutMap(prev => !prev);
+        return;
+      }
+      
+      // Close shortcut map on Escape
+      if (e.key === 'Escape' && showShortcutMap) {
+        e.preventDefault();
+        setShowShortcutMap(false);
+        return;
+      }
+      
+      // Step navigation using Left/Right arrows (global, exclusive)
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (step > 1) {
+          setStep((step - 1) as Step);
+        } else {
+          // On first step, go back to invoices list
+          navigate('/invoices');
+        }
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (step === 1 && canProceedToStep2) setStep(2);
+        else if (step === 2 && canProceedToStep3) setStep(3);
+        return;
+      }
+      
+      // Step 1: Customer Selection shortcuts
+      if (step === 1) {
+        // W for walk-in toggle
+        if (e.key === 'w' && !isInInput) {
+          e.preventDefault();
+          setIsWalkIn(!isWalkIn);
+          setSelectedCustomer('');
+          return;
+        }
+        
+        // F2 to focus customer search
+        if (e.key === 'F2' && !isWalkIn) {
+          e.preventDefault();
+          setCurrentMode('search');
+          customerSearchRef.current?.focus();
+          customerSearchRef.current?.select();
+          return;
+        }
+
+        // F3 to toggle Walk-in immediately
+        if (e.key === 'F3') {
+          e.preventDefault();
+          // Trigger click directly so it's instant
+          walkInButtonRef.current?.click();
+          return;
+        }
+        
+        // Tab or any key to focus search when not in input
+        if (e.key === 'Tab' && !isInInput) {
+          e.preventDefault();
+          customerSearchRef.current?.focus();
+          return;
+        }
+        
+        // Arrow down to navigate customer list
+        if (e.key === 'ArrowDown') {
+          if (document.activeElement === customerSearchRef.current || !isInInput) {
+            e.preventDefault();
+            setSelectedCustomerIndex(prev => 
+              prev < filteredCustomers.length - 1 ? prev + 1 : prev
+            );
+            return;
+          }
+        }
+        
+        // Arrow up to navigate customer list
+        if (e.key === 'ArrowUp') {
+          if (document.activeElement === customerSearchRef.current || !isInInput) {
+            e.preventDefault();
+            setSelectedCustomerIndex(prev => prev > 0 ? prev - 1 : 0);
+            return;
+          }
+        }
+        
+        // Enter to select highlighted customer
+        if (e.key === 'Enter' && selectedCustomerIndex >= 0) {
+          e.preventDefault();
+          const customer = filteredCustomers[selectedCustomerIndex];
+          if (customer) {
+            setSelectedCustomer(customer.id);
+            setSelectedCustomerIndex(-1);
+            toast.success(t('invoice.customerSelected', { name: customer.name }));
+          }
+          return;
+        }
+        
+
+      }
+      
+      // Step 2: Product Selection shortcuts
+      if (step === 2) {
+        // Focus barcode/search with F2
+        if (e.key === 'F2') {
+          e.preventDefault();
+          setCurrentMode('search');
+          productSearchRef.current?.focus();
+          productSearchRef.current?.select();
+          return;
+        }
+        
+        // Focus quantity with F3
+        if (e.key === 'F3') {
+          e.preventDefault();
+          setCurrentMode('quantity');
+          quantityInputRef.current?.focus();
+          quantityInputRef.current?.select();
+          return;
+        }
+        
+        // Product navigation with arrow keys in search
+        if (e.key === 'ArrowDown' && document.activeElement === productSearchRef.current) {
+          e.preventDefault();
+          setSelectedProductIndex(prev => 
+            prev < filteredProducts.length - 1 ? prev + 1 : prev
+          );
+          return;
+        }
+        if (e.key === 'ArrowUp' && document.activeElement === productSearchRef.current) {
+          e.preventDefault();
+          setSelectedProductIndex(prev => prev > 0 ? prev - 1 : 0);
+          return;
+        }
+        if (e.key === 'Enter' && selectedProductIndex >= 0 && document.activeElement === productSearchRef.current) {
+          e.preventDefault();
+          const product = filteredProducts[selectedProductIndex];
+          if (product && product.stock > 0) {
+            setSelectedProductId(product.id);
+            setProductSearch(product.name);
+            const { price } = getProductPrice(product);
+            setCustomPrice(price);
+            setSelectedProductIndex(-1);
+            // Focus quantity input
+            setTimeout(() => {
+              quantityInputRef.current?.focus();
+              quantityInputRef.current?.select();
+            }, 50);
+          }
+          return;
+        }
+
+        // When quantity input is focused, Enter should add the item immediately
+        if (e.key === 'Enter' && document.activeElement === quantityInputRef.current) {
+          e.preventDefault();
+          // Get the current product fresh from state to avoid stale closures
+          const liveProduct = products.find(p => p.id === selectedProductId);
+          if (selectedProductId && quantity > 0 && liveProduct && quantity <= liveProduct.stock) {
+            addItem();
+            toast.success(t('invoice.addedToCart'));
+            // refocus product search for next entry
+            setTimeout(() => {
+              productSearchRef.current?.focus();
+              productSearchRef.current?.select();
+            }, 50);
+          } else {
+            toast.error(t('invoice.invalidQuantity'));
+            quantityInputRef.current?.focus();
+          }
+          return;
+        }
+        
+        // Price mode toggle with arrow keys when focused
+        if (isPriceModeFocused) {
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            const currentIndex = PRICE_MODES.indexOf(priceMode);
+            const newIndex = currentIndex === 0 ? PRICE_MODES.length - 1 : currentIndex - 1;
+            setPriceMode(PRICE_MODES[newIndex]);
+            return;
+          }
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            const currentIndex = PRICE_MODES.indexOf(priceMode);
+            const newIndex = (currentIndex + 1) % PRICE_MODES.length;
+            setPriceMode(PRICE_MODES[newIndex]);
+            return;
+          }
+        }
+        
+        // Item discount toggle with arrow keys when focused
+        if (isItemDiscountFocused) {
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            const currentIndex = DISCOUNT_TYPES.indexOf(itemDiscountType);
+            const newIndex = currentIndex === 0 ? DISCOUNT_TYPES.length - 1 : currentIndex - 1;
+            setItemDiscountType(DISCOUNT_TYPES[newIndex]);
+            return;
+          }
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            const currentIndex = DISCOUNT_TYPES.indexOf(itemDiscountType);
+            const newIndex = (currentIndex + 1) % DISCOUNT_TYPES.length;
+            setItemDiscountType(DISCOUNT_TYPES[newIndex]);
+            return;
+          }
+        }
+        
+
+      }
+      
+      // Step 3: Review shortcuts
+      if (step === 3) {
+        // F12 to complete invoice
+        if (e.key === 'F12') {
+          e.preventDefault();
+          if (items.length > 0) handleCreateInvoice();
+          return;
+        }
+        
+        // Payment method quick keys (1-4)
+        if (!isInInput) {
+          if (e.key === '1') {
+            e.preventDefault();
+            setPaymentMethod('cash');
+            toast.info(t('invoice.cash'));
+            return;
+          }
+          if (e.key === '2') {
+            e.preventDefault();
+            setPaymentMethod('card');
+            toast.info(t('invoice.card'));
+            return;
+          }
+          if (e.key === '3') {
+            e.preventDefault();
+            setPaymentMethod('bank_transfer');
+            toast.info(t('invoice.bankTransfer'));
+            return;
+          }
+          if (e.key === '4') {
+            e.preventDefault();
+            setPaymentMethod('credit');
+            toast.info(t('invoice.credit'));
+            return;
+          }
+        }
+        
+        // F4 to focus Payment Method (first option)
+        if (e.key === 'F4' && !isInInput) {
+          e.preventDefault();
+          paymentMethodFirstRef.current?.focus();
+          return;
+        }
+
+        // F5 to select/activate discount (None)
+        if (e.key === 'F5' && !isInInput) {
+          e.preventDefault();
+          // Select 'None' discount immediately
+          setDiscountType('none');
+          setDiscount(0);
+          discountNoneRef.current?.focus();
+          toast.info(t('invoice.discountNoneSelected'));
+          return;
+        }
+        
+        // F6 to toggle tax (replaces 'T')
+        if (e.key === 'F6' && !isInInput) {
+          e.preventDefault();
+          setEnableTax(prev => {
+            const next = !prev;
+            toast.info(next ? t('invoice.taxEnabled') : t('invoice.taxDisabled'));
+            return next;
+          });
+          // focus the toggle visually
+          setTimeout(() => taxToggleRef.current?.focus(), 50);
+          return;
+        }
+        
+        // F7 to focus notes (N shortcut removed)
+        if (e.key === 'F7' && !isInInput) {
+          e.preventDefault();
+          notesInputRef.current?.focus();
+          return;
+        }
+        
+        // F7 to focus notes
+        if (e.key === 'F7' && !isInInput) {
+          e.preventDefault();
+          notesInputRef.current?.focus();
+          return;
+        }
+        
+
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [step, canProceedToStep2, canProceedToStep3, showShortcutMap, selectedCustomerIndex, 
+      filteredCustomers, selectedProductIndex, filteredProducts, priceMode, itemDiscountType,
+      isPriceModeFocused, isItemDiscountFocused, items, isWalkIn, enableTax, t, navigate, selectedProductId, quantity, products]);
+
+  // Focus search on step 2
+  useEffect(() => {
+    if (step === 2) {
+      setTimeout(() => {
+        productSearchRef.current?.focus();
+      }, 100);
+    }
+  }, [step]);
+
+  // Auto-focus customer search on step 1
+  useEffect(() => {
+    if (step === 1 && !isWalkIn) {
+      setTimeout(() => {
+        customerSearchRef.current?.focus();
+      }, 100);
+    }
+  }, [step, isWalkIn]);
+
   const getStepIcon = (stepNum: number) => {
     switch (stepNum) {
       case 1: return <User className="w-4 h-4" />;
@@ -295,7 +664,18 @@ export const CreateInvoice: React.FC = () => {
   };
 
   return (
-    <div className={`space-y-6 ${isMobile ? 'mb-20' : ''}`}>
+    <div className={`space-y-6 ${isMobile ? 'mb-32' : 'pb-16'}`}>
+      {/* Shortcut Map Overlay */}
+      <ShortcutMapOverlay
+        isOpen={showShortcutMap}
+        onClose={() => setShowShortcutMap(false)}
+        currentStep={getStepName()}
+        currentMode={currentMode}
+        isQuickCheckout={false}
+        stepIndex={step}
+        totalSteps={3}
+      />
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -321,6 +701,22 @@ export const CreateInvoice: React.FC = () => {
             </p>
           </div>
         </div>
+        
+        {/* Keyboard Shortcuts Button */}
+        <button
+          onClick={() => setShowShortcutMap(true)}
+          className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+            theme === 'dark' 
+              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' 
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }`}
+        >
+          <Keyboard className="w-4 h-4" />
+          {t('quickCheckout.keyboardShortcuts')}
+          <kbd className={`ml-1 px-1.5 py-0.5 rounded text-xs font-mono ${
+            theme === 'dark' ? 'bg-slate-600 text-slate-400' : 'bg-slate-200 text-slate-500'
+          }`}>?</kbd>
+        </button>
       </div>
 
       {/* Progress Indicator */}
@@ -330,9 +726,20 @@ export const CreateInvoice: React.FC = () => {
         <div className="flex items-center justify-between max-w-2xl mx-auto">
           {[1, 2, 3].map((s) => (
             <React.Fragment key={s}>
-              <div className="flex flex-col items-center">
+              <button
+                onClick={() => {
+                  if (s === 1 || (s === 2 && canProceedToStep2) || (s === 3 && canProceedToStep2 && canProceedToStep3)) {
+                    setStep(s as Step);
+                  }
+                }}
+                disabled={
+                  (s === 2 && !canProceedToStep2) || 
+                  (s === 3 && (!canProceedToStep2 || !canProceedToStep3))
+                }
+                className="flex flex-col items-center group cursor-pointer disabled:cursor-not-allowed"
+              >
                 <div
-                  className={`w-14 h-14 rounded-xl flex items-center justify-center font-bold text-sm transition-all shadow-sm ${
+                  className={`w-14 h-14 rounded-xl flex items-center justify-center font-bold text-sm transition-all shadow-sm group-hover:scale-105 group-disabled:hover:scale-100 ${
                     s < step
                       ? 'bg-emerald-500 text-white'
                       : s === step
@@ -347,7 +754,11 @@ export const CreateInvoice: React.FC = () => {
                 }`}>
                   {s === 1 ? t('invoice.stepCustomer') : s === 2 ? t('invoice.stepProducts') : t('invoice.stepReview')}
                 </p>
-              </div>
+                {/* Keyboard hint */}
+                <span className={`text-xs mt-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                  ← →
+                </span>
+              </button>
               {s < 3 && (
                 <div className={`flex-1 h-1.5 mx-4 rounded-full transition-colors ${
                   s < step ? 'bg-emerald-500' : (theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200')
@@ -382,6 +793,8 @@ export const CreateInvoice: React.FC = () => {
 
               {/* Walk-in Toggle */}
               <button
+                ref={walkInButtonRef}
+                aria-pressed={isWalkIn}
                 onClick={() => {
                   setIsWalkIn(!isWalkIn);
                   setSelectedCustomer('');
@@ -395,7 +808,10 @@ export const CreateInvoice: React.FC = () => {
                 }`}
               >
                 <UserX className="w-4 h-4" />
-                {t('invoice.walkInCustomer')}
+                <span className="flex items-center gap-2">
+                  {t('invoice.walkInCustomer')}
+                  <kbd className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F3</kbd>
+                </span>
               </button>
             </div>
 
@@ -430,16 +846,42 @@ export const CreateInvoice: React.FC = () => {
                 <div className="relative">
                   <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
                   <input
+                    ref={customerSearchRef}
                     type="text"
                     placeholder={t('invoice.searchCustomerPlaceholder')}
                     value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                    className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    onChange={(e) => {
+                      setCustomerSearch(e.target.value);
+                      setSelectedCustomerIndex(0); // Reset selection when searching
+                    }}
+                    className={`w-full pl-12 pr-16 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       theme === 'dark'
                         ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
                         : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400'
                     }`}
                   />
+                  {/* Shortcut hint badge */}
+                  <div className={`absolute right-3 top-2.5 px-2 py-1 rounded text-xs font-mono ${
+                    theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'
+                  }`}>
+                    F2
+                  </div>
+                </div>
+
+                {/* Keyboard navigation hint */}
+                <div className={`flex items-center gap-4 text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <span className="flex items-center gap-1">
+                    <kbd className={`px-1.5 py-0.5 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>↑↓</kbd>
+                    {t('shortcuts.navigateList')}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <kbd className={`px-1.5 py-0.5 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>Enter</kbd>
+                    {t('shortcuts.selectCustomer')}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <kbd className={`px-1.5 py-0.5 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>→</kbd>
+                    {t('shortcuts.nextStep')}
+                  </span>
                 </div>
 
                 {/* Customer Grid */}
@@ -450,13 +892,22 @@ export const CreateInvoice: React.FC = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2">
-                    {filteredCustomers.map((customer) => (
+                    {filteredCustomers.map((customer, index) => {
+                      const isKeyboardSelected = index === selectedCustomerIndex;
+                      const isSelected = selectedCustomer === customer.id;
+                      
+                      return (
                       <button
                         key={customer.id}
-                        onClick={() => setSelectedCustomer(customer.id)}
-                        className={`p-4 border-2 rounded-xl text-left transition-all ${
-                          selectedCustomer === customer.id
+                        onClick={() => {
+                          setSelectedCustomer(customer.id);
+                          setSelectedCustomerIndex(index);
+                        }}
+                        className={`p-4 border-2 rounded-xl text-left transition-all relative ${
+                          isSelected
                             ? 'border-blue-500 bg-blue-500/10 ring-2 ring-blue-500/30'
+                            : isKeyboardSelected
+                            ? 'border-cyan-400 bg-cyan-500/10 ring-2 ring-cyan-400/30'
                             : `${getCustomerStatusColor(customer)} ${
                                 theme === 'dark' 
                                   ? 'border-slate-700 hover:border-blue-500/50' 
@@ -464,10 +915,18 @@ export const CreateInvoice: React.FC = () => {
                               }`
                         }`}
                       >
+                        {/* Keyboard selection indicator */}
+                        {isKeyboardSelected && !isSelected && (
+                          <div className="absolute -top-2 -right-2 px-1.5 py-0.5 bg-cyan-500 text-white text-xs rounded font-mono">
+                            Enter
+                          </div>
+                        )}
                         <div className="flex items-start gap-3">
                           {/* Avatar */}
                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0 ${
-                            theme === 'dark' 
+                            isKeyboardSelected
+                              ? 'bg-gradient-to-br from-cyan-500/30 to-blue-500/30 text-cyan-400'
+                              : theme === 'dark' 
                               ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-blue-400' 
                               : 'bg-gradient-to-br from-blue-100 to-cyan-100 text-blue-600'
                           }`}>
@@ -476,7 +935,9 @@ export const CreateInvoice: React.FC = () => {
                           
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <p className={`font-semibold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                              <p className={`font-semibold truncate ${
+                                isKeyboardSelected ? 'text-cyan-400' : theme === 'dark' ? 'text-white' : 'text-slate-900'
+                              }`}>
                                 {customer.name}
                               </p>
                               {customer.customerType === 'wholesale' && (
@@ -552,7 +1013,8 @@ export const CreateInvoice: React.FC = () => {
                           </div>
                         </div>
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </>
@@ -670,19 +1132,63 @@ export const CreateInvoice: React.FC = () => {
                 <div className="relative">
                   <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
                   <input
+                    ref={productSearchRef}
                     type="text"
                     placeholder={t('invoice.searchProductPlaceholder')}
                     value={productSearch}
                     onChange={(e) => {
-                      setProductSearch(e.target.value);
+                      const val = e.target.value;
+                      setProductSearch(val);
                       setSelectedProductId('');
+                      setSelectedProductIndex(0);
+
+                      // Detect exact barcode scan: if input exactly matches a product barcode, auto-select it and focus quantity
+                      const barcodeCandidate = val.trim();
+                      if (barcodeCandidate) {
+                        const matched = products.find(p => p.barcode && p.barcode === barcodeCandidate);
+                        if (matched && matched.stock > 0) {
+                          setSelectedProductId(matched.id);
+                          setProductSearch(matched.name);
+                          const { price } = getProductPrice(matched);
+                          setCustomPrice(price);
+                          setSelectedProductIndex(-1);
+                          // Focus quantity input after small delay to ensure UI updated
+                          setTimeout(() => {
+                            quantityInputRef.current?.focus();
+                            quantityInputRef.current?.select();
+                          }, 100);
+                          toast.success(t('invoice.barcodeDetected', { name: matched.name }));
+                        }
+                      }
                     }}
-                    className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
+                    className={`w-full pl-12 pr-16 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
                       theme === 'dark'
                         ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
                         : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400'
                     }`}
                   />
+                  {/* Shortcut hint badge */}
+                  <div className={`absolute right-3 top-2.5 px-2 py-1 rounded text-xs font-mono ${
+                    theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'
+                  }`}>
+                    F2
+                  </div>
+                </div>
+
+                {/* Keyboard navigation hint */}
+                <div className={`flex items-center gap-4 text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <span className="flex items-center gap-1">
+                    <kbd className={`px-1.5 py-0.5 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>↑↓</kbd>
+                    {t('shortcuts.navigateList')}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <kbd className={`px-1.5 py-0.5 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>Enter</kbd>
+                    {t('shortcuts.selectItem')}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <kbd className={`px-1.5 py-0.5 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>F3</kbd>
+                    {t('shortcuts.focusQty')}
+                  </span>
                 </div>
 
                 {/* Product List */}
@@ -701,11 +1207,13 @@ export const CreateInvoice: React.FC = () => {
                       </button>
                     </div>
                   ) : (
-                    filteredProducts.map((p) => {
+                    filteredProducts.map((p, index) => {
                       const isOutOfStock = p.stock <= 0;
                       const isLowStock = p.stock <= (p.minStock || 5);
                       const isWholesale = currentCustomer?.customerType === 'wholesale';
                       const displayPrice = isWholesale ? (p.wholesalePrice || p.retailPrice || p.price || 0) : (p.retailPrice || p.price || 0);
+                      const isKeyboardSelected = index === selectedProductIndex;
+                      const isSelected = selectedProductId === p.id;
                       
                       return (
                         <button
@@ -714,25 +1222,34 @@ export const CreateInvoice: React.FC = () => {
                           onClick={() => {
                             setSelectedProductId(p.id);
                             setProductSearch(p.name);
+                            setSelectedProductIndex(index);
                             const { price } = getProductPrice(p);
                             setCustomPrice(price);
                           }}
                           disabled={isOutOfStock}
-                          className={`w-full px-4 py-3 text-left border-b last:border-b-0 transition-colors ${
+                          className={`w-full px-4 py-3 text-left border-b last:border-b-0 transition-colors relative ${
                             theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'
                           } ${
                             isOutOfStock
                               ? 'opacity-50 cursor-not-allowed'
-                              : selectedProductId === p.id
+                              : isSelected
                                 ? 'bg-cyan-500/10'
+                                : isKeyboardSelected
+                                ? 'bg-cyan-500/5 border-l-2 border-l-cyan-400'
                                 : theme === 'dark' ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'
                           }`}
                         >
+                          {/* Keyboard selection hint */}
+                          {isKeyboardSelected && !isSelected && (
+                            <div className="absolute right-2 top-2 px-1.5 py-0.5 bg-cyan-500 text-white text-xs rounded font-mono">
+                              Enter
+                            </div>
+                          )}
                           <div className="flex justify-between items-start">
                             <div className="flex-1 min-w-0 pr-3">
                               <div className="flex items-center gap-2">
                                 <p className={`font-medium truncate ${
-                                  selectedProductId === p.id ? 'text-cyan-400' : (theme === 'dark' ? 'text-white' : 'text-slate-900')
+                                  isKeyboardSelected ? 'text-cyan-400' : isSelected ? 'text-cyan-400' : (theme === 'dark' ? 'text-white' : 'text-slate-900')
                                 }`}>
                                   {p.name}
                                 </p>
@@ -997,8 +1514,13 @@ export const CreateInvoice: React.FC = () => {
                     {/* Quantity & Add */}
                     <div className="flex gap-3">
                       <div className="flex-1">
+                        <label className={`flex items-center justify-between text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                          <span>{t('invoice.quantity')}</span>
+                          <kbd className={`px-1.5 py-0.5 rounded font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F3</kbd>
+                        </label>
                         <div className="relative">
                           <input
+                            ref={quantityInputRef}
                             type="number"
                             min="1"
                             max={currentProduct.stock}
@@ -1015,14 +1537,19 @@ export const CreateInvoice: React.FC = () => {
                           </span>
                         </div>
                       </div>
-                      <button
-                        onClick={addItem}
-                        disabled={quantity <= 0 || quantity > currentProduct.stock}
-                        className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium flex items-center gap-2 transition-all shadow-lg shadow-cyan-500/20"
-                      >
-                        <Plus className="w-5 h-5" />
-                        {t('invoice.addToInvoice')}
-                      </button>
+                      <div className="flex flex-col">
+                        <label className={`text-xs font-medium mb-1.5 text-right ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                          <kbd className={`px-1.5 py-0.5 rounded font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>Enter</kbd>
+                        </label>
+                        <button
+                          onClick={addItem}
+                          disabled={quantity <= 0 || quantity > currentProduct.stock}
+                          className="flex-1 px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium flex items-center gap-2 transition-all shadow-lg shadow-cyan-500/20"
+                        >
+                          <Plus className="w-5 h-5" />
+                          {t('invoice.addToInvoice')}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1243,26 +1770,41 @@ export const CreateInvoice: React.FC = () => {
                 <div className={`p-4 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
-                  <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    <CreditCard className="w-4 h-4 text-emerald-400" />
-                    {t('invoice.paymentMethod')}
+                  <h4 className={`font-semibold mb-3 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <span className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-emerald-400" />
+                      {t('invoice.paymentMethod')}
+                    </span>
+                    <span className={`text-xs font-normal flex items-center gap-3 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                      <span>{t('shortcuts.pressKeys')} 1-4</span>
+                      <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F4</kbd>
+                    </span>
                   </h4>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { value: 'cash', label: t('invoice.cash'), icon: DollarSign, color: 'emerald' },
-                      { value: 'card', label: t('invoice.card'), icon: CreditCard, color: 'blue' },
-                      { value: 'bank_transfer', label: t('invoice.bankTransfer'), icon: Building2, color: 'purple' },
-                      { value: 'credit', label: t('invoice.credit'), icon: AlertTriangle, color: 'amber' },
-                    ].map(({ value, label, icon: Icon, color }) => (
+                      { value: 'cash', label: t('invoice.cash'), icon: DollarSign, color: 'emerald', key: '1' },
+                      { value: 'card', label: t('invoice.card'), icon: CreditCard, color: 'blue', key: '2' },
+                      { value: 'bank_transfer', label: t('invoice.bankTransfer'), icon: Building2, color: 'purple', key: '3' },
+                      { value: 'credit', label: t('invoice.credit'), icon: AlertTriangle, color: 'amber', key: '4' },
+                    ].map(({ value, label, icon: Icon, color, key }) => (
                       <button
                         key={value}
+                        ref={value === 'cash' ? paymentMethodFirstRef : undefined}
                         onClick={() => setPaymentMethod(value as typeof paymentMethod)}
-                        className={`p-2.5 rounded-lg border-2 text-left transition-all flex items-center gap-2 ${
+                        className={`p-2.5 rounded-lg border-2 text-left transition-all flex items-center gap-2 relative ${
                           paymentMethod === value
                             ? `border-${color}-500 bg-${color}-500/10`
                             : theme === 'dark' ? 'border-slate-700 hover:border-slate-600' : 'border-slate-200 hover:border-slate-300'
                         }`}
                       >
+                        {/* Keyboard shortcut badge */}
+                        <span className={`absolute -top-2 -left-1 w-5 h-5 rounded text-xs font-mono flex items-center justify-center ${
+                          paymentMethod === value 
+                            ? `bg-${color}-500 text-white` 
+                            : theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'
+                        }`}>
+                          {key}
+                        </span>
                         <Icon className={`w-4 h-4 ${paymentMethod === value ? `text-${color}-400` : theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
                         <span className={`text-sm font-medium ${paymentMethod === value ? `text-${color}-400` : theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                           {label}
@@ -1276,9 +1818,12 @@ export const CreateInvoice: React.FC = () => {
                 <div className={`p-4 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
-                  <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    <Percent className="w-4 h-4 text-pink-400" />
-                    {t('invoice.overallDiscount')}
+                  <h4 className={`font-semibold mb-3 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <span className="flex items-center gap-2">
+                      <Percent className="w-4 h-4 text-pink-400" />
+                      {t('invoice.overallDiscount')}
+                    </span>
+                    <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F5</kbd>
                   </h4>
                   <div className="space-y-3">
                     {/* Discount Type Selection */}
@@ -1290,6 +1835,7 @@ export const CreateInvoice: React.FC = () => {
                       ].map(({ value, label }) => (
                         <button
                           key={value}
+                          ref={value === 'none' ? discountNoneRef : undefined}
                           onClick={() => {
                             setDiscountType(value as typeof discountType);
                             if (value === 'none') setDiscount(0);
@@ -1308,6 +1854,7 @@ export const CreateInvoice: React.FC = () => {
                     {discountType !== 'none' && (
                       <div className="flex items-center gap-3">
                         <input
+                          ref={discountInputRef}
                           type="number"
                           min="0"
                           max={discountType === 'percentage' ? 100 : subtotal}
@@ -1343,15 +1890,21 @@ export const CreateInvoice: React.FC = () => {
                 <div className={`p-4 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
-                  <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    <Calculator className="w-4 h-4 text-cyan-400" />
-                    {t('invoice.taxSettings')}
+                  <h4 className={`font-semibold mb-3 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <span className="flex items-center gap-2">
+                      <Calculator className="w-4 h-4 text-cyan-400" />
+                      {t('invoice.taxSettings')}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F6</kbd>
+                    </div>
                   </h4>
                   <div className="space-y-3">
                     {/* Enable Tax Toggle */}
                     <label className="flex items-center gap-3 cursor-pointer">
                       <div className="relative">
                         <input
+                          ref={taxToggleRef}
                           type="checkbox"
                           checked={enableTax}
                           onChange={(e) => setEnableTax(e.target.checked)}
@@ -1399,11 +1952,17 @@ export const CreateInvoice: React.FC = () => {
                 <div className={`p-4 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
-                  <label className={`text-sm font-medium mb-2 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    <FileText className="w-4 h-4 text-slate-400" />
-                    {t('invoice.notes')}
+                  <label className={`text-sm font-medium mb-2 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <span className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-slate-400" />
+                      {t('invoice.notes')}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F7</kbd>
+                    </div>
                   </label>
                   <textarea
+                    ref={notesInputRef}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder={t('invoice.notesPlaceholder')}
@@ -1648,6 +2207,13 @@ export const CreateInvoice: React.FC = () => {
           isActive: true,
           loanBalance: 0
         } : currentCustomer}
+      />
+
+      {/* Shortcut Hints Bar - Fixed at bottom */}
+      <ShortcutHintsBar
+        currentStep={getStepName()}
+        currentMode={currentMode}
+        onShowFullMap={() => setShowShortcutMap(true)}
       />
     </div>
   );
