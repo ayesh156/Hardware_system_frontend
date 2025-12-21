@@ -93,10 +93,42 @@ export const QuickCheckout: React.FC = () => {
   const paymentRef = useRef<HTMLDivElement>(null);
   const productListRef = useRef<HTMLDivElement>(null);
   const cartListRef = useRef<HTMLDivElement>(null);
+  const cartItemsContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Quick Add row refs and state
+  const quickAddNameRef = useRef<HTMLInputElement>(null);
+  const quickAddPriceRef = useRef<HTMLInputElement>(null);
+  const quickAddQtyRef = useRef<HTMLInputElement>(null);
+  const [isQuickAddMode, setIsQuickAddMode] = useState(false);
+  const [quickAddFocusField, setQuickAddFocusField] = useState<'name' | 'price' | 'qty'>('name');
+  const [quickAddName, setQuickAddName] = useState('');
+  const [quickAddPrice, setQuickAddPrice] = useState<number>(0);
+  const [quickAddQty, setQuickAddQty] = useState<number>(1);
+  
   const [selectedProductIndex, setSelectedProductIndex] = useState<number>(-1);
   const [selectedCartIndex, setSelectedCartIndex] = useState<number>(-1);
   const [isCartFocused, setIsCartFocused] = useState(false);
   const [isPaymentFocused, setIsPaymentFocused] = useState(false);
+  const [priceEditBuffer, setPriceEditBuffer] = useState<string>('');
+  const [isPriceEditing, setIsPriceEditing] = useState(false);
+  const priceEditTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper functions for decimal-preserving quantity adjustments
+  // When adjusting, only the integer part changes while decimal fraction is preserved
+  const incrementQuantity = useCallback((currentQty: number): number => {
+    const intPart = Math.floor(currentQty);
+    const decimalPart = currentQty - intPart;
+    return intPart + 1 + decimalPart;
+  }, []);
+
+  const decrementQuantity = useCallback((currentQty: number, minValue: number = 0.01): number => {
+    const intPart = Math.floor(currentQty);
+    const decimalPart = currentQty - intPart;
+    const newIntPart = Math.max(0, intPart - 1);
+    const newQty = newIntPart + decimalPart;
+    // Ensure we don't go below minimum (0.01 for decimals, or the decimal part if > 0)
+    return Math.max(minValue, newQty > 0 ? newQty : decimalPart > 0 ? decimalPart : minValue);
+  }, []);
 
   // Play beep sound for feedback
   const playBeep = useCallback((type: 'add' | 'remove' | 'error' | 'success') => {
@@ -243,6 +275,13 @@ export const QuickCheckout: React.FC = () => {
     setProductSearch('');
     setSelectedProductIndex(-1);
     searchInputRef.current?.focus();
+    
+    // Auto-scroll cart to bottom to show newly added item
+    setTimeout(() => {
+      if (cartItemsContainerRef.current) {
+        cartItemsContainerRef.current.scrollTop = cartItemsContainerRef.current.scrollHeight;
+      }
+    }, 50);
   }, [items, quantity, playBeep, t, products]);
 
   // Remove item from cart
@@ -312,6 +351,44 @@ export const QuickCheckout: React.FC = () => {
       toast.success(`${product.name} ${t('quickCheckout.addedToCart')}`, { duration: 1500 });
     }
   }, [addProductToCart, isMobile, t]);
+
+  // Add custom item from Quick Add row
+  const addQuickAddItem = useCallback(() => {
+    if (!quickAddName.trim() || quickAddPrice <= 0 || quickAddQty <= 0) {
+      playBeep('error');
+      toast.error(t('quickCheckout.quickAddValidation'));
+      return;
+    }
+    
+    const newItem: QuickInvoiceItem = {
+      id: `custom-${Date.now()}`,
+      productId: `custom-${Date.now()}`,
+      productName: quickAddName.trim(),
+      quantity: quickAddQty,
+      unitPrice: quickAddPrice,
+      originalPrice: quickAddPrice,
+      total: quickAddQty * quickAddPrice,
+    };
+    
+    setItems(prev => [...prev, newItem]);
+    playBeep('add');
+    toast.success(`${quickAddName} ${t('quickCheckout.addedToCart')}`);
+    
+    // Reset Quick Add fields
+    setQuickAddName('');
+    setQuickAddPrice(0);
+    setQuickAddQty(1);
+    setIsQuickAddMode(false);
+    setQuickAddFocusField('name');
+    searchInputRef.current?.focus();
+    
+    // Auto-scroll cart to bottom
+    setTimeout(() => {
+      if (cartItemsContainerRef.current) {
+        cartItemsContainerRef.current.scrollTop = cartItemsContainerRef.current.scrollHeight;
+      }
+    }, 50);
+  }, [quickAddName, quickAddPrice, quickAddQty, playBeep, t]);
 
   // Calculate totals
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
@@ -468,6 +545,23 @@ export const QuickCheckout: React.FC = () => {
           discountInputRef.current?.select();
           break;
           
+        case 'F7':
+          // Quick Add custom item mode
+          e.preventDefault();
+          setIsCartFocused(false);
+          setIsPaymentFocused(false);
+          setIsQuantityFocused(false);
+          setPendingProduct(null);
+          setIsQuickAddMode(true);
+          setQuickAddFocusField('name');
+          setCurrentMode('search');
+          setTimeout(() => {
+            quickAddNameRef.current?.focus();
+            quickAddNameRef.current?.select();
+          }, 50);
+          playBeep('add');
+          break;
+          
         case 'F12':
           e.preventDefault();
           if (items.length > 0) handleCheckout();
@@ -477,6 +571,14 @@ export const QuickCheckout: React.FC = () => {
           e.preventDefault();
           if (showShortcutMap) {
             setShowShortcutMap(false);
+          } else if (isQuickAddMode) {
+            // Exit Quick Add mode
+            setIsQuickAddMode(false);
+            setQuickAddName('');
+            setQuickAddPrice(0);
+            setQuickAddQty(1);
+            setQuickAddFocusField('name');
+            searchInputRef.current?.focus();
           } else if (isCartFocused) {
             setIsCartFocused(false);
             setSelectedCartIndex(-1);
@@ -524,6 +626,12 @@ export const QuickCheckout: React.FC = () => {
           if (isCartFocused && items.length > 0) {
             e.preventDefault();
             setSelectedCartIndex((prev) => prev < items.length - 1 ? prev + 1 : prev);
+            // Reset price editing when changing selection
+            setPriceEditBuffer('');
+            setIsPriceEditing(false);
+            if (priceEditTimeoutRef.current) {
+              clearTimeout(priceEditTimeoutRef.current);
+            }
           } else if (filteredProducts.length > 0 && isInSearchInput) {
             e.preventDefault();
             // In search mode: navigate products
@@ -538,6 +646,12 @@ export const QuickCheckout: React.FC = () => {
           if (isCartFocused && items.length > 0) {
             e.preventDefault();
             setSelectedCartIndex((prev) => prev > 0 ? prev - 1 : 0);
+            // Reset price editing when changing selection
+            setPriceEditBuffer('');
+            setIsPriceEditing(false);
+            if (priceEditTimeoutRef.current) {
+              clearTimeout(priceEditTimeoutRef.current);
+            }
           } else if (filteredProducts.length > 0 && isInSearchInput) {
             e.preventDefault();
             // In search mode: navigate products
@@ -548,14 +662,14 @@ export const QuickCheckout: React.FC = () => {
         case 'ArrowLeft':
           e.preventDefault();
           if (isCartFocused && items.length > 0 && selectedCartIndex >= 0) {
-            // In cart mode: decrease quantity
+            // In cart mode: decrease quantity (preserving decimal fraction)
             const item = items[selectedCartIndex];
             if (item) {
-              updateItemQuantity(item.id, item.quantity - 1);
+              updateItemQuantity(item.id, decrementQuantity(item.quantity, 0.01));
             }
           } else if (isInQuantityInput) {
-            // In quantity input: decrease quantity
-            setQuantity(q => Math.max(1, q - 1));
+            // In quantity input: decrease quantity (preserving decimal fraction)
+            setQuantity(q => decrementQuantity(q, 0.01));
           } else if (isPaymentFocused) {
             // In payment mode: switch to cash
             setPaymentMethod('cash');
@@ -566,14 +680,14 @@ export const QuickCheckout: React.FC = () => {
         case 'ArrowRight':
           e.preventDefault();
           if (isCartFocused && items.length > 0 && selectedCartIndex >= 0) {
-            // In cart mode: increase quantity
+            // In cart mode: increase quantity (preserving decimal fraction)
             const item = items[selectedCartIndex];
             if (item) {
-              updateItemQuantity(item.id, item.quantity + 1);
+              updateItemQuantity(item.id, incrementQuantity(item.quantity));
             }
           } else if (isInQuantityInput) {
-            // In quantity input: increase quantity
-            setQuantity(q => q + 1);
+            // In quantity input: increase quantity (preserving decimal fraction)
+            setQuantity(q => incrementQuantity(q));
           } else if (isPaymentFocused) {
             // In payment mode: switch to credit
             setPaymentMethod('credit');
@@ -581,18 +695,167 @@ export const QuickCheckout: React.FC = () => {
           }
           break;
           
+        // Handle numeric keys for direct price modification in cart mode
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+          if (isCartFocused && items.length > 0 && selectedCartIndex >= 0 && !isInSearchInput && !isInQuantityInput && !isInDiscountInput) {
+            e.preventDefault();
+            const digit = e.key;
+            
+            // Clear any existing timeout
+            if (priceEditTimeoutRef.current) {
+              clearTimeout(priceEditTimeoutRef.current);
+            }
+            
+            // Build up the price buffer
+            const newBuffer = priceEditBuffer + digit;
+            setPriceEditBuffer(newBuffer);
+            setIsPriceEditing(true);
+            
+            // Update the price immediately
+            const newPrice = parseFloat(newBuffer) || 0;
+            const item = items[selectedCartIndex];
+            if (item && newPrice >= 0) {
+              setItems(prevItems => prevItems.map(i => 
+                i.id === item.id 
+                  ? { ...i, unitPrice: newPrice, total: i.quantity * newPrice }
+                  : i
+              ));
+            }
+            
+            // Set timeout to clear buffer after 1.5 seconds of inactivity
+            priceEditTimeoutRef.current = setTimeout(() => {
+              setPriceEditBuffer('');
+              setIsPriceEditing(false);
+              if (newPrice > 0) {
+                playBeep('success');
+                toast.success(`${t('quickCheckout.priceUpdated')}: ${t('common.currency')} ${newPrice.toLocaleString()}`);
+              }
+            }, 1500);
+          }
+          break;
+          
+        case 'Backspace':
+          if (isCartFocused && isPriceEditing && priceEditBuffer.length > 0 && !isInSearchInput && !isInQuantityInput && !isInDiscountInput) {
+            e.preventDefault();
+            
+            // Clear any existing timeout
+            if (priceEditTimeoutRef.current) {
+              clearTimeout(priceEditTimeoutRef.current);
+            }
+            
+            // Remove last digit from buffer
+            const newBuffer = priceEditBuffer.slice(0, -1);
+            setPriceEditBuffer(newBuffer);
+            
+            // Update the price
+            const newPrice = parseFloat(newBuffer) || 0;
+            const item = items[selectedCartIndex];
+            if (item) {
+              setItems(prevItems => prevItems.map(i => 
+                i.id === item.id 
+                  ? { ...i, unitPrice: newPrice || i.originalPrice, total: i.quantity * (newPrice || i.originalPrice) }
+                  : i
+              ));
+            }
+            
+            // If buffer is empty, revert to original price
+            if (newBuffer === '') {
+              setIsPriceEditing(false);
+            } else {
+              // Reset timeout
+              priceEditTimeoutRef.current = setTimeout(() => {
+                setPriceEditBuffer('');
+                setIsPriceEditing(false);
+              }, 1500);
+            }
+          }
+          break;
+          
+        case '.':
+          if (isCartFocused && isPriceEditing && !priceEditBuffer.includes('.') && !isInSearchInput && !isInQuantityInput && !isInDiscountInput) {
+            e.preventDefault();
+            
+            // Clear any existing timeout
+            if (priceEditTimeoutRef.current) {
+              clearTimeout(priceEditTimeoutRef.current);
+            }
+            
+            const newBuffer = priceEditBuffer + '.';
+            setPriceEditBuffer(newBuffer);
+            
+            // Reset timeout
+            priceEditTimeoutRef.current = setTimeout(() => {
+              setPriceEditBuffer('');
+              setIsPriceEditing(false);
+            }, 1500);
+          }
+          break;
+          
         case 'Enter':
-          if (pendingProduct && isInQuantityInput) {
-            // Confirm pending product with quantity
+          // Quick Add mode - commit the custom item
+          if (isQuickAddMode) {
+            e.preventDefault();
+            addQuickAddItem();
+          } else if (pendingProduct && isInQuantityInput) {
+            // Second Enter: Confirm pending product with quantity and add to cart
             e.preventDefault();
             addProductToCart(pendingProduct);
             setPendingProduct(null);
+            setCurrentMode('search');
+            searchInputRef.current?.focus();
           } else if (isInSearchInput && filteredProducts.length > 0) {
+            // First Enter: Set pending product and focus quantity input
             e.preventDefault();
-            const productToAdd = selectedProductIndex >= 0 
+            const productToSelect = selectedProductIndex >= 0 
               ? filteredProducts[selectedProductIndex] 
               : filteredProducts[0];
-            if (productToAdd) addProductToCart(productToAdd);
+            if (productToSelect) {
+              setPendingProduct(productToSelect);
+              setProductSearch('');
+              setSelectedProductIndex(-1);
+              setQuantity(1);
+              setIsQuantityFocused(true);
+              setCurrentMode('quantity');
+              setTimeout(() => {
+                quantityInputRef.current?.focus();
+                quantityInputRef.current?.select();
+              }, 50);
+              playBeep('add');
+              toast.info(`${productToSelect.name} - ${t('quickCheckout.enterQuantity')}`);
+            }
+          }
+          break;
+          
+        case 'Tab':
+          // Handle Tab navigation in Quick Add mode
+          if (isQuickAddMode) {
+            e.preventDefault();
+            if (e.shiftKey) {
+              // Shift+Tab - go backwards
+              if (quickAddFocusField === 'qty') {
+                setQuickAddFocusField('price');
+                quickAddPriceRef.current?.focus();
+              } else if (quickAddFocusField === 'price') {
+                setQuickAddFocusField('name');
+                quickAddNameRef.current?.focus();
+              } else {
+                setQuickAddFocusField('qty');
+                quickAddQtyRef.current?.focus();
+              }
+            } else {
+              // Tab - go forwards
+              if (quickAddFocusField === 'name') {
+                setQuickAddFocusField('price');
+                quickAddPriceRef.current?.focus();
+              } else if (quickAddFocusField === 'price') {
+                setQuickAddFocusField('qty');
+                quickAddQtyRef.current?.focus();
+              } else {
+                setQuickAddFocusField('name');
+                quickAddNameRef.current?.focus();
+              }
+            }
           }
           break;
       }
@@ -600,13 +863,20 @@ export const QuickCheckout: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [items, productSearch, filteredProducts, selectedProductIndex, selectedCartIndex, isCartFocused, isPaymentFocused, isQuantityFocused, pendingProduct, showShortcuts, showShortcutMap, currentStep, handleCheckout, removeItem, addProductToCart, updateItemQuantity, playBeep]);
+  }, [items, productSearch, filteredProducts, selectedProductIndex, selectedCartIndex, isCartFocused, isPaymentFocused, isQuantityFocused, pendingProduct, showShortcuts, showShortcutMap, currentStep, handleCheckout, removeItem, addProductToCart, updateItemQuantity, playBeep, priceEditBuffer, isPriceEditing, t, incrementQuantity, decrementQuantity, isQuickAddMode, quickAddFocusField, addQuickAddItem]);
 
-  // Auto-focus search on mount
+  // Auto-focus search on mount and cleanup timeout on unmount
   useEffect(() => {
     if (!isMobile) {
       searchInputRef.current?.focus();
     }
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (priceEditTimeoutRef.current) {
+        clearTimeout(priceEditTimeoutRef.current);
+      }
+    };
   }, [isMobile]);
 
   const isDark = theme === 'dark';
@@ -752,7 +1022,7 @@ export const QuickCheckout: React.FC = () => {
                 : isDark ? 'border-slate-700 bg-slate-800/80' : 'border-slate-200 bg-white'
             }`}>
               <button
-                onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                onClick={() => setQuantity(q => decrementQuantity(q, 0.01))}
                 className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 ${isDark ? 'active:bg-slate-700 text-slate-400' : 'active:bg-slate-200 text-slate-600'}`}
               >
                 <Minus className="w-4 h-4" />
@@ -760,10 +1030,11 @@ export const QuickCheckout: React.FC = () => {
               <input
                 ref={quantityInputRef}
                 type="number"
-                inputMode="numeric"
-                min="1"
+                inputMode="decimal"
+                min="0.01"
+                step="any"
                 value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                onChange={(e) => setQuantity(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && pendingProduct) {
                     e.preventDefault();
@@ -774,7 +1045,7 @@ export const QuickCheckout: React.FC = () => {
                 className={`w-12 py-3 text-center font-bold text-lg bg-transparent focus:outline-none ${isDark ? 'text-white' : 'text-slate-900'}`}
               />
               <button
-                onClick={() => setQuantity(q => q + 1)}
+                onClick={() => setQuantity(q => incrementQuantity(q))}
                 className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 ${isDark ? 'active:bg-slate-700 text-slate-400' : 'active:bg-slate-200 text-slate-600'}`}
               >
                 <Plus className="w-4 h-4" />
@@ -914,7 +1185,7 @@ export const QuickCheckout: React.FC = () => {
                       {/* Quantity Controls */}
                       <div className={`flex items-center gap-1 p-1 rounded-xl ${isDark ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
                         <button
-                          onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, item.quantity - 1); }}
+                          onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, decrementQuantity(item.quantity, 0.01)); }}
                           className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${
                             isDark ? 'active:bg-slate-600 text-slate-300' : 'active:bg-slate-200 text-slate-600'
                           }`}
@@ -925,7 +1196,7 @@ export const QuickCheckout: React.FC = () => {
                           {item.quantity}
                         </span>
                         <button
-                          onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, item.quantity + 1); }}
+                          onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, incrementQuantity(item.quantity)); }}
                           className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${
                             isDark ? 'active:bg-slate-600 text-slate-300' : 'active:bg-slate-200 text-slate-600'
                           }`}
@@ -1251,9 +1522,10 @@ export const QuickCheckout: React.FC = () => {
                     <input
                       ref={quantityInputRef}
                       type="number"
-                      min="1"
+                      min="0.01"
+                      step="any"
                       value={quantity}
-                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      onChange={(e) => setQuantity(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
                       onFocus={() => setIsQuantityFocused(true)}
                       onBlur={() => setIsQuantityFocused(false)}
                       onKeyDown={(e) => {
@@ -1275,13 +1547,13 @@ export const QuickCheckout: React.FC = () => {
                     />
                     <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col">
                       <button
-                        onClick={() => setQuantity(q => q + 1)}
+                        onClick={() => setQuantity(q => incrementQuantity(q))}
                         className={`p-0.5 ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
                       >
                         <ChevronUp className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                        onClick={() => setQuantity(q => decrementQuantity(q, 0.01))}
                         className={`p-0.5 ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
                       >
                         <ChevronDown className="w-4 h-4" />
@@ -1305,7 +1577,21 @@ export const QuickCheckout: React.FC = () => {
                   {filteredProducts.map((product, index) => (
                     <button
                       key={product.id}
-                      onClick={() => addProductToCart(product)}
+                      onClick={() => {
+                        // Mouse selection should set pending product and focus quantity for quick workflow
+                        setPendingProduct(product);
+                        setProductSearch('');
+                        setSelectedProductIndex(-1);
+                        setQuantity(1);
+                        setIsQuantityFocused(true);
+                        setCurrentMode('quantity');
+                        setTimeout(() => {
+                          quantityInputRef.current?.focus();
+                          quantityInputRef.current?.select();
+                        }, 50);
+                        playBeep('add');
+                        toast.info(`${product.name} - ${t('quickCheckout.enterQuantity')}`);
+                      }}
                       className={`w-full flex items-center gap-4 p-3 text-left transition-colors border-b last:border-b-0 ${
                         index === selectedProductIndex
                           ? isDark ? 'bg-amber-500/20 border-amber-500/30' : 'bg-amber-50 border-amber-200'
@@ -1379,12 +1665,105 @@ export const QuickCheckout: React.FC = () => {
                   {t('quickCheckout.cartItems')} ({items.length})
                   {isCartFocused && (
                     <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'}`}>
-                      ↑↓ {t('quickCheckout.shortcut.navigateItems')} • ←→ {t('quickCheckout.shortcut.adjustQty')}
+                      ↑↓ {t('quickCheckout.shortcut.navigateItems')} • ←→ {t('quickCheckout.shortcut.adjustQty')} • 0-9 {t('quickCheckout.shortcut.editPrice')}
                     </span>
                   )}
                 </h2>
-                <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'}`}>F4</kbd>
+                <div className="flex items-center gap-2">
+                  <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'}`}>F4</kbd>
+                  <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-100 text-teal-700'}`}>F7 {t('quickCheckout.quickAdd')}</kbd>
+                </div>
               </div>
+              
+              {/* Quick Add Row */}
+              {isQuickAddMode && (
+                <div className={`mb-3 p-3 rounded-xl border-2 ${
+                  isDark 
+                    ? 'bg-teal-500/10 border-teal-500/50 ring-2 ring-teal-500/20' 
+                    : 'bg-teal-50 border-teal-400 ring-2 ring-teal-200'
+                }`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Plus className={`w-4 h-4 ${isDark ? 'text-teal-400' : 'text-teal-600'}`} />
+                    <span className={`text-sm font-semibold ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>
+                      {t('quickCheckout.quickAddTitle')}
+                    </span>
+                    <span className={`text-xs ${isDark ? 'text-teal-400/70' : 'text-teal-600/70'}`}>
+                      (Tab {t('quickCheckout.toNavigate')} • Enter {t('quickCheckout.toAdd')} • Esc {t('quickCheckout.toCancel')})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={quickAddNameRef}
+                      type="text"
+                      placeholder={t('quickCheckout.itemName')}
+                      value={quickAddName}
+                      onChange={(e) => setQuickAddName(e.target.value)}
+                      onFocus={() => setQuickAddFocusField('name')}
+                      className={`flex-1 px-3 py-2 text-sm border-2 rounded-lg focus:outline-none transition-all ${
+                        quickAddFocusField === 'name'
+                          ? isDark 
+                            ? 'border-teal-500 bg-slate-700 text-white ring-2 ring-teal-500/30' 
+                            : 'border-teal-500 bg-white text-slate-900 ring-2 ring-teal-200'
+                          : isDark
+                            ? 'border-slate-600 bg-slate-700/50 text-white'
+                            : 'border-slate-200 bg-white text-slate-900'
+                      }`}
+                    />
+                    <div className="w-28">
+                      <input
+                        ref={quickAddPriceRef}
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        placeholder={t('quickCheckout.price')}
+                        value={quickAddPrice || ''}
+                        onChange={(e) => setQuickAddPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                        onFocus={() => setQuickAddFocusField('price')}
+                        className={`w-full px-3 py-2 text-sm text-right border-2 rounded-lg focus:outline-none transition-all ${
+                          quickAddFocusField === 'price'
+                            ? isDark 
+                              ? 'border-teal-500 bg-slate-700 text-white ring-2 ring-teal-500/30' 
+                              : 'border-teal-500 bg-white text-slate-900 ring-2 ring-teal-200'
+                            : isDark
+                              ? 'border-slate-600 bg-slate-700/50 text-white'
+                              : 'border-slate-200 bg-white text-slate-900'
+                        }`}
+                      />
+                    </div>
+                    <div className="w-20">
+                      <input
+                        ref={quickAddQtyRef}
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        placeholder={t('quickCheckout.qty')}
+                        value={quickAddQty || ''}
+                        onChange={(e) => setQuickAddQty(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
+                        onFocus={() => setQuickAddFocusField('qty')}
+                        className={`w-full px-3 py-2 text-sm text-center border-2 rounded-lg focus:outline-none transition-all ${
+                          quickAddFocusField === 'qty'
+                            ? isDark 
+                              ? 'border-teal-500 bg-slate-700 text-white ring-2 ring-teal-500/30' 
+                              : 'border-teal-500 bg-white text-slate-900 ring-2 ring-teal-200'
+                            : isDark
+                              ? 'border-slate-600 bg-slate-700/50 text-white'
+                              : 'border-slate-200 bg-white text-slate-900'
+                        }`}
+                      />
+                    </div>
+                    <button
+                      onClick={addQuickAddItem}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                        quickAddName && quickAddPrice > 0
+                          ? 'bg-teal-500 hover:bg-teal-600 text-white'
+                          : isDark ? 'bg-slate-600 text-slate-400 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      }`}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
               
               {items.length === 0 ? (
                 <div className={`flex flex-col items-center justify-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -1393,10 +1772,25 @@ export const QuickCheckout: React.FC = () => {
                   <p className="text-sm mt-1">{t('quickCheckout.scanOrSearch')}</p>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                <div 
+                  ref={cartItemsContainerRef}
+                  className="space-y-2 h-[350px] overflow-y-auto"
+                >
                   {items.map((item, index) => (
                     <div
                       key={item.id}
+                      onClick={() => {
+                        setIsCartFocused(true);
+                        setSelectedCartIndex(index);
+                        setSelectedProductIndex(-1);
+                        setPendingProduct(null);
+                        setCurrentMode('cart');
+                        setPriceEditBuffer('');
+                        setIsPriceEditing(false);
+                        (document.activeElement as HTMLElement)?.blur();
+                        cartListRef.current?.focus();
+                        playBeep('add');
+                      }}
                       className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
                         isCartFocused && index === selectedCartIndex
                           ? isDark 
@@ -1424,7 +1818,7 @@ export const QuickCheckout: React.FC = () => {
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
+                          onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, decrementQuantity(item.quantity, 0.01)); }}
                           className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
                             isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
                           }`}
@@ -1435,7 +1829,7 @@ export const QuickCheckout: React.FC = () => {
                           {item.quantity}
                         </span>
                         <button
-                          onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
+                          onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, incrementQuantity(item.quantity)); }}
                           className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
                             isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
                           }`}
@@ -1444,12 +1838,56 @@ export const QuickCheckout: React.FC = () => {
                         </button>
                       </div>
                       
+                      {/* Price Display - Editable in Cart Mode */}
+                      <div className={`w-28 text-right relative ${
+                        isCartFocused && index === selectedCartIndex && isPriceEditing
+                          ? 'animate-pulse'
+                          : ''
+                      }`}>
+                        {isCartFocused && index === selectedCartIndex && isPriceEditing ? (
+                          <div className={`px-2 py-1 rounded-lg border-2 ${
+                            isDark 
+                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                              : 'bg-emerald-50 border-emerald-400 text-emerald-700'
+                          }`}>
+                            <p className="font-bold font-mono text-sm">
+                              {t('common.currency')} {priceEditBuffer || '0'}
+                            </p>
+                            <p className={`text-xs ${isDark ? 'text-emerald-500/70' : 'text-emerald-600/70'}`}>
+                              {t('quickCheckout.typing')}...
+                            </p>
+                          </div>
+                        ) : (
+                          <div className={`px-2 py-1 rounded-lg transition-all ${
+                            isCartFocused && index === selectedCartIndex
+                              ? isDark 
+                                ? 'bg-slate-600/50 ring-1 ring-amber-500/30' 
+                                : 'bg-white ring-1 ring-amber-300'
+                              : ''
+                          }`}>
+                            <p className={`font-bold font-mono ${
+                              item.unitPrice !== item.originalPrice
+                                ? 'text-emerald-500'
+                                : isDark ? 'text-white' : 'text-slate-900'
+                            }`}>
+                              {t('common.currency')} {item.unitPrice.toLocaleString()}
+                            </p>
+                            {item.unitPrice !== item.originalPrice && (
+                              <p className={`text-xs line-through ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {t('common.currency')} {item.originalPrice.toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Line Total */}
                       <p className={`w-24 text-right font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
                         {t('common.currency')} {item.total.toLocaleString()}
                       </p>
                       
                       <button
-                        onClick={() => removeItem(item.id)}
+                        onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
                         className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />

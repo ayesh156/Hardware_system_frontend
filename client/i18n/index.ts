@@ -878,6 +878,8 @@ export const translations = {
       actions: 'Actions',
       addedToCart: 'added to cart',
       itemRemoved: 'Item removed',
+      priceUpdated: 'Price updated',
+      typing: 'typing',
       shortcut: {
         search: 'Search',
         quantity: 'Quantity',
@@ -892,7 +894,18 @@ export const translations = {
         decreaseQty: 'Decrease',
         navigateItems: 'Navigate',
         adjustQty: 'Adjust qty',
+        editPrice: 'Edit price',
       },
+      // Quick Add feature
+      quickAdd: 'Quick Add',
+      quickAddTitle: 'Quick Add Custom Item',
+      quickAddValidation: 'Please enter name, price and quantity',
+      itemName: 'Item name',
+      price: 'Price',
+      qty: 'Qty',
+      toNavigate: 'to navigate',
+      toAdd: 'to add',
+      toCancel: 'to cancel',
     },
     // Barcode Labels
     barcodeLabels: {
@@ -1889,6 +1902,8 @@ export const translations = {
       actions: 'ක්‍රියාමාර්ග',
       addedToCart: 'කරත්තයට එකතු කළා',
       itemRemoved: 'අයිතමය ඉවත් කළා',
+      priceUpdated: 'මිල යාවත්කාලීන කළා',
+      typing: 'ටයිප් කරනවා',
       shortcut: {
         search: 'සෙවීම',
         quantity: 'ප්‍රමාණය',
@@ -1903,7 +1918,18 @@ export const translations = {
         decreaseQty: 'අඩු කරන්න',
         navigateItems: 'සැරිසරන්න',
         adjustQty: 'ප්‍රමාණය සකසන්න',
+        editPrice: 'මිල සංස්කරණය',
       },
+      // Quick Add feature
+      quickAdd: 'ඉක්මන් එකතු කිරීම',
+      quickAddTitle: 'අභිරුචි අයිතමය ඉක්මනින් එකතු කරන්න',
+      quickAddValidation: 'කරුණාකර නම, මිල සහ ප්‍රමාණය ඇතුළත් කරන්න',
+      itemName: 'අයිතම නාමය',
+      price: 'මිල',
+      qty: 'ප්‍රමාණය',
+      toNavigate: 'සැරිසැරීමට',
+      toAdd: 'එකතු කිරීමට',
+      toCancel: 'අවලංගු කිරීමට',
     },
     // Barcode Labels
     barcodeLabels: {
