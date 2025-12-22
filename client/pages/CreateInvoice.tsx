@@ -96,6 +96,10 @@ export const CreateInvoice: React.FC = () => {
   const paymentMethodFirstRef = useRef<HTMLButtonElement>(null);
   const discountNoneRef = useRef<HTMLButtonElement>(null);
   const taxToggleRef = useRef<HTMLInputElement>(null);
+  
+  // Refs for scroll synchronization - stores refs to individual items
+  const customerItemRefs = useRef<Map<number, HTMLElement>>(new Map());
+  const productItemRefs = useRef<Map<number, HTMLElement>>(new Map());
 
   const currentCustomer = customers.find((c) => c.id === selectedCustomer);
   const currentProduct = products.find((p) => p.id === selectedProductId);
@@ -643,6 +647,32 @@ export const CreateInvoice: React.FC = () => {
     }
   }, [step, isWalkIn]);
 
+  // Active-scroll synchronization: Keep selected customer in viewport
+  useEffect(() => {
+    if (selectedCustomerIndex >= 0) {
+      const itemElement = customerItemRefs.current.get(selectedCustomerIndex);
+      if (itemElement) {
+        itemElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
+    }
+  }, [selectedCustomerIndex]);
+
+  // Active-scroll synchronization: Keep selected product in viewport
+  useEffect(() => {
+    if (selectedProductIndex >= 0) {
+      const itemElement = productItemRefs.current.get(selectedProductIndex);
+      if (itemElement) {
+        itemElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
+    }
+  }, [selectedProductIndex]);
+
   const getStepIcon = (stepNum: number) => {
     switch (stepNum) {
       case 1: return <User className="w-4 h-4" />;
@@ -899,6 +929,10 @@ export const CreateInvoice: React.FC = () => {
                       return (
                       <button
                         key={customer.id}
+                        ref={(el) => {
+                          if (el) customerItemRefs.current.set(index, el);
+                          else customerItemRefs.current.delete(index);
+                        }}
                         onClick={() => {
                           setSelectedCustomer(customer.id);
                           setSelectedCustomerIndex(index);
@@ -1219,6 +1253,10 @@ export const CreateInvoice: React.FC = () => {
                         <button
                           key={p.id}
                           type="button"
+                          ref={(el) => {
+                            if (el) productItemRefs.current.set(index, el);
+                            else productItemRefs.current.delete(index);
+                          }}
                           onClick={() => {
                             setSelectedProductId(p.id);
                             setProductSearch(p.name);

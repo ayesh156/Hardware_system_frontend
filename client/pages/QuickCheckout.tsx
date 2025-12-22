@@ -95,6 +95,10 @@ export const QuickCheckout: React.FC = () => {
   const cartListRef = useRef<HTMLDivElement>(null);
   const cartItemsContainerRef = useRef<HTMLDivElement>(null);
   
+  // Refs for scroll synchronization - stores refs to individual items
+  const cartItemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const productItemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  
   // Quick Add row refs and state
   const quickAddNameRef = useRef<HTMLInputElement>(null);
   const quickAddPriceRef = useRef<HTMLInputElement>(null);
@@ -449,6 +453,46 @@ export const QuickCheckout: React.FC = () => {
     toast.success(t('quickCheckout.saleCompleted'));
   }, [t]);
 
+  // Quick save without print preview (F9)
+  const handleQuickSave = useCallback(() => {
+    if (items.length === 0 || isProcessing) return;
+    
+    setIsProcessing(true);
+    
+    const invoiceNumber = `QC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const invoice: Invoice = {
+      id: `inv-${Date.now()}`,
+      invoiceNumber,
+      customerId: 'walk-in',
+      customerName: t('invoice.walkInCustomer'),
+      items,
+      subtotal: Math.round(subtotal * 100) / 100,
+      tax: 0,
+      discount: Math.round(discountAmount * 100) / 100,
+      total: Math.round(total * 100) / 100,
+      issueDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date().toISOString().split('T')[0],
+      status: paymentMethod === 'credit' ? 'pending' : 'paid',
+      paymentMethod: paymentMethod,
+      notes: discountAmount > 0 
+        ? `${t('quickCheckout.quickSaleNote')} - ${t('quickCheckout.discount')}: ${t('common.currency')} ${discountAmount.toLocaleString()}`
+        : t('quickCheckout.quickSaleNote'),
+    };
+
+    // Save directly without showing print modal
+    playBeep('success');
+    toast.success(
+      `${t('quickCheckout.invoiceSaved')}: ${invoiceNumber}`, 
+      { description: `${t('common.currency')} ${invoice.total.toLocaleString()}` }
+    );
+    
+    // Reset cart
+    setItems([]);
+    setDiscount(0);
+    setIsProcessing(false);
+    searchInputRef.current?.focus();
+  }, [items, subtotal, total, discountAmount, paymentMethod, playBeep, t, isProcessing]);
+
   // Keyboard event handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -560,6 +604,12 @@ export const QuickCheckout: React.FC = () => {
             quickAddNameRef.current?.select();
           }, 50);
           playBeep('add');
+          break;
+          
+        case 'F9':
+          // Quick save - save invoice directly without print preview
+          e.preventDefault();
+          if (items.length > 0) handleQuickSave();
           break;
           
         case 'F12':
@@ -712,9 +762,20 @@ export const QuickCheckout: React.FC = () => {
             setPriceEditBuffer(newBuffer);
             setIsPriceEditing(true);
             
-            // Update the price immediately
-            const newPrice = parseFloat(newBuffer) || 0;
             const item = items[selectedCartIndex];
+            let newPrice: number;
+            let isRelativeDeduction = false;
+            
+            // Check if this is a relative deduction (buffer starts with '-')
+            if (newBuffer.startsWith('-')) {
+              const deductionAmount = parseFloat(newBuffer.slice(1)) || 0;
+              newPrice = Math.max(0, (item?.originalPrice || 0) - deductionAmount);
+              isRelativeDeduction = true;
+            } else {
+              newPrice = parseFloat(newBuffer) || 0;
+            }
+            
+            // Update the price immediately
             if (item && newPrice >= 0) {
               setItems(prevItems => prevItems.map(i => 
                 i.id === item.id 
@@ -729,7 +790,12 @@ export const QuickCheckout: React.FC = () => {
               setIsPriceEditing(false);
               if (newPrice > 0) {
                 playBeep('success');
-                toast.success(`${t('quickCheckout.priceUpdated')}: ${t('common.currency')} ${newPrice.toLocaleString()}`);
+                if (isRelativeDeduction) {
+                  const deductionAmount = parseFloat(newBuffer.slice(1)) || 0;
+                  toast.success(`${t('quickCheckout.priceDeducted')}: -${t('common.currency')} ${deductionAmount.toLocaleString()} → ${t('common.currency')} ${newPrice.toLocaleString()}`);
+                } else {
+                  toast.success(`${t('quickCheckout.priceUpdated')}: ${t('common.currency')} ${newPrice.toLocaleString()}`);
+                }
               }
             }, 1500);
           }
@@ -789,6 +855,30 @@ export const QuickCheckout: React.FC = () => {
               setPriceEditBuffer('');
               setIsPriceEditing(false);
             }, 1500);
+          }
+          break;
+          
+        case '-':
+          // Minus key for relative price deduction (e.g., -50 means subtract 50 from original price)
+          if (isCartFocused && items.length > 0 && selectedCartIndex >= 0 && !isInSearchInput && !isInQuantityInput && !isInDiscountInput) {
+            // Only allow minus at the beginning of the buffer
+            if (priceEditBuffer === '') {
+              e.preventDefault();
+              
+              // Clear any existing timeout
+              if (priceEditTimeoutRef.current) {
+                clearTimeout(priceEditTimeoutRef.current);
+              }
+              
+              setPriceEditBuffer('-');
+              setIsPriceEditing(true);
+              
+              // Reset timeout
+              priceEditTimeoutRef.current = setTimeout(() => {
+                setPriceEditBuffer('');
+                setIsPriceEditing(false);
+              }, 1500);
+            }
           }
           break;
           
@@ -863,7 +953,7 @@ export const QuickCheckout: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [items, productSearch, filteredProducts, selectedProductIndex, selectedCartIndex, isCartFocused, isPaymentFocused, isQuantityFocused, pendingProduct, showShortcuts, showShortcutMap, currentStep, handleCheckout, removeItem, addProductToCart, updateItemQuantity, playBeep, priceEditBuffer, isPriceEditing, t, incrementQuantity, decrementQuantity, isQuickAddMode, quickAddFocusField, addQuickAddItem]);
+  }, [items, productSearch, filteredProducts, selectedProductIndex, selectedCartIndex, isCartFocused, isPaymentFocused, isQuantityFocused, pendingProduct, showShortcuts, showShortcutMap, currentStep, handleCheckout, handleQuickSave, removeItem, addProductToCart, updateItemQuantity, playBeep, priceEditBuffer, isPriceEditing, t, incrementQuantity, decrementQuantity, isQuickAddMode, quickAddFocusField, addQuickAddItem]);
 
   // Auto-focus search on mount and cleanup timeout on unmount
   useEffect(() => {
@@ -878,6 +968,32 @@ export const QuickCheckout: React.FC = () => {
       }
     };
   }, [isMobile]);
+
+  // Active-scroll synchronization: Keep selected cart item in viewport
+  useEffect(() => {
+    if (isCartFocused && selectedCartIndex >= 0) {
+      const itemElement = cartItemRefs.current.get(selectedCartIndex);
+      if (itemElement) {
+        itemElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
+    }
+  }, [selectedCartIndex, isCartFocused]);
+
+  // Active-scroll synchronization: Keep selected product in viewport
+  useEffect(() => {
+    if (selectedProductIndex >= 0) {
+      const itemElement = productItemRefs.current.get(selectedProductIndex);
+      if (itemElement) {
+        itemElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
+    }
+  }, [selectedProductIndex]);
 
   const isDark = theme === 'dark';
 
@@ -1063,6 +1179,10 @@ export const QuickCheckout: React.FC = () => {
                   {filteredProducts.map((product, index) => (
                     <button
                       key={product.id}
+                      ref={(el) => {
+                        if (el) productItemRefs.current.set(index, el);
+                        else productItemRefs.current.delete(index);
+                      }}
                       onClick={() => quickAddProduct(product)}
                       className={`w-full flex items-center gap-3 p-3.5 text-left transition-all active:scale-[0.98] border-b last:border-b-0 ${
                         index === selectedProductIndex
@@ -1577,6 +1697,10 @@ export const QuickCheckout: React.FC = () => {
                   {filteredProducts.map((product, index) => (
                     <button
                       key={product.id}
+                      ref={(el) => {
+                        if (el) productItemRefs.current.set(index, el);
+                        else productItemRefs.current.delete(index);
+                      }}
                       onClick={() => {
                         // Mouse selection should set pending product and focus quantity for quick workflow
                         setPendingProduct(product);
@@ -1672,6 +1796,7 @@ export const QuickCheckout: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'}`}>F4</kbd>
                   <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-100 text-teal-700'}`}>F7 {t('quickCheckout.quickAdd')}</kbd>
+                  <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'}`}>F9 {t('quickCheckout.shortcut.quickSave')}</kbd>
                 </div>
               </div>
               
@@ -1779,6 +1904,10 @@ export const QuickCheckout: React.FC = () => {
                   {items.map((item, index) => (
                     <div
                       key={item.id}
+                      ref={(el) => {
+                        if (el) cartItemRefs.current.set(index, el);
+                        else cartItemRefs.current.delete(index);
+                      }}
                       onClick={() => {
                         setIsCartFocused(true);
                         setSelectedCartIndex(index);

@@ -879,6 +879,8 @@ export const translations = {
       addedToCart: 'added to cart',
       itemRemoved: 'Item removed',
       priceUpdated: 'Price updated',
+      priceDeducted: 'Price reduced',
+      invoiceSaved: 'Invoice saved',
       typing: 'typing',
       shortcut: {
         search: 'Search',
@@ -886,6 +888,7 @@ export const translations = {
         cart: 'Cart',
         payment: 'Payment',
         discount: 'Discount',
+        quickSave: 'Quick Save',
         addItem: 'Add item',
         removeLastItem: 'Remove item',
         checkout: 'Checkout',
@@ -1903,6 +1906,8 @@ export const translations = {
       addedToCart: 'කරත්තයට එකතු කළා',
       itemRemoved: 'අයිතමය ඉවත් කළා',
       priceUpdated: 'මිල යාවත්කාලීන කළා',
+      priceDeducted: 'මිල අඩු කළා',
+      invoiceSaved: 'ඉන්වොයිසිය සුරැකුවා',
       typing: 'ටයිප් කරනවා',
       shortcut: {
         search: 'සෙවීම',
@@ -1910,6 +1915,7 @@ export const translations = {
         cart: 'කරත්තය',
         payment: 'ගෙවීම',
         discount: 'වට්ටම',
+        quickSave: 'ඉක්මන් සුරැකීම',
         addItem: 'අයිතමය එකතු',
         removeLastItem: 'අයිතමය ඉවත්',
         checkout: 'පිටවීම',

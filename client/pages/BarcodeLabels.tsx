@@ -525,11 +525,11 @@ export const BarcodeLabels: React.FC = () => {
   }, [labelConfig, labelGroups, t]);
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-slate-50'} ${isMobile ? 'pb-20' : ''}`}>
-      {/* Header */}
-      <div className={`sticky top-0 z-40 px-4 py-3 ${isDark ? 'bg-slate-800/95 backdrop-blur border-b border-slate-700' : 'bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm'}`}>
+    <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-slate-50'} ${isMobile ? 'pb-24' : ''}`}>
+      {/* Header - Compact on mobile */}
+      <div className={`sticky top-0 z-40 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'} ${isDark ? 'bg-slate-800/95 backdrop-blur border-b border-slate-700' : 'bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm'}`}>
         <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/products')}
               className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`}
@@ -537,25 +537,27 @@ export const BarcodeLabels: React.FC = () => {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                <ScanLine className="w-5 h-5 text-white" />
+              <div className={`${isMobile ? 'w-8 h-8' : 'w-10 h-10'} bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30`}>
+                <ScanLine className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-white`} />
               </div>
               <div>
-                <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <h1 className={`${isMobile ? 'text-base' : 'text-xl'} font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {t('barcodeLabels.title')}
                 </h1>
-                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {t('barcodeLabels.subtitle')}
-                </p>
+                {!isMobile && (
+                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {t('barcodeLabels.subtitle')}
+                  </p>
+                )}
               </div>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {totalLabels > 0 && (
-              <Badge variant="secondary" className="gap-1 px-3 py-1.5 bg-indigo-500/20 text-indigo-600 dark:text-indigo-400">
-                <Tag className="w-3.5 h-3.5" />
-                {totalLabels} {t('barcodeLabels.labels')}
+              <Badge variant="secondary" className={`gap-1 ${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5'} bg-indigo-500/20 text-indigo-600 dark:text-indigo-400`}>
+                <Tag className={`${isMobile ? 'w-3 h-3' : 'w-3.5 h-3.5'}`} />
+                {totalLabels}
               </Badge>
             )}
             
@@ -571,27 +573,30 @@ export const BarcodeLabels: React.FC = () => {
               <Settings2 className="w-5 h-5" />
             </button>
             
-            <Button
-              onClick={handlePrint}
-              disabled={selectedProducts.size === 0}
-              className="gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
-            >
-              <Printer className="w-4 h-4" />
-              {!isMobile && t('barcodeLabels.print')}
-            </Button>
+            {/* Print button - hidden on mobile (floating button used instead) */}
+            {!isMobile && (
+              <Button
+                onClick={handlePrint}
+                disabled={selectedProducts.size === 0}
+                className="gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+              >
+                <Printer className="w-4 h-4" />
+                {t('barcodeLabels.print')}
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-4">
-        {/* Configuration Panel */}
+      <div className={`max-w-7xl mx-auto ${isMobile ? 'px-3 py-3' : 'p-4'}`}>
+        {/* Configuration Panel - Collapsible on mobile */}
         {showConfig && (
-          <div className={`mb-4 p-4 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
-            <h3 className={`font-semibold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+          <div className={`mb-4 ${isMobile ? 'p-3' : 'p-4'} rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+            <h3 className={`font-semibold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'} ${isMobile ? 'text-sm' : ''}`}>
               <Settings2 className="w-4 h-4" />
               {t('barcodeLabels.labelSettings')}
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className={`grid ${isMobile ? 'grid-cols-2 gap-3' : 'grid-cols-2 md:grid-cols-4 gap-4'}`}>
               {/* Label height */}
               <div>
                 <label className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -700,25 +705,25 @@ export const BarcodeLabels: React.FC = () => {
             </div>
 
             {/* Quick Add - Recently used or popular products */}
-            <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+            <div className={`${isMobile ? 'p-3' : 'p-4'} rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
               <h4 className={`text-sm font-medium mb-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 {t('barcodeLabels.quickAdd')}
               </h4>
-              <div className="flex flex-wrap gap-2">
-                {productsWithBarcodes.slice(0, 8).map(product => {
+              <div className={`flex flex-wrap ${isMobile ? 'gap-1.5' : 'gap-2'}`}>
+                {productsWithBarcodes.slice(0, isMobile ? 6 : 8).map(product => {
                   const isSelected = selectedProducts.has(product.id);
                   return (
                     <button
                       key={product.id}
                       onClick={() => !isSelected && handleProductSelect(product.id)}
                       disabled={isSelected}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      className={`${isMobile ? 'px-2.5 py-2 text-xs' : 'px-3 py-1.5 text-xs'} rounded-lg font-medium transition-all active:scale-95 ${
                         isSelected
                           ? isDark ? 'bg-indigo-500/30 text-indigo-300 cursor-not-allowed' : 'bg-indigo-100 text-indigo-600 cursor-not-allowed'
-                          : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 active:bg-slate-500' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300'
                       }`}
                     >
-                      {product.name.length > 20 ? product.name.slice(0, 20) + '...' : product.name}
+                      {product.name.length > (isMobile ? 15 : 20) ? product.name.slice(0, isMobile ? 15 : 20) + '...' : product.name}
                     </button>
                   );
                 })}
@@ -729,17 +734,17 @@ export const BarcodeLabels: React.FC = () => {
           {/* Right Panel - Selected Products & Quantities */}
           <div className="space-y-4">
             <div className={`rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
-              <div className={`px-4 py-3 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <div className={`${isMobile ? 'px-3 py-2.5' : 'px-4 py-3'} border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'} ${isMobile ? 'text-sm' : ''}`}>
                   <Layers className="w-4 h-4" />
                   {t('barcodeLabels.selectedProducts')} ({selectedProducts.size})
                 </h3>
               </div>
               
-              <div className="max-h-[500px] overflow-y-auto">
+              <div className={`${isMobile ? 'max-h-[350px]' : 'max-h-[500px]'} overflow-y-auto`}>
                 {selectedProducts.size === 0 ? (
-                  <div className="p-8 text-center">
-                    <Tag className={`w-12 h-12 mx-auto mb-3 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                  <div className={`${isMobile ? 'p-6' : 'p-8'} text-center`}>
+                    <Tag className={`${isMobile ? 'w-10 h-10' : 'w-12 h-12'} mx-auto mb-3 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
                     <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {t('barcodeLabels.noSelection')}
                     </p>
@@ -749,11 +754,11 @@ export const BarcodeLabels: React.FC = () => {
                     {Array.from(selectedProducts.values()).map(({ product, quantity, barcodes }) => (
                       <div
                         key={product.id}
-                        className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
+                        className={`${isMobile ? 'p-3' : 'p-4'} rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
                       >
-                        <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0 flex-1">
-                            <p className={`font-medium text-sm truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                            <p className={`font-medium ${isMobile ? 'text-sm' : 'text-sm'} truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
                               {product.name}
                             </p>
                             <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -762,21 +767,21 @@ export const BarcodeLabels: React.FC = () => {
                           </div>
                           <button
                             onClick={() => removeProduct(product.id)}
-                            className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-100 text-red-500'}`}
+                            className={`${isMobile ? 'p-2' : 'p-1.5'} rounded-lg transition-colors active:scale-95 ${isDark ? 'hover:bg-red-500/20 active:bg-red-500/30 text-red-400' : 'hover:bg-red-100 active:bg-red-200 text-red-500'}`}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} />
                           </button>
                         </div>
                         
-                        {/* Barcode preview */}
-                        <div className={`mb-3 rounded-lg ${isDark ? 'bg-white' : 'bg-white border border-slate-200'} flex items-center justify-center px-3 py-2`} style={{ minHeight: 64 }}>
+                        {/* Barcode preview - smaller on mobile */}
+                        <div className={`${isMobile ? 'mb-2' : 'mb-3'} rounded-lg ${isDark ? 'bg-white' : 'bg-white border border-slate-200'} flex items-center justify-center px-2 py-1.5`} style={{ minHeight: isMobile ? 50 : 64 }}>
                           <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
-                            <Code39Barcode value={barcodes[0]} height={35} narrow={1} wide={3} margin={2} />
-                            <p className="text-center text-xs font-mono text-slate-600 mt-1">{barcodes[0]}</p>
+                            <Code39Barcode value={barcodes[0]} height={isMobile ? 28 : 35} narrow={isMobile ? 0.8 : 1} wide={isMobile ? 2.5 : 3} margin={1} />
+                            <p className={`text-center ${isMobile ? 'text-[10px]' : 'text-xs'} font-mono text-slate-600 mt-0.5`}>{barcodes[0]}</p>
                           </div>
                         </div>
                         
-                        {/* Quantity controls */}
+                        {/* Quantity controls - larger touch targets on mobile */}
                         <div className="flex items-center justify-between">
                           <span className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                             {t('barcodeLabels.labelsQty')}:
@@ -784,9 +789,9 @@ export const BarcodeLabels: React.FC = () => {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => updateQuantity(product.id, -1)}
-                              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-600'}`}
+                              className={`${isMobile ? 'p-2.5' : 'p-1.5'} rounded-lg transition-colors active:scale-95 ${isDark ? 'hover:bg-slate-700 active:bg-slate-600 text-slate-400' : 'hover:bg-slate-200 active:bg-slate-300 text-slate-600'}`}
                             >
-                              <Minus className="w-4 h-4" />
+                              <Minus className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} />
                             </button>
                             <input
                               type="number"
@@ -794,7 +799,7 @@ export const BarcodeLabels: React.FC = () => {
                               max="100"
                               value={quantity}
                               onChange={(e) => setQuantity(product.id, parseInt(e.target.value) || 1)}
-                              className={`w-16 px-2 py-1.5 text-center text-sm font-bold rounded-lg border ${
+                              className={`${isMobile ? 'w-14 px-1.5 py-2 text-base' : 'w-16 px-2 py-1.5 text-sm'} text-center font-bold rounded-lg border ${
                                 isDark 
                                   ? 'bg-slate-700 border-slate-600 text-white' 
                                   : 'bg-white border-slate-300 text-slate-900'
@@ -802,7 +807,7 @@ export const BarcodeLabels: React.FC = () => {
                             />
                             <button
                               onClick={() => updateQuantity(product.id, 1)}
-                              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-600'}`}
+                              className={`${isMobile ? 'p-2.5' : 'p-1.5'} rounded-lg transition-colors active:scale-95 ${isDark ? 'hover:bg-slate-700 active:bg-slate-600 text-slate-400' : 'hover:bg-slate-200 active:bg-slate-300 text-slate-600'}`}
                             >
                               <Plus className="w-4 h-4" />
                             </button>
@@ -822,12 +827,12 @@ export const BarcodeLabels: React.FC = () => {
               
               {/* Summary Footer */}
               {selectedProducts.size > 0 && (
-                <div className={`px-4 py-4 border-t ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <div className={`${isMobile ? 'px-3 py-3' : 'px-4 py-4'} border-t ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`font-medium ${isMobile ? 'text-sm' : ''} ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                       {t('barcodeLabels.totalLabels')}:
                     </span>
-                    <span className="text-2xl font-bold text-indigo-500">
+                    <span className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-indigo-500`}>
                       {totalLabels}
                     </span>
                   </div>
@@ -841,47 +846,47 @@ export const BarcodeLabels: React.FC = () => {
         </div>
       </div>
 
-      {/* Print Preview Modal */}
+      {/* Print Preview Modal - Full screen on mobile */}
       {isPrintPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className={`w-full max-w-4xl max-h-[90vh] overflow-auto m-4 rounded-2xl ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
-            <div className={`sticky top-0 px-4 py-3 border-b flex items-center justify-between ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+          <div className={`w-full ${isMobile ? 'h-full max-h-full rounded-none' : 'max-w-4xl max-h-[90vh] m-4 rounded-2xl'} overflow-auto ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+            <div className={`sticky top-0 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'} border-b flex items-center justify-between ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} z-10`}>
+              <h3 className={`font-semibold ${isMobile ? 'text-sm' : ''} ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {t('barcodeLabels.printPreview')}
               </h3>
               <div className="flex items-center gap-2">
-                <Button onClick={executePrint} className="gap-2">
-                  <Printer className="w-4 h-4" />
-                  {t('barcodeLabels.confirmPrint')}
+                <Button onClick={executePrint} className={`gap-2 ${isMobile ? 'h-9 px-3 text-sm' : ''}`}>
+                  <Printer className={`${isMobile ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                  {isMobile ? t('barcodeLabels.print') : t('barcodeLabels.confirmPrint')}
                 </Button>
-                <Button variant="outline" onClick={() => setIsPrintPreview(false)}>
+                <Button variant="outline" onClick={() => setIsPrintPreview(false)} className={isMobile ? 'h-9 w-9 p-0' : ''}>
                   <X className="w-4 h-4" />
                 </Button>
               </div>
             </div>
             
             {/* Preview Content */}
-            <div className="p-6 bg-white">
+            <div className={`${isMobile ? 'p-3' : 'p-6'} bg-white`}>
               {labelGroups.map(group => (
                 <div key={group.categoryName} className="mb-6">
                   <div className="text-black px-1 pb-2 mb-3 text-sm font-semibold border-b border-slate-300">
                     {group.categoryName} ({group.totalLabels} {t('barcodeLabels.labels')})
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
                     {group.products.flatMap(({ product, quantity, barcodes }) => 
                       barcodes.flatMap(barcode => 
-                        Array.from({ length: Math.min(quantity, 3) }).map((_, idx) => (
+                        Array.from({ length: Math.min(quantity, isMobile ? 2 : 3) }).map((_, idx) => (
                           <div 
                             key={`${product.id}-${barcode}-${idx}`}
-                            className="border border-dashed border-slate-300 rounded-md px-2 py-1 flex flex-col items-center text-center"
+                            className={`border border-dashed border-slate-300 rounded-md ${isMobile ? 'px-1.5 py-1' : 'px-2 py-1'} flex flex-col items-center text-center`}
                           >
-                            <p className="text-xs font-semibold text-slate-800 w-full mb-2" style={{ display: '-webkit-box' as any, WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>
+                            <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} font-semibold text-slate-800 w-full ${isMobile ? 'mb-1' : 'mb-2'}`} style={{ display: '-webkit-box' as any, WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>
                               {product.name}
                             </p>
-                            <Code39Barcode value={barcode} height={36} narrow={1} wide={3} margin={1} />
-                            <p className="text-xs font-mono text-slate-600 mt-1">{barcode}</p>
+                            <Code39Barcode value={barcode} height={isMobile ? 28 : 36} narrow={isMobile ? 0.8 : 1} wide={isMobile ? 2.5 : 3} margin={1} />
+                            <p className={`${isMobile ? 'text-[9px]' : 'text-xs'} font-mono text-slate-600 mt-0.5`}>{barcode}</p>
                             {labelConfig.showPrice && (
-                              <p className="text-sm font-bold text-emerald-600 mt-1">
+                              <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-bold text-emerald-600 mt-0.5`}>
                                 Rs. {(product.retailPrice || product.price || 0).toLocaleString()}
                               </p>
                             )}
@@ -890,15 +895,28 @@ export const BarcodeLabels: React.FC = () => {
                       )
                     )}
                   </div>
-                  {group.totalLabels > 9 && (
+                  {group.totalLabels > (isMobile ? 4 : 9) && (
                     <p className="text-xs text-slate-400 text-center mt-2">
-                      +{group.totalLabels - Math.min(group.products.reduce((acc, p) => acc + Math.min(p.quantity, 3) * p.barcodes.length, 0), 9)} more labels...
+                      +{group.totalLabels - Math.min(group.products.reduce((acc, p) => acc + Math.min(p.quantity, isMobile ? 2 : 3) * p.barcodes.length, 0), isMobile ? 4 : 9)} more labels...
                     </p>
                   )}
                 </div>
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Mobile Floating Action Button */}
+      {isMobile && selectedProducts.size > 0 && !isPrintPreview && (
+        <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
+          <Button
+            onClick={handlePrint}
+            className="w-full h-14 gap-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-2xl shadow-indigo-500/40 rounded-2xl text-base font-semibold"
+          >
+            <Printer className="w-5 h-5" />
+            {t('barcodeLabels.print')} ({totalLabels} {t('barcodeLabels.labels')})
+          </Button>
         </div>
       )}
     </div>
