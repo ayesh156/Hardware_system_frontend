@@ -350,6 +350,7 @@ export const translations = {
       questionsContact: 'Questions? Contact us at info@liyanage.lk or 0773751805 / 0412268217',
       poweredBy: '© 2025 Powered by Nebulainfinite',
       customerSelected: '{{name}} selected',
+      quickSaveNote: 'Quick Save - No print preview',
     },
     // Homepage
     home: {
@@ -1374,6 +1375,7 @@ export const translations = {
       questionsContact: 'ගැටළු තිබේද? info@liyanage.lk හෝ 0773751805 / 0412268217 අමතන්න',
       poweredBy: '© 2025 Nebulainfinite මගින් බලගන්වා ඇත',
       customerSelected: '{{name}} තෝරාගත්තා',
+      quickSaveNote: 'ඉක්මන් සුරැකීම - මුද්‍රණ පෙරදසුනක් නැත',
       addedToCart: 'ට කරමින් එකතු කරන ලදී',
       invalidQuantity: 'වලංගු නොවන ප්‍රමාණය',
       barcodeDetected: 'බාර්කෝඩ් සෙහාලය: {{name}}',

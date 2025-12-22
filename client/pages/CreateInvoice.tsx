@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
-import { mockCustomers, mockProducts } from '../data/mockData';
+import { mockCustomers, mockProducts, mockInvoices } from '../data/mockData';
 import { Customer, Product, Invoice, InvoiceItem } from '../types/index';
 import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
 import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
@@ -295,9 +295,61 @@ export const CreateInvoice: React.FC = () => {
       notes,
     };
 
+    // Add to mockInvoices at the beginning so it appears at top of list
+    mockInvoices.unshift(invoice);
+
     setCreatedInvoice(invoice);
     setShowPrintModal(true);
   };
+
+  // Quick Save without print preview (F9)
+  const handleQuickSave = useCallback(() => {
+    if ((!selectedCustomer && !isWalkIn) || items.length === 0) return;
+
+    const customerName = isWalkIn ? 'Walk-in Customer' : (currentCustomer?.name || 'Unknown');
+    const customerId = isWalkIn ? 'walk-in' : selectedCustomer;
+
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const invoice: Invoice = {
+      id: `inv-${Date.now()}`,
+      invoiceNumber,
+      customerId,
+      customerName,
+      items,
+      subtotal: Math.round(subtotal * 100) / 100,
+      discount: discountType !== 'none' ? Math.round(discountAmount * 100) / 100 : 0,
+      discountType,
+      discountValue: discount,
+      enableTax,
+      taxRate: enableTax ? taxRate : 0,
+      tax: Math.round(tax * 100) / 100,
+      total: Math.round(total * 100) / 100,
+      issueDate,
+      dueDate,
+      status: paymentMethod === 'credit' ? 'pending' : 'paid',
+      paymentMethod,
+      notes: notes || t('invoice.quickSaveNote'),
+    };
+
+    // Add to mockInvoices at the beginning so it appears at top of list
+    mockInvoices.unshift(invoice);
+
+    // Show success toast
+    toast.success(
+      `${t('invoice.invoiceSaved')}: ${invoiceNumber}`,
+      { description: `${t('common.currency')} ${invoice.total.toLocaleString()}` }
+    );
+
+    // Reset form and navigate to invoices
+    setItems([]);
+    setSelectedCustomer('');
+    setIsWalkIn(false);
+    setDiscount(0);
+    setDiscountType('none');
+    setNotes('');
+    setStep(1);
+    navigate('/invoices');
+  }, [selectedCustomer, isWalkIn, items, currentCustomer, subtotal, discountAmount, discountType, discount, enableTax, taxRate, tax, total, issueDate, dueDate, paymentMethod, notes, t, navigate]);
 
   const handlePrintClose = () => {
     setShowPrintModal(false);
@@ -539,6 +591,13 @@ export const CreateInvoice: React.FC = () => {
       
       // Step 3: Review shortcuts
       if (step === 3) {
+        // F9 to quick save without print preview
+        if (e.key === 'F9') {
+          e.preventDefault();
+          if (items.length > 0) handleQuickSave();
+          return;
+        }
+        
         // F12 to complete invoice
         if (e.key === 'F12') {
           e.preventDefault();
@@ -627,7 +686,7 @@ export const CreateInvoice: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [step, canProceedToStep2, canProceedToStep3, showShortcutMap, selectedCustomerIndex, 
       filteredCustomers, selectedProductIndex, filteredProducts, priceMode, itemDiscountType,
-      isPriceModeFocused, isItemDiscountFocused, items, isWalkIn, enableTax, t, navigate, selectedProductId, quantity, products]);
+      isPriceModeFocused, isItemDiscountFocused, items, isWalkIn, enableTax, t, navigate, selectedProductId, quantity, products, handleQuickSave]);
 
   // Focus search on step 2
   useEffect(() => {

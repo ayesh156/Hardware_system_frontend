@@ -206,6 +206,7 @@ export const ShortcutMapOverlay: React.FC<ShortcutMapOverlayProps> = ({
         icon: <CheckCircle className="w-4 h-4" />,
         color: 'emerald',
         shortcuts: [
+          { key: 'F9', label: t('quickCheckout.shortcut.quickSave') || 'Quick Save' },
           { key: 'F12', label: t('shortcuts.completeInvoice') || 'Complete & Print' },
           { key: 'P', label: t('shortcuts.printPreview') || 'Print Preview' },
           { key: '1-4', label: t('shortcuts.paymentQuick') || 'Payment Method (1-4)' },
