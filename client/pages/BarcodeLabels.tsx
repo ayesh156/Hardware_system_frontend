@@ -130,16 +130,25 @@ interface LabelConfig {
   showCategory: boolean;
 }
 
-interface SelectedProduct {
+interface Entry {
+  id: string;
   product: Product;
+  variant?: Product['variants'][number];
+  name: string;
+  sku: string;
+  barcode?: string;
+  categoryId?: string;
+}
+
+interface SelectedEntry {
+  entry: Entry;
   quantity: number;
-  barcodes: string[];
 }
 
 interface CategoryGroup {
   category: Category | null;
   categoryName: string;
-  products: SelectedProduct[];
+  products: SelectedEntry[];
   totalLabels: number;
 }
 
@@ -164,7 +173,7 @@ export const BarcodeLabels: React.FC = () => {
   // State
   const [products] = useState<Product[]>(mockProducts);
   const [categories] = useState<Category[]>(mockCategories);
-  const [selectedProducts, setSelectedProducts] = useState<Map<string, SelectedProduct>>(new Map());
+  const [selectedEntries, setSelectedEntries] = useState<Map<string, SelectedEntry>>(new Map());
   const [labelConfig, setLabelConfig] = useState<LabelConfig>(DEFAULT_CONFIG);
   const [showConfig, setShowConfig] = useState(false);
   const [isPrintPreview, setIsPrintPreview] = useState(false);
@@ -179,131 +188,137 @@ export const BarcodeLabels: React.FC = () => {
     return cat?.name || categoryId;
   }, [categories, t]);
 
-  // Get all barcodes for a product (only actual barcodes, no SKU fallback)
-  const getProductBarcodes = useCallback((product: Product): string[] => {
-    const barcodes: string[] = [];
-    
-    if (product.barcode) {
-      barcodes.push(product.barcode);
-    }
-    
-    if (product.variants && product.variants.length > 0) {
-      product.variants.forEach(variant => {
-        if (variant.barcode && !barcodes.includes(variant.barcode)) {
-          barcodes.push(variant.barcode);
-        }
-      });
-    }
-    
-    return barcodes;
-  }, []);
-
-  // Products with barcodes only for selection
-  const productsWithBarcodes = useMemo(() => {
-    return products.filter(p => {
-      const barcodes = getProductBarcodes(p);
-      return barcodes.length > 0;
+  // Flatten products into selectable entries (variant-level). Each entry has exactly one barcode (if present)
+  const entries = useMemo(() => {
+    const list: Entry[] = [];
+    products.forEach(product => {
+      if (product.hasVariants && product.variants && product.variants.length > 0) {
+        product.variants.forEach(variant => {
+          if (!variant.isActive) return;
+          const labelParts: string[] = [];
+          if (variant.size) labelParts.push(variant.size);
+          if (variant.color) labelParts.push(variant.color);
+          const name = labelParts.length ? `${product.name} (${labelParts.join(' - ')})` : `${product.name} (${variant.sku})`;
+          list.push({
+            id: `${product.id}__${variant.id}`,
+            product,
+            variant,
+            name,
+            sku: variant.sku,
+            barcode: variant.barcode,
+            categoryId: product.categoryId || product.category,
+          });
+        });
+      } else {
+        list.push({
+          id: product.id,
+          product,
+          variant: undefined,
+          name: product.name,
+          sku: product.sku,
+          barcode: product.barcode,
+          categoryId: product.categoryId || product.category,
+        });
+      }
     });
-  }, [products, getProductBarcodes]);
+    return list;
+  }, [products]);
 
-  // SearchableSelect options for products
+  const entriesWithBarcodes = useMemo(() => entries.filter(e => e.barcode), [entries]);
+  const countEntriesWithBarcodes = entriesWithBarcodes.length;
+
+  // SearchableSelect options for entries (variants and standalone products)
   const productOptions: SearchableSelectOption[] = useMemo(() => {
-    return productsWithBarcodes.map(product => {
-      const barcodes = getProductBarcodes(product);
-      return {
-        value: product.id,
-        label: `${product.name} (${product.sku})`,
-        icon: <Barcode className="w-4 h-4 text-indigo-500" />,
-        count: barcodes.length,
-        disabled: selectedProducts.has(product.id),
-      };
-    });
-  }, [productsWithBarcodes, getProductBarcodes, selectedProducts]);
+    return entriesWithBarcodes.map(entry => ({
+      value: entry.id,
+      label: `${entry.name} (${entry.sku})`,
+      icon: <Barcode className="w-4 h-4 text-indigo-500" />,
+      count: 1,
+      disabled: selectedEntries.has(entry.id),
+    }));
+  }, [entriesWithBarcodes, selectedEntries]);
 
   // Handle product selection from SearchableSelect
-  const handleProductSelect = useCallback((productId: string) => {
-    if (!productId || selectedProducts.has(productId)) return;
-    
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-    
-    const barcodes = getProductBarcodes(product);
-    if (barcodes.length === 0) {
+  const handleEntrySelect = useCallback((entryId: string) => {
+    if (!entryId || selectedEntries.has(entryId)) return;
+
+    const entry = entries.find(e => e.id === entryId);
+    if (!entry) return;
+    if (!entry.barcode) {
       toast.error(t('barcodeLabels.noBarcode'));
       return;
     }
-    
-    setSelectedProducts(prev => {
+
+    setSelectedEntries(prev => {
       const newMap = new Map(prev);
-      newMap.set(product.id, {
-        product,
+      newMap.set(entry.id, {
+        entry,
         quantity: 1,
-        barcodes,
       });
       return newMap;
     });
-    
+
     setProductSelectValue('');
-    toast.success(`${product.name} ${t('barcodeLabels.added')}`);
-  }, [products, selectedProducts, getProductBarcodes, t]);
+    toast.success(`${entry.name} ${t('barcodeLabels.added')}`);
+  }, [entries, selectedEntries, t]);
 
   // Update label quantity for a product
-  const updateQuantity = useCallback((productId: string, delta: number) => {
-    setSelectedProducts(prev => {
+  const updateQuantity = useCallback((entryId: string, delta: number) => {
+    setSelectedEntries(prev => {
       const newMap = new Map(prev);
-      const item = newMap.get(productId);
+      const item = newMap.get(entryId);
       if (item) {
         const newQty = Math.max(1, Math.min(100, item.quantity + delta));
-        newMap.set(productId, { ...item, quantity: newQty });
+        newMap.set(entryId, { ...item, quantity: newQty });
       }
       return newMap;
     });
   }, []);
 
   // Set exact quantity
-  const setQuantity = useCallback((productId: string, quantity: number) => {
-    setSelectedProducts(prev => {
+  const setQuantity = useCallback((entryId: string, quantity: number) => {
+    setSelectedEntries(prev => {
       const newMap = new Map(prev);
-      const item = newMap.get(productId);
+      const item = newMap.get(entryId);
       if (item) {
         const newQty = Math.max(1, Math.min(100, quantity));
-        newMap.set(productId, { ...item, quantity: newQty });
+        newMap.set(entryId, { ...item, quantity: newQty });
       }
       return newMap;
     });
   }, []);
 
-  // Remove product from selection
-  const removeProduct = useCallback((productId: string) => {
-    setSelectedProducts(prev => {
+  // Remove entry from selection
+  const removeEntry = useCallback((entryId: string) => {
+    setSelectedEntries(prev => {
       const newMap = new Map(prev);
-      newMap.delete(productId);
+      newMap.delete(entryId);
       return newMap;
     });
   }, []);
 
   // Clear all selections
   const clearSelection = useCallback(() => {
-    setSelectedProducts(new Map());
+    setSelectedEntries(new Map());
     toast.info(t('barcodeLabels.selectionCleared'));
   }, [t]);
 
   // Calculate total labels
   const totalLabels = useMemo(() => {
     let total = 0;
-    selectedProducts.forEach(item => {
-      total += item.quantity * item.barcodes.length;
+    selectedEntries.forEach(item => {
+      total += item.quantity;
     });
     return total;
-  }, [selectedProducts]);
+  }, [selectedEntries]);
 
   // Organize labels by category for printing
   const labelGroups = useMemo((): CategoryGroup[] => {
     const groups = new Map<string, CategoryGroup>();
-    
-    selectedProducts.forEach(item => {
-      const catKey = item.product.categoryId || item.product.category || 'other';
-      
+
+    selectedEntries.forEach(item => {
+      const catKey = item.entry.categoryId || item.entry.product.categoryId || item.entry.product.category || 'other';
+
       if (!groups.has(catKey)) {
         const category = categories.find(c => c.id === catKey) || null;
         groups.set(catKey, {
@@ -313,25 +328,25 @@ export const BarcodeLabels: React.FC = () => {
           totalLabels: 0,
         });
       }
-      
+
       const group = groups.get(catKey)!;
       group.products.push(item);
-      group.totalLabels += item.quantity * item.barcodes.length;
+      group.totalLabels += item.quantity;
     });
 
-    return Array.from(groups.values()).sort((a, b) => 
+    return Array.from(groups.values()).sort((a, b) =>
       a.categoryName.localeCompare(b.categoryName)
     );
-  }, [selectedProducts, categories, getCategoryName]);
+  }, [selectedEntries, categories, getCategoryName]);
 
   // Print labels
   const handlePrint = useCallback(() => {
-    if (selectedProducts.size === 0) {
+    if (selectedEntries.size === 0) {
       toast.error(t('barcodeLabels.noProductsSelected'));
       return;
     }
     setIsPrintPreview(true);
-  }, [selectedProducts.size, t]);
+  }, [selectedEntries.size, t]);
 
   // Execute print with 3-column A4 layout and real Code39 barcodes
   const executePrint = useCallback(() => {
@@ -352,25 +367,25 @@ export const BarcodeLabels: React.FC = () => {
       labelsHTML += `<div class="category-header">${group.categoryName} (${group.totalLabels} labels)</div>`;
       labelsHTML += `<div class="labels-grid">`;
       
-      group.products.forEach(({ product, quantity, barcodes }) => {
-        barcodes.forEach(barcode => {
-          for (let i = 0; i < quantity; i++) {
-            const barcodeSVG = generateCode39SVG(barcode, 38, 1.2, 3.5, 2);
-            
-            labelsHTML += `
-              <div class="label-item" style="height: ${labelHeightPx}">
-                <div class="product-name">${product.name}</div>
-                <div class="barcode-container">
-                  ${barcodeSVG}
-                  <div class="barcode-text">${barcode}</div>
-                </div>
-                ${labelConfig.showPrice ? `<div class="price">Rs. ${(product.retailPrice || product.price || 0).toLocaleString()}</div>` : ''}
-                ${labelConfig.showSku ? `<div class="sku">${product.sku}</div>` : ''}
-                ${labelConfig.showCategory ? `<div class="category-tag">${group.categoryName}</div>` : ''}
+      group.products.forEach(({ entry, quantity }) => {
+        const barcode = entry.barcode || '';
+        if (!barcode) return;
+        for (let i = 0; i < quantity; i++) {
+          const barcodeSVG = generateCode39SVG(barcode, 38, 1.2, 3.5, 2);
+
+          labelsHTML += `
+            <div class="label-item" style="height: ${labelHeightPx}">
+              <div class="product-name">${entry.name}</div>
+              <div class="barcode-container">
+                ${barcodeSVG}
+                <div class="barcode-text">${barcode}</div>
               </div>
-            `;
-          }
-        });
+              ${labelConfig.showPrice ? `<div class="price">Rs. ${(entry.product.retailPrice || entry.product.price || 0).toLocaleString()}</div>` : ''}
+              ${labelConfig.showSku ? `<div class="sku">${entry.sku}</div>` : ''}
+              ${labelConfig.showCategory ? `<div class="category-tag">${group.categoryName}</div>` : ''}
+            </div>
+          `;
+        }
       });
       
       labelsHTML += `</div></div>`;
@@ -577,7 +592,7 @@ export const BarcodeLabels: React.FC = () => {
             {!isMobile && (
               <Button
                 onClick={handlePrint}
-                disabled={selectedProducts.size === 0}
+                disabled={selectedEntries.size === 0}
                 className="gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
               >
                 <Printer className="w-4 h-4" />
@@ -681,7 +696,7 @@ export const BarcodeLabels: React.FC = () => {
                 <SearchableSelect
                   options={productOptions}
                   value={productSelectValue}
-                  onValueChange={handleProductSelect}
+                  onValueChange={handleEntrySelect}
                   placeholder={t('barcodeLabels.searchAndSelect')}
                   searchPlaceholder={t('barcodeLabels.searchProducts')}
                   emptyMessage={t('barcodeLabels.noProductsWithBarcode')}
@@ -691,8 +706,8 @@ export const BarcodeLabels: React.FC = () => {
               
               {/* Stats */}
               <div className={`flex items-center justify-between text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                <span>{productsWithBarcodes.length} {t('barcodeLabels.productsWithBarcodes')}</span>
-                {selectedProducts.size > 0 && (
+                <span>{countEntriesWithBarcodes} {t('barcodeLabels.productsWithBarcodes')}</span>
+                {selectedEntries.size > 0 && (
                   <button
                     onClick={clearSelection}
                     className="text-red-500 hover:text-red-600 text-xs flex items-center gap-1"
@@ -710,12 +725,12 @@ export const BarcodeLabels: React.FC = () => {
                 {t('barcodeLabels.quickAdd')}
               </h4>
               <div className={`flex flex-wrap ${isMobile ? 'gap-1.5' : 'gap-2'}`}>
-                {productsWithBarcodes.slice(0, isMobile ? 6 : 8).map(product => {
-                  const isSelected = selectedProducts.has(product.id);
+                {entriesWithBarcodes.slice(0, isMobile ? 6 : 8).map(entry => {
+                  const isSelected = selectedEntries.has(entry.id);
                   return (
                     <button
-                      key={product.id}
-                      onClick={() => !isSelected && handleProductSelect(product.id)}
+                      key={entry.id}
+                      onClick={() => !isSelected && handleEntrySelect(entry.id)}
                       disabled={isSelected}
                       className={`${isMobile ? 'px-2.5 py-2 text-xs' : 'px-3 py-1.5 text-xs'} rounded-lg font-medium transition-all active:scale-95 ${
                         isSelected
@@ -723,7 +738,7 @@ export const BarcodeLabels: React.FC = () => {
                           : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 active:bg-slate-500' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300'
                       }`}
                     >
-                      {product.name.length > (isMobile ? 15 : 20) ? product.name.slice(0, isMobile ? 15 : 20) + '...' : product.name}
+                      {entry.name.length > (isMobile ? 15 : 20) ? entry.name.slice(0, isMobile ? 15 : 20) + '...' : entry.name}
                     </button>
                   );
                 })}
@@ -737,12 +752,12 @@ export const BarcodeLabels: React.FC = () => {
               <div className={`${isMobile ? 'px-3 py-2.5' : 'px-4 py-3'} border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                 <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'} ${isMobile ? 'text-sm' : ''}`}>
                   <Layers className="w-4 h-4" />
-                  {t('barcodeLabels.selectedProducts')} ({selectedProducts.size})
+                  {t('barcodeLabels.selectedProducts')} ({selectedEntries.size})
                 </h3>
               </div>
               
               <div className={`${isMobile ? 'max-h-[350px]' : 'max-h-[500px]'} overflow-y-auto`}>
-                {selectedProducts.size === 0 ? (
+                {selectedEntries.size === 0 ? (
                   <div className={`${isMobile ? 'p-6' : 'p-8'} text-center`}>
                     <Tag className={`${isMobile ? 'w-10 h-10' : 'w-12 h-12'} mx-auto mb-3 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
                     <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -751,22 +766,22 @@ export const BarcodeLabels: React.FC = () => {
                   </div>
                 ) : (
                   <div className="p-3 space-y-3">
-                    {Array.from(selectedProducts.values()).map(({ product, quantity, barcodes }) => (
+                    {Array.from(selectedEntries.values()).map(({ entry, quantity }) => (
                       <div
-                        key={product.id}
+                        key={entry.id}
                         className={`${isMobile ? 'p-3' : 'p-4'} rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0 flex-1">
                             <p className={`font-medium ${isMobile ? 'text-sm' : 'text-sm'} truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                              {product.name}
+                              {entry.name}
                             </p>
                             <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                              SKU: {product.sku}
+                              SKU: {entry.sku}
                             </p>
                           </div>
                           <button
-                            onClick={() => removeProduct(product.id)}
+                            onClick={() => removeEntry(entry.id)}
                             className={`${isMobile ? 'p-2' : 'p-1.5'} rounded-lg transition-colors active:scale-95 ${isDark ? 'hover:bg-red-500/20 active:bg-red-500/30 text-red-400' : 'hover:bg-red-100 active:bg-red-200 text-red-500'}`}
                           >
                             <Trash2 className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} />
@@ -776,8 +791,8 @@ export const BarcodeLabels: React.FC = () => {
                         {/* Barcode preview - smaller on mobile */}
                         <div className={`${isMobile ? 'mb-2' : 'mb-3'} rounded-lg ${isDark ? 'bg-white' : 'bg-white border border-slate-200'} flex items-center justify-center px-2 py-1.5`} style={{ minHeight: isMobile ? 50 : 64 }}>
                           <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
-                            <Code39Barcode value={barcodes[0]} height={isMobile ? 28 : 35} narrow={isMobile ? 0.8 : 1} wide={isMobile ? 2.5 : 3} margin={1} />
-                            <p className={`text-center ${isMobile ? 'text-[10px]' : 'text-xs'} font-mono text-slate-600 mt-0.5`}>{barcodes[0]}</p>
+                            <Code39Barcode value={entry.barcode} height={isMobile ? 28 : 35} narrow={isMobile ? 0.8 : 1} wide={isMobile ? 2.5 : 3} margin={1} />
+                            <p className={`text-center ${isMobile ? 'text-[10px]' : 'text-xs'} font-mono text-slate-600 mt-0.5`}>{entry.barcode}</p>
                           </div>
                         </div>
                         
@@ -788,7 +803,7 @@ export const BarcodeLabels: React.FC = () => {
                           </span>
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => updateQuantity(product.id, -1)}
+                              onClick={() => updateQuantity(entry.id, -1)}
                               className={`${isMobile ? 'p-2.5' : 'p-1.5'} rounded-lg transition-colors active:scale-95 ${isDark ? 'hover:bg-slate-700 active:bg-slate-600 text-slate-400' : 'hover:bg-slate-200 active:bg-slate-300 text-slate-600'}`}
                             >
                               <Minus className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} />
@@ -798,7 +813,7 @@ export const BarcodeLabels: React.FC = () => {
                               min="1"
                               max="100"
                               value={quantity}
-                              onChange={(e) => setQuantity(product.id, parseInt(e.target.value) || 1)}
+                              onChange={(e) => setQuantity(entry.id, parseInt(e.target.value) || 1)}
                               className={`${isMobile ? 'w-14 px-1.5 py-2 text-base' : 'w-16 px-2 py-1.5 text-sm'} text-center font-bold rounded-lg border ${
                                 isDark 
                                   ? 'bg-slate-700 border-slate-600 text-white' 
@@ -806,7 +821,7 @@ export const BarcodeLabels: React.FC = () => {
                               }`}
                             />
                             <button
-                              onClick={() => updateQuantity(product.id, 1)}
+                              onClick={() => updateQuantity(entry.id, 1)}
                               className={`${isMobile ? 'p-2.5' : 'p-1.5'} rounded-lg transition-colors active:scale-95 ${isDark ? 'hover:bg-slate-700 active:bg-slate-600 text-slate-400' : 'hover:bg-slate-200 active:bg-slate-300 text-slate-600'}`}
                             >
                               <Plus className="w-4 h-4" />
@@ -816,8 +831,7 @@ export const BarcodeLabels: React.FC = () => {
                         
                         {/* Total labels for this product */}
                         <div className={`mt-2 pt-2 border-t text-xs text-right ${isDark ? 'border-slate-700 text-indigo-400' : 'border-slate-200 text-indigo-600'}`}>
-                          {barcodes.length > 1 && <span>{barcodes.length} barcodes × </span>}
-                          {quantity} = <strong>{quantity * barcodes.length} {t('barcodeLabels.labels')}</strong>
+                          {quantity} = <strong>{quantity} {t('barcodeLabels.labels')}</strong>
                         </div>
                       </div>
                     ))}
@@ -826,7 +840,7 @@ export const BarcodeLabels: React.FC = () => {
               </div>
               
               {/* Summary Footer */}
-              {selectedProducts.size > 0 && (
+              {selectedEntries.size > 0 && (
                 <div className={`${isMobile ? 'px-3 py-3' : 'px-4 py-4'} border-t ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className={`font-medium ${isMobile ? 'text-sm' : ''} ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -873,31 +887,29 @@ export const BarcodeLabels: React.FC = () => {
                     {group.categoryName} ({group.totalLabels} {t('barcodeLabels.labels')})
                   </div>
                   <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
-                    {group.products.flatMap(({ product, quantity, barcodes }) => 
-                      barcodes.flatMap(barcode => 
-                        Array.from({ length: Math.min(quantity, isMobile ? 2 : 3) }).map((_, idx) => (
-                          <div 
-                            key={`${product.id}-${barcode}-${idx}`}
-                            className={`border border-dashed border-slate-300 rounded-md ${isMobile ? 'px-1.5 py-1' : 'px-2 py-1'} flex flex-col items-center text-center`}
-                          >
-                            <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} font-semibold text-slate-800 w-full ${isMobile ? 'mb-1' : 'mb-2'}`} style={{ display: '-webkit-box' as any, WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>
-                              {product.name}
+                    {group.products.flatMap(({ entry, quantity }) => 
+                      Array.from({ length: Math.min(quantity, isMobile ? 2 : 3) }).map((_, idx) => (
+                        <div 
+                          key={`${entry.id}-${idx}`}
+                          className={`border border-dashed border-slate-300 rounded-md ${isMobile ? 'px-1.5 py-1' : 'px-2 py-1'} flex flex-col items-center text-center`}
+                        >
+                          <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} font-semibold text-slate-800 w-full ${isMobile ? 'mb-1' : 'mb-2'}`} style={{ display: '-webkit-box' as any, WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>
+                            {entry.name}
+                          </p>
+                          <Code39Barcode value={entry.barcode} height={isMobile ? 28 : 36} narrow={isMobile ? 0.8 : 1} wide={isMobile ? 2.5 : 3} margin={1} />
+                          <p className={`${isMobile ? 'text-[9px]' : 'text-xs'} font-mono text-slate-600 mt-0.5`}>{entry.barcode}</p>
+                          {labelConfig.showPrice && (
+                            <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-bold text-emerald-600 mt-0.5`}>
+                              Rs. {(entry.product.retailPrice || entry.product.price || 0).toLocaleString()}
                             </p>
-                            <Code39Barcode value={barcode} height={isMobile ? 28 : 36} narrow={isMobile ? 0.8 : 1} wide={isMobile ? 2.5 : 3} margin={1} />
-                            <p className={`${isMobile ? 'text-[9px]' : 'text-xs'} font-mono text-slate-600 mt-0.5`}>{barcode}</p>
-                            {labelConfig.showPrice && (
-                              <p className={`${isMobile ? 'text-xs' : 'text-sm'} font-bold text-emerald-600 mt-0.5`}>
-                                Rs. {(product.retailPrice || product.price || 0).toLocaleString()}
-                              </p>
-                            )}
-                          </div>
-                        ))
-                      )
+                          )}
+                        </div>
+                      ))
                     )}
                   </div>
                   {group.totalLabels > (isMobile ? 4 : 9) && (
                     <p className="text-xs text-slate-400 text-center mt-2">
-                      +{group.totalLabels - Math.min(group.products.reduce((acc, p) => acc + Math.min(p.quantity, isMobile ? 2 : 3) * p.barcodes.length, 0), isMobile ? 4 : 9)} more labels...
+                      +{group.totalLabels - Math.min(group.products.reduce((acc, p) => acc + Math.min(p.quantity, isMobile ? 2 : 3), 0), isMobile ? 4 : 9)} more labels...
                     </p>
                   )}
                 </div>
@@ -908,7 +920,7 @@ export const BarcodeLabels: React.FC = () => {
       )}
 
       {/* Mobile Floating Action Button */}
-      {isMobile && selectedProducts.size > 0 && !isPrintPreview && (
+      {isMobile && selectedEntries.size > 0 && !isPrintPreview && (
         <div className="fixed bottom-20 left-0 right-0 px-4 z-50">
           <Button
             onClick={handlePrint}

@@ -68,6 +68,31 @@ export interface ProductVariant {
   isActive: boolean;
 }
 
+// Flattened product entry - represents either a standalone product or a specific variant
+// Used in Invoice/Quick Checkout for displaying each variant as a distinct line item
+export interface FlattenedProduct {
+  // Unique key combining product + variant IDs
+  flatId: string;
+  // Original product reference
+  product: Product;
+  // Variant reference (undefined for non-variant products)
+  variant?: ProductVariant;
+  // Display fields (derived from product or variant)
+  displayName: string;
+  displaySku: string;
+  displayBarcode?: string;
+  // Pricing (from variant if present, else from product)
+  costPrice: number;
+  wholesalePrice: number;
+  retailPrice: number;
+  // Stock (from variant if present, else from product)
+  stock: number;
+  minStock: number;
+  // Convenience flags
+  isVariant: boolean;
+  variantLabel?: string; // e.g., "10mm" or "Red - 1.5mm²"
+}
+
 // Enhanced Product Interface
 export interface Product {
   id: string;

@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { mockCustomers, mockProducts, mockInvoices } from '../data/mockData';
-import { Customer, Product, Invoice, InvoiceItem } from '../types/index';
+import { Customer, Product, Invoice, InvoiceItem, FlattenedProduct } from '../types/index';
+import { flattenProducts } from '../lib/utils';
 import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
 import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
 import {
@@ -39,6 +40,9 @@ export const CreateInvoice: React.FC = () => {
   
   const [customers] = useState<Customer[]>(mockCustomers);
   const [products] = useState<Product[]>(mockProducts);
+  
+  // Flatten products so each variant appears as a distinct line item
+  const flattenedProducts = useMemo(() => flattenProducts(products), [products]);
   
   const [step, setStep] = useState<Step>(1);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
@@ -102,7 +106,8 @@ export const CreateInvoice: React.FC = () => {
   const productItemRefs = useRef<Map<number, HTMLElement>>(new Map());
 
   const currentCustomer = customers.find((c) => c.id === selectedCustomer);
-  const currentProduct = products.find((p) => p.id === selectedProductId);
+  // selectedProductId now holds flatId (product or variant identifier)
+  const currentProduct = flattenedProducts.find((fp) => fp.flatId === selectedProductId);
 
   // Filter customers by search
   const filteredCustomers = useMemo(() => {
@@ -117,24 +122,25 @@ export const CreateInvoice: React.FC = () => {
     );
   }, [customers, customerSearch]);
 
-  // Filter products by search - include out of stock for visibility
-  const filteredProducts = useMemo(() => {
-    let filtered = products;
+  // Filter products by search - uses flattened products for variant display
+  const filteredProducts = useMemo((): FlattenedProduct[] => {
+    let filtered = flattenedProducts;
     
     if (productSearch.trim()) {
-      const selectedProduct = products.find(p => p.id === selectedProductId);
-      if (selectedProduct && productSearch === selectedProduct.name) {
-        filtered = products;
+      const selectedFlatProduct = flattenedProducts.find(fp => fp.flatId === selectedProductId);
+      if (selectedFlatProduct && productSearch === selectedFlatProduct.displayName) {
+        filtered = flattenedProducts;
       } else {
         const searchLower = productSearch.toLowerCase();
-        filtered = products.filter(
-          (p) =>
-            p.name.toLowerCase().includes(searchLower) ||
-            p.sku.toLowerCase().includes(searchLower) ||
-            (p.nameAlt && p.nameAlt.includes(searchLower)) ||
-            p.category.toLowerCase().includes(searchLower) ||
-            (p.brand && p.brand.toLowerCase().includes(searchLower)) ||
-            (p.barcode && p.barcode.includes(searchLower))
+        filtered = flattenedProducts.filter(
+          (fp) =>
+            fp.displayName.toLowerCase().includes(searchLower) ||
+            fp.displaySku.toLowerCase().includes(searchLower) ||
+            (fp.product.nameAlt && fp.product.nameAlt.includes(searchLower)) ||
+            fp.product.category.toLowerCase().includes(searchLower) ||
+            (fp.product.brand && fp.product.brand.toLowerCase().includes(searchLower)) ||
+            (fp.displayBarcode && fp.displayBarcode.includes(searchLower)) ||
+            (fp.variantLabel && fp.variantLabel.toLowerCase().includes(searchLower))
         );
       }
     }
@@ -143,21 +149,21 @@ export const CreateInvoice: React.FC = () => {
     return filtered.sort((a, b) => {
       if (a.stock > 0 && b.stock <= 0) return -1;
       if (a.stock <= 0 && b.stock > 0) return 1;
-      return a.name.localeCompare(b.name);
+      return a.displayName.localeCompare(b.displayName);
     });
-  }, [products, productSearch, selectedProductId]);
+  }, [flattenedProducts, productSearch, selectedProductId]);
 
-  // Determine the best price based on customer type
-  const getProductPrice = (product: Product): { price: number; label: string } => {
-    const isWholesaleCustomer = currentCustomer?.customerType === 'wholesale';
-    
+  // Determine the best price based on customer type (uses FlattenedProduct)
+  const getProductPrice = (flatProduct: FlattenedProduct): { price: number; label: string } => {
+    // Retail is the global primary price. Wholesale is only used when explicitly selected.
     if (priceMode === 'custom' && customPrice > 0) {
       return { price: customPrice, label: 'Custom' };
     }
-    if (priceMode === 'wholesale' || (priceMode === 'auto' && isWholesaleCustomer)) {
-      return { price: product.wholesalePrice || product.retailPrice || product.price || 0, label: 'Wholesale' };
+    if (priceMode === 'wholesale') {
+      return { price: flatProduct.wholesalePrice, label: 'Wholesale' };
     }
-    return { price: product.retailPrice || product.price || 0, label: 'Retail' };
+    // Default to retail price
+    return { price: flatProduct.retailPrice, label: 'Retail' };
   };
 
   // Calculate final price after item discount
@@ -171,29 +177,44 @@ export const CreateInvoice: React.FC = () => {
     return basePrice;
   };
 
-  // Reset pricing options when product changes
+  // Reset pricing options when product changes - default to Retail price
+  const customPriceRef = useRef<HTMLInputElement | null>(null);
+
   useEffect(() => {
     if (currentProduct) {
-      const { price } = getProductPrice(currentProduct);
-      setCustomPrice(price);
+      // Default to retail pricing for explicitness in the UI
+      setPriceMode('retail');
+      setCustomPrice(currentProduct.retailPrice || 0);
       setItemDiscountType('none');
       setItemDiscountValue(0);
-      setPriceMode('auto');
     }
   }, [selectedProductId]);
 
+  // Focus the custom price input when custom mode is selected
+  useEffect(() => {
+    if (priceMode === 'custom') {
+      // Delay to ensure the input is rendered
+      setTimeout(() => {
+        customPriceRef.current?.focus();
+        customPriceRef.current?.select();
+      }, 0);
+    }
+  }, [priceMode]);
+
   const addItem = () => {
     if (!selectedProductId || quantity <= 0) return;
-    const product = products.find((p) => p.id === selectedProductId);
-    if (!product) return;
+    const flatProduct = flattenedProducts.find((fp) => fp.flatId === selectedProductId);
+    if (!flatProduct) return;
 
-    const { price: basePrice } = getProductPrice(product);
+    const { price: basePrice } = getProductPrice(flatProduct);
     const finalPrice = priceMode === 'custom' ? customPrice : calculateFinalPrice(basePrice);
     
     const newItem: ExtendedInvoiceItem = {
       id: `item-${Date.now()}`,
-      productId: product.id,
-      productName: product.name,
+      productId: flatProduct.flatId,
+      productName: flatProduct.displayName,
+      variantId: flatProduct.variant?.id,
+      size: flatProduct.variant?.size,
       quantity,
       unitPrice: finalPrice,
       originalPrice: basePrice,
@@ -514,11 +535,11 @@ export const CreateInvoice: React.FC = () => {
         }
         if (e.key === 'Enter' && selectedProductIndex >= 0 && document.activeElement === productSearchRef.current) {
           e.preventDefault();
-          const product = filteredProducts[selectedProductIndex];
-          if (product && product.stock > 0) {
-            setSelectedProductId(product.id);
-            setProductSearch(product.name);
-            const { price } = getProductPrice(product);
+          const flatProduct = filteredProducts[selectedProductIndex];
+          if (flatProduct && flatProduct.stock > 0) {
+            setSelectedProductId(flatProduct.flatId);
+            setProductSearch(flatProduct.displayName);
+            const { price } = getProductPrice(flatProduct);
             setCustomPrice(price);
             setSelectedProductIndex(-1);
             // Focus quantity input
@@ -534,7 +555,7 @@ export const CreateInvoice: React.FC = () => {
         if (e.key === 'Enter' && document.activeElement === quantityInputRef.current) {
           e.preventDefault();
           // Get the current product fresh from state to avoid stale closures
-          const liveProduct = products.find(p => p.id === selectedProductId);
+          const liveProduct = flattenedProducts.find(fp => fp.flatId === selectedProductId);
           if (selectedProductId && quantity > 0 && liveProduct && quantity <= liveProduct.stock) {
             addItem();
             toast.success(t('invoice.addedToCart'));
@@ -1238,10 +1259,10 @@ export const CreateInvoice: React.FC = () => {
                       // Detect exact barcode scan: if input exactly matches a product barcode, auto-select it and focus quantity
                       const barcodeCandidate = val.trim();
                       if (barcodeCandidate) {
-                        const matched = products.find(p => p.barcode && p.barcode === barcodeCandidate);
+                        const matched = flattenedProducts.find(fp => fp.displayBarcode && fp.displayBarcode === barcodeCandidate);
                         if (matched && matched.stock > 0) {
-                          setSelectedProductId(matched.id);
-                          setProductSearch(matched.name);
+                          setSelectedProductId(matched.flatId);
+                          setProductSearch(matched.displayName);
                           const { price } = getProductPrice(matched);
                           setCustomPrice(price);
                           setSelectedProductIndex(-1);
@@ -1250,7 +1271,7 @@ export const CreateInvoice: React.FC = () => {
                             quantityInputRef.current?.focus();
                             quantityInputRef.current?.select();
                           }, 100);
-                          toast.success(t('invoice.barcodeDetected', { name: matched.name }));
+                          toast.success(t('invoice.barcodeDetected', { name: matched.displayName }));
                         }
                       }
                     }}
@@ -1300,27 +1321,27 @@ export const CreateInvoice: React.FC = () => {
                       </button>
                     </div>
                   ) : (
-                    filteredProducts.map((p, index) => {
-                      const isOutOfStock = p.stock <= 0;
-                      const isLowStock = p.stock <= (p.minStock || 5);
+                    filteredProducts.map((fp, index) => {
+                      const isOutOfStock = fp.stock <= 0;
+                      const isLowStock = fp.stock <= fp.minStock;
                       const isWholesale = currentCustomer?.customerType === 'wholesale';
-                      const displayPrice = isWholesale ? (p.wholesalePrice || p.retailPrice || p.price || 0) : (p.retailPrice || p.price || 0);
+                      const displayPrice = isWholesale ? fp.wholesalePrice : fp.retailPrice;
                       const isKeyboardSelected = index === selectedProductIndex;
-                      const isSelected = selectedProductId === p.id;
+                      const isSelected = selectedProductId === fp.flatId;
                       
                       return (
                         <button
-                          key={p.id}
+                          key={fp.flatId}
                           type="button"
                           ref={(el) => {
                             if (el) productItemRefs.current.set(index, el);
                             else productItemRefs.current.delete(index);
                           }}
                           onClick={() => {
-                            setSelectedProductId(p.id);
-                            setProductSearch(p.name);
+                            setSelectedProductId(fp.flatId);
+                            setProductSearch(fp.displayName);
                             setSelectedProductIndex(index);
-                            const { price } = getProductPrice(p);
+                            const { price } = getProductPrice(fp);
                             setCustomPrice(price);
                           }}
                           disabled={isOutOfStock}
@@ -1348,7 +1369,7 @@ export const CreateInvoice: React.FC = () => {
                                 <p className={`font-medium truncate ${
                                   isKeyboardSelected ? 'text-cyan-400' : isSelected ? 'text-cyan-400' : (theme === 'dark' ? 'text-white' : 'text-slate-900')
                                 }`}>
-                                  {p.name}
+                                  {fp.displayName}
                                 </p>
                                 {isOutOfStock && (
                                   <span className="px-1.5 py-0.5 text-xs font-medium bg-red-500/10 text-red-400 rounded">
@@ -1356,26 +1377,25 @@ export const CreateInvoice: React.FC = () => {
                                   </span>
                                 )}
                               </div>
-                              {p.nameAlt && (
+                              {fp.product.nameAlt && (
                                 <p className={`text-xs truncate ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                                  {p.nameAlt}
+                                  {fp.product.nameAlt}
                                 </p>
                               )}
                               <p className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                {p.sku} • {p.brand || p.category}
+                                {fp.displaySku} • {fp.product.brand || fp.product.category}
                               </p>
                             </div>
                             <div className="text-right flex-shrink-0">
                               <div className="flex flex-col items-end">
-                                {isWholesale && p.wholesalePrice && (
-                                  <span className="text-xs text-purple-400 font-medium">{t('invoice.wholesale')}</span>
-                                )}
+                                {/* Primary price is Retail globally */}
                                 <p className="font-bold text-emerald-500">
-                                  {t('common.currency')} {displayPrice.toLocaleString()}
+                                  {t('common.currency')} {fp.retailPrice.toLocaleString()}
                                 </p>
-                                {p.wholesalePrice && p.retailPrice && isWholesale && (
-                                  <p className="text-xs text-slate-500 line-through">
-                                    {t('common.currency')} {p.retailPrice.toLocaleString()}
+                                {/* If customer is wholesale, show wholesale rate as secondary info */}
+                                {isWholesale && fp.wholesalePrice && (
+                                  <p className="text-xs text-purple-400">
+                                    {t('invoice.wholesaleRate')}: {t('common.currency')} {fp.wholesalePrice.toLocaleString()}
                                   </p>
                                 )}
                               </div>
@@ -1383,7 +1403,7 @@ export const CreateInvoice: React.FC = () => {
                                 isOutOfStock ? 'text-red-400' : isLowStock ? 'text-amber-400' : theme === 'dark' ? 'text-slate-500' : 'text-slate-500'
                               }`}>
                                 <Boxes className="w-3 h-3" />
-                                {p.stock} {p.unit || 'pcs'}
+                                {fp.stock} {fp.product.unit || 'pcs'}
                               </p>
                             </div>
                           </div>
@@ -1402,10 +1422,10 @@ export const CreateInvoice: React.FC = () => {
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                          {currentProduct.name}
+                          {currentProduct.displayName}
                         </h4>
                         <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {currentProduct.sku} • {t('invoice.available')}: <span className={currentProduct.stock <= (currentProduct.minStock || 5) ? 'text-amber-400 font-medium' : 'text-emerald-400 font-medium'}>{currentProduct.stock} {currentProduct.unit || 'pcs'}</span>
+                          {currentProduct.displaySku} • {t('invoice.available')}: <span className={currentProduct.stock <= currentProduct.minStock ? 'text-amber-400 font-medium' : 'text-emerald-400 font-medium'}>{currentProduct.stock} {currentProduct.product.unit || 'pcs'}</span>
                         </p>
                       </div>
                       <div className="text-right">
@@ -1431,7 +1451,7 @@ export const CreateInvoice: React.FC = () => {
                               : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                           }`}
                         >
-                          {t('invoice.auto')} ({currentCustomer?.customerType === 'wholesale' ? t('invoice.wholesale') : t('invoice.retail')})
+                          {t('invoice.auto')} ({t('invoice.retail')})
                         </button>
                         <button
                           onClick={() => setPriceMode('retail')}
@@ -1441,7 +1461,7 @@ export const CreateInvoice: React.FC = () => {
                               : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                           }`}
                         >
-                          {t('invoice.retail')}: {t('common.currency')} {(currentProduct.retailPrice || currentProduct.price || 0).toLocaleString()}
+                          {t('invoice.retail')}: {t('common.currency')} {currentProduct.retailPrice.toLocaleString()}
                         </button>
                         {currentProduct.wholesalePrice && (
                           <button
@@ -1478,6 +1498,7 @@ export const CreateInvoice: React.FC = () => {
                         <div className="relative">
                           <span className={`absolute left-3 top-2.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('common.currency')}</span>
                           <input
+                            ref={customPriceRef}
                             type="number"
                             value={customPrice || ''}
                             onChange={(e) => setCustomPrice(parseFloat(e.target.value) || 0)}

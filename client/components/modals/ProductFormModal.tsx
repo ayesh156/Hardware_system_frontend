@@ -215,12 +215,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Clear main barcode when product has variants (each variant has its own barcode)
+    const effectiveBarcode = formData.hasVariants && formData.variants.length > 0 ? '' : formData.barcode;
     const newProduct: Product = {
       id: product?.id || `prod-${Date.now()}`,
       name: formData.name,
       nameAlt: formData.nameAlt,
       sku: formData.sku,
-      barcode: formData.barcode,
+      barcode: effectiveBarcode,
       categoryId: formData.categoryId,
       category: formData.category as Product['category'],
       brandId: formData.brandId,
@@ -337,13 +339,21 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className={labelClasses}>{t('productsForm.barcode')}</label>
+                <label className={labelClasses}>
+                  {t('productsForm.barcode')}
+                  {formData.hasVariants && formData.variants.length > 0 && (
+                    <span className="ml-2 text-[10px] text-amber-500 font-normal">
+                      ({t('productsForm.managedByVariants')})
+                    </span>
+                  )}
+                </label>
                 <input
                   type="text"
-                  value={formData.barcode}
+                  value={formData.hasVariants && formData.variants.length > 0 ? '' : formData.barcode}
                   onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                  className={inputClasses}
-                  placeholder={t('productsForm.placeholders.barcode')}
+                  className={`${inputClasses} ${formData.hasVariants && formData.variants.length > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  placeholder={formData.hasVariants && formData.variants.length > 0 ? t('productsForm.placeholders.barcodeManagedByVariants') : t('productsForm.placeholders.barcode')}
+                  disabled={formData.hasVariants && formData.variants.length > 0}
                 />
               </div>
             </div>

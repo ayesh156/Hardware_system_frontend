@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { mockProducts } from '../data/mockData';
-import { Product, Invoice, InvoiceItem } from '../types/index';
+import { Product, Invoice, InvoiceItem, FlattenedProduct } from '../types/index';
+import { flattenProducts } from '../lib/utils';
 import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
 import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
 import {
@@ -60,6 +61,10 @@ export const QuickCheckout: React.FC = () => {
   const isMobile = useIsMobile();
   
   const [products] = useState<Product[]>(mockProducts);
+  
+  // Flatten products so each variant appears as a distinct line item
+  const flattenedProducts = useMemo(() => flattenProducts(products), [products]);
+  
   const [items, setItems] = useState<QuickInvoiceItem[]>([]);
   const [productSearch, setProductSearch] = useState('');
   const [quantity, setQuantity] = useState<number>(1);
@@ -68,7 +73,7 @@ export const QuickCheckout: React.FC = () => {
   const [showShortcutMap, setShowShortcutMap] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit'>('cash');
-  const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
+  const [pendingProduct, setPendingProduct] = useState<FlattenedProduct | null>(null);
   
   // Stepped navigation state
   const [currentStep, setCurrentStep] = useState<QuickCheckoutStep>('products');
@@ -97,7 +102,7 @@ export const QuickCheckout: React.FC = () => {
   
   // Refs for scroll synchronization - stores refs to individual items
   const cartItemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const productItemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const productItemRefs = useRef<Map<number, HTMLElement>>(new Map());
   
   // Quick Add row refs and state
   const quickAddNameRef = useRef<HTMLInputElement>(null);
@@ -164,34 +169,35 @@ export const QuickCheckout: React.FC = () => {
     }
   }, [soundEnabled]);
 
-  // Filter products by search (SKU, barcode, name)
-  const filteredProducts = useMemo(() => {
+  // Filter products by search (SKU, barcode, name) - uses flattened products for variant display
+  const filteredProducts = useMemo((): FlattenedProduct[] => {
     if (!productSearch.trim()) return [];
     
     const searchLower = productSearch.toLowerCase().trim();
     
     // Check for exact barcode/SKU match first (for barcode scanner)
-    const exactMatch = products.find(
-      (p) => p.barcode === productSearch || p.sku.toLowerCase() === searchLower
+    const exactMatch = flattenedProducts.find(
+      (fp) => fp.displayBarcode === productSearch || fp.displaySku.toLowerCase() === searchLower
     );
     
     if (exactMatch && exactMatch.stock > 0) {
       return [exactMatch];
     }
     
-    return products
+    return flattenedProducts
       .filter(
-        (p) =>
-          p.stock > 0 && (
-            p.name.toLowerCase().includes(searchLower) ||
-            p.sku.toLowerCase().includes(searchLower) ||
-            (p.nameAlt && p.nameAlt.includes(searchLower)) ||
-            (p.barcode && p.barcode.includes(searchLower)) ||
-            p.category.toLowerCase().includes(searchLower)
+        (fp) =>
+          fp.stock > 0 && (
+            fp.displayName.toLowerCase().includes(searchLower) ||
+            fp.displaySku.toLowerCase().includes(searchLower) ||
+            (fp.product.nameAlt && fp.product.nameAlt.includes(searchLower)) ||
+            (fp.displayBarcode && fp.displayBarcode.includes(searchLower)) ||
+            fp.product.category.toLowerCase().includes(searchLower) ||
+            (fp.variantLabel && fp.variantLabel.toLowerCase().includes(searchLower))
           )
       )
-      .slice(0, 8); // Limit for performance
-  }, [products, productSearch]);
+      .slice(0, 12); // Increased limit since variants expand the list
+  }, [flattenedProducts, productSearch]);
 
   // Parse common barcode scan formats and extract quantity if provided
   const parseScanInput = (input: string): { code?: string; qty?: number } | null => {
@@ -214,11 +220,11 @@ export const QuickCheckout: React.FC = () => {
   // Auto-detect barcode scan - set pending product for quantity input
   useEffect(() => {
     if (filteredProducts.length === 1 && productSearch.length >= 3) {
-      const product = filteredProducts[0];
+      const flatProduct = filteredProducts[0];
       // Check if it's an exact match (barcode scanner typically sends full code)
-      if (product.barcode === productSearch || product.sku.toLowerCase() === productSearch.toLowerCase()) {
+      if (flatProduct.displayBarcode === productSearch || flatProduct.displaySku.toLowerCase() === productSearch.toLowerCase()) {
         // Set as pending product and focus quantity input
-        setPendingProduct(product);
+        setPendingProduct(flatProduct);
         setProductSearch('');
         setSelectedProductIndex(-1);
         setQuantity(1);
@@ -229,43 +235,46 @@ export const QuickCheckout: React.FC = () => {
           quantityInputRef.current?.select();
         }, 50);
         playBeep('add');
-        toast.info(`${product.name} - ${t('quickCheckout.enterQuantity')}`);
+        toast.info(`${flatProduct.displayName} - ${t('quickCheckout.enterQuantity')}`);
       }
     }
   }, [filteredProducts, productSearch, playBeep, t]);
 
-  // Add product to cart
-  const addProductToCart = useCallback((product: Product, overrideQty?: number) => {
-    const price = product.retailPrice || product.price || 0;
+  // Add product to cart (accepts FlattenedProduct for variant support)
+  const addProductToCart = useCallback((flatProduct: FlattenedProduct, overrideQty?: number) => {
+    const price = flatProduct.retailPrice;
     const addQty = Math.max(1, overrideQty ?? quantity);
     
-    const existingItem = items.find((i) => i.productId === product.id);
+    // Use flatId as the unique identifier (includes variant info)
+    const existingItem = items.find((i) => i.productId === flatProduct.flatId);
     if (existingItem) {
       // Check stock
-      if (existingItem.quantity + addQty > product.stock) {
+      if (existingItem.quantity + addQty > flatProduct.stock) {
         playBeep('error');
-        toast.error(`${t('quickCheckout.insufficientStock')}: ${product.stock} ${t('invoice.available')}`);
+        toast.error(`${t('quickCheckout.insufficientStock')}: ${flatProduct.stock} ${t('invoice.available')}`);
         return;
       }
       
       setItems(
         items.map((i) =>
-          i.productId === product.id
+          i.productId === flatProduct.flatId
             ? { ...i, quantity: i.quantity + addQty, total: (i.quantity + addQty) * i.unitPrice }
             : i
         )
       );
     } else {
-      if (addQty > product.stock) {
+      if (addQty > flatProduct.stock) {
         playBeep('error');
-        toast.error(`${t('quickCheckout.insufficientStock')}: ${product.stock} ${t('invoice.available')}`);
+        toast.error(`${t('quickCheckout.insufficientStock')}: ${flatProduct.stock} ${t('invoice.available')}`);
         return;
       }
       
       const newItem: QuickInvoiceItem = {
         id: `item-${Date.now()}`,
-        productId: product.id,
-        productName: product.name,
+        productId: flatProduct.flatId,
+        productName: flatProduct.displayName,
+        variantId: flatProduct.variant?.id,
+        size: flatProduct.variant?.size,
         quantity: addQty,
         unitPrice: price,
         originalPrice: price,
@@ -286,7 +295,7 @@ export const QuickCheckout: React.FC = () => {
         cartItemsContainerRef.current.scrollTop = cartItemsContainerRef.current.scrollHeight;
       }
     }, 50);
-  }, [items, quantity, playBeep, t, products]);
+  }, [items, quantity, playBeep, t]);
 
   // Remove item from cart
   const removeItem = useCallback((itemId: string) => {
@@ -303,10 +312,11 @@ export const QuickCheckout: React.FC = () => {
     
     const item = items.find((i) => i.id === itemId);
     if (item) {
-      const product = products.find((p) => p.id === item.productId);
-      if (product && newQuantity > product.stock) {
+      // Find the flattened product by the item's productId (which is flatId)
+      const flatProduct = flattenedProducts.find((fp) => fp.flatId === item.productId);
+      if (flatProduct && newQuantity > flatProduct.stock) {
         playBeep('error');
-        toast.error(`${t('quickCheckout.insufficientStock')}: ${product.stock} ${t('invoice.available')}`);
+        toast.error(`${t('quickCheckout.insufficientStock')}: ${flatProduct.stock} ${t('invoice.available')}`);
         return;
       }
     }
@@ -316,7 +326,7 @@ export const QuickCheckout: React.FC = () => {
         ? { ...i, quantity: newQuantity, total: newQuantity * i.unitPrice }
         : i
     ));
-  }, [items, products, removeItem, playBeep, t]);
+  }, [items, flattenedProducts, removeItem, playBeep, t]);
 
   // Mobile swipe handlers for cart items
   const handleTouchStart = useCallback((e: React.TouchEvent, itemId: string) => {
@@ -349,10 +359,10 @@ export const QuickCheckout: React.FC = () => {
   }, [touchDeltaX, swipedItemId, items, removeItem, updateItemQuantity, t]);
 
   // Quick add with haptic-style feedback
-  const quickAddProduct = useCallback((product: Product) => {
-    addProductToCart(product, 1);
+  const quickAddProduct = useCallback((flatProduct: FlattenedProduct) => {
+    addProductToCart(flatProduct, 1);
     if (isMobile) {
-      toast.success(`${product.name} ${t('quickCheckout.addedToCart')}`, { duration: 1500 });
+      toast.success(`${flatProduct.displayName} ${t('quickCheckout.addedToCart')}`, { duration: 1500 });
     }
   }, [addProductToCart, isMobile, t]);
 
@@ -912,7 +922,7 @@ export const QuickCheckout: React.FC = () => {
                 quantityInputRef.current?.select();
               }, 50);
               playBeep('add');
-              toast.info(`${productToSelect.name} - ${t('quickCheckout.enterQuantity')}`);
+              toast.info(`${productToSelect.displayName} - ${t('quickCheckout.enterQuantity')}`);
             }
           }
           break;
@@ -1064,9 +1074,9 @@ export const QuickCheckout: React.FC = () => {
                   <Package className={`w-5 h-5 ${isDark ? 'text-amber-400' : 'text-amber-700'}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`font-semibold truncate ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{pendingProduct.name}</p>
+                  <p className={`font-semibold truncate ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{pendingProduct.displayName}</p>
                   <p className={`text-xs ${isDark ? 'text-amber-400/70' : 'text-amber-600'}`}>
-                    {t('common.currency')} {(pendingProduct.retailPrice || pendingProduct.price || 0).toLocaleString()}
+                    {t('common.currency')} {pendingProduct.retailPrice.toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -1095,8 +1105,8 @@ export const QuickCheckout: React.FC = () => {
                   const val = e.target.value;
                   const parsed = parseScanInput(val);
                   if (parsed?.qty && parsed?.code) {
-                    const match = products.find(
-                      (p) => p.barcode === parsed.code || p.sku.toLowerCase() === parsed.code.toLowerCase()
+                    const match = flattenedProducts.find(
+                      (fp) => fp.displayBarcode === parsed.code || fp.displaySku.toLowerCase() === parsed.code.toLowerCase()
                     );
                     if (match) {
                       addProductToCart(match, parsed.qty);
@@ -1176,14 +1186,14 @@ export const QuickCheckout: React.FC = () => {
             <div className={`rounded-2xl border overflow-hidden ${isDark ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white shadow-lg'}`}>
               {filteredProducts.length > 0 ? (
                 <div className="max-h-[50vh] overflow-y-auto">
-                  {filteredProducts.map((product, index) => (
+                  {filteredProducts.map((flatProduct, index) => (
                     <button
-                      key={product.id}
+                      key={flatProduct.flatId}
                       ref={(el) => {
                         if (el) productItemRefs.current.set(index, el);
                         else productItemRefs.current.delete(index);
                       }}
-                      onClick={() => quickAddProduct(product)}
+                      onClick={() => quickAddProduct(flatProduct)}
                       className={`w-full flex items-center gap-3 p-3.5 text-left transition-all active:scale-[0.98] border-b last:border-b-0 ${
                         index === selectedProductIndex
                           ? isDark ? 'bg-amber-500/20' : 'bg-amber-50'
@@ -1195,26 +1205,26 @@ export const QuickCheckout: React.FC = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {product.name}
+                          {flatProduct.displayName}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                            {product.sku}
+                            {flatProduct.displaySku}
                           </span>
                           <span className={`text-xs px-1.5 py-0.5 rounded-lg ${
-                            product.stock > 10 
+                            flatProduct.stock > 10 
                               ? 'bg-emerald-500/10 text-emerald-500' 
-                              : product.stock > 0 
+                              : flatProduct.stock > 0 
                                 ? 'bg-amber-500/10 text-amber-500' 
                                 : 'bg-red-500/10 text-red-500'
                           }`}>
-                            {product.stock}
+                            {flatProduct.stock}
                           </span>
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {t('common.currency')} {(product.retailPrice || product.price || 0).toLocaleString()}
+                          {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
                         </p>
                       </div>
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
@@ -1541,9 +1551,9 @@ export const QuickCheckout: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <Package className={`w-5 h-5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
                     <div>
-                      <p className={`font-medium ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{pendingProduct.name}</p>
+                      <p className={`font-medium ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{pendingProduct.displayName}</p>
                       <p className={`text-xs ${isDark ? 'text-amber-400/70' : 'text-amber-600'}`}>
-                        {t('quickCheckout.enterQuantityPrompt')} • {t('common.currency')} {(pendingProduct.retailPrice || pendingProduct.price || 0).toLocaleString()}
+                        {t('quickCheckout.enterQuantityPrompt')} • {t('common.currency')} {pendingProduct.retailPrice.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -1581,8 +1591,8 @@ export const QuickCheckout: React.FC = () => {
 
                         if (parsed?.qty && parsed?.code) {
                           // If qty is provided in the scan, try to resolve product immediately
-                          const match = products.find(
-                            (p) => p.barcode === parsed.code || p.sku.toLowerCase() === parsed.code.toLowerCase()
+                          const match = flattenedProducts.find(
+                            (fp) => fp.displayBarcode === parsed.code || fp.displaySku.toLowerCase() === parsed.code.toLowerCase()
                           );
 
                           if (match) {
@@ -1694,16 +1704,16 @@ export const QuickCheckout: React.FC = () => {
                   ref={productListRef}
                   className={`mt-3 max-h-64 overflow-y-auto rounded-xl border ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}
                 >
-                  {filteredProducts.map((product, index) => (
+                  {filteredProducts.map((flatProduct, index) => (
                     <button
-                      key={product.id}
+                      key={flatProduct.flatId}
                       ref={(el) => {
                         if (el) productItemRefs.current.set(index, el);
                         else productItemRefs.current.delete(index);
                       }}
                       onClick={() => {
                         // Mouse selection should set pending product and focus quantity for quick workflow
-                        setPendingProduct(product);
+                        setPendingProduct(flatProduct);
                         setProductSearch('');
                         setSelectedProductIndex(-1);
                         setQuantity(1);
@@ -1714,7 +1724,7 @@ export const QuickCheckout: React.FC = () => {
                           quantityInputRef.current?.select();
                         }, 50);
                         playBeep('add');
-                        toast.info(`${product.name} - ${t('quickCheckout.enterQuantity')}`);
+                        toast.info(`${flatProduct.displayName} - ${t('quickCheckout.enterQuantity')}`);
                       }}
                       className={`w-full flex items-center gap-4 p-3 text-left transition-colors border-b last:border-b-0 ${
                         index === selectedProductIndex
@@ -1727,34 +1737,34 @@ export const QuickCheckout: React.FC = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {product.name}
+                          {flatProduct.displayName}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                            SKU: {product.sku}
+                            SKU: {flatProduct.displaySku}
                           </span>
-                          {product.barcode && (
+                          {flatProduct.displayBarcode && (
                             <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                              • {product.barcode}
+                              • {flatProduct.displayBarcode}
                             </span>
                           )}
                           <span className={`text-xs px-1.5 py-0.5 rounded ${
-                            product.stock > 10 
+                            flatProduct.stock > 10 
                               ? 'bg-emerald-500/10 text-emerald-500' 
-                              : product.stock > 0 
+                              : flatProduct.stock > 0 
                                 ? 'bg-amber-500/10 text-amber-500' 
                                 : 'bg-red-500/10 text-red-500'
                           }`}>
-                            {product.stock} {t('invoice.available')}
+                            {flatProduct.stock} {t('invoice.available')}
                           </span>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {t('common.currency')} {(product.retailPrice || product.price || 0).toLocaleString()}
+                          {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
                         </p>
                         <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                          {product.unit || 'piece'}
+                          {flatProduct.product.unit || 'piece'}
                         </p>
                       </div>
                       <Plus className={`w-5 h-5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />

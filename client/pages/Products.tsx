@@ -13,6 +13,7 @@ import { ProductFormModal } from '../components/modals/ProductFormModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { SearchableSelect } from '../components/ui/searchable-select';
 import { Pagination } from '../components/ui/data-table';
+import { getProductDisplayBarcode } from '../lib/utils';
 
 type ViewMode = 'grid' | 'table';
 // Simple Code39 barcode renderer (sufficient for scannable barcodes for alphanumerics)
@@ -557,23 +558,32 @@ export const Products: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Full-width Barcode below product name */}
-                  {(product.barcode || product.sku) && (
-                    <div className="mt-3 w-full">
-                      <div className="bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm w-full flex items-center justify-center">
-                        <Code39Barcode value={product.barcode || product.sku} height={40} narrow={1.5} wide={4} margin={4} />
+                  {/* Full-width Barcode below product name - uses primary variant barcode for variant products */}
+                  {(() => {
+                    const displayBarcode = getProductDisplayBarcode(product) || product.sku;
+                    return displayBarcode && (
+                      <div className="mt-3 w-full">
+                        <div className="bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm w-full flex items-center justify-center">
+                          <Code39Barcode value={displayBarcode} height={40} narrow={1.5} wide={4} margin={4} />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   <div className="flex items-center gap-2 flex-wrap mt-3">
-                    {/* Barcode Badge */}
-                    {(product.barcode || product.sku) && (
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'}`}>
-                        <Package className="w-3 h-3" />
-                        Barcode: {product.barcode || product.sku}
-                      </span>
-                    )}
+                    {/* Barcode Badge - uses primary variant barcode for variant products */}
+                    {(() => {
+                      const displayBarcode = getProductDisplayBarcode(product) || product.sku;
+                      return displayBarcode && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'}`}>
+                          <Package className="w-3 h-3" />
+                          Barcode: {displayBarcode}
+                          {product.hasVariants && product.variants && product.variants.length > 0 && (
+                            <span className="ml-1 text-[10px] opacity-70">(primary)</span>
+                          )}
+                        </span>
+                      );
+                    })()}
                     {/* SKU Badge - separate from barcode */}
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${theme === 'dark' ? 'bg-slate-700/50 text-slate-300 border border-slate-600' : 'bg-slate-100 text-slate-700 border border-slate-200'}`}>
                       <Tag className="w-3 h-3" />
