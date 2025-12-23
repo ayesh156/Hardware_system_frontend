@@ -4,7 +4,7 @@ import { Invoice, Customer } from '../types/index';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { FileText, ArrowLeft, Printer, Download } from 'lucide-react';
-import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
+import { printInvoice } from '../components/modals/PrintInvoiceModal';
 
 interface InvoiceDetailProps {
   invoices: Invoice[];
@@ -16,7 +16,6 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoices, customer
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { theme } = useTheme();
-  const [showPrintModal, setShowPrintModal] = useState(false);
 
   const invoice = invoices.find((inv) => inv.id === id);
   const customer = customers.find(c => c.id === invoice?.customerId);
@@ -40,7 +39,21 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoices, customer
   }
 
   const handlePrint = () => {
-    setShowPrintModal(true);
+    if (!invoice) return;
+    const printCustomer = customer || {
+      id: invoice.customerId || 'walk-in',
+      name: invoice.customerName,
+      businessName: invoice.customerName,
+      email: '',
+      phone: '',
+      address: '',
+      registrationDate: new Date().toISOString(),
+      totalSpent: 0,
+      customerType: 'regular' as const,
+      isActive: true,
+      loanBalance: 0
+    };
+    printInvoice(invoice, printCustomer).catch(() => {});
   };
 
   return (
@@ -250,13 +263,6 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoices, customer
           }
         }
       `}</style>
-
-      <PrintInvoiceModal
-        isOpen={showPrintModal}
-        onClose={() => setShowPrintModal(false)}
-        invoice={invoice}
-        customer={customer}
-      />
     </div>
   );
 };

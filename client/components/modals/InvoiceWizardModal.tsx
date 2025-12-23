@@ -3,7 +3,7 @@ import { Customer, Product, Invoice, InvoiceItem } from '../../types/index';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Search, FileText, User, Package, Calendar, CheckCircle } from 'lucide-react';
-import { PrintInvoiceModal } from './PrintInvoiceModal';
+import { printInvoice } from './PrintInvoiceModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 
 interface InvoiceWizardModalProps {
@@ -36,8 +36,6 @@ export const InvoiceWizardModal: React.FC<InvoiceWizardModalProps> = ({
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [customerSearch, setCustomerSearch] = useState<string>('');
   const [productSearch, setProductSearch] = useState<string>('');
-  const [createdInvoice, setCreatedInvoice] = useState<Invoice | null>(null);
-  const [showPrintModal, setShowPrintModal] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
@@ -140,8 +138,13 @@ export const InvoiceWizardModal: React.FC<InvoiceWizardModalProps> = ({
     };
 
     const createdInv = onCreateInvoice(invoice);
-    setCreatedInvoice(createdInv);
-    setShowPrintModal(true);
+    
+    // Print directly without preview modal
+    printInvoice(createdInv, customer).then(() => {
+      handleClose();
+    }).catch(() => {
+      handleClose();
+    });
   };
 
   const handleClose = () => {
@@ -154,8 +157,6 @@ export const InvoiceWizardModal: React.FC<InvoiceWizardModalProps> = ({
     setProductSearch('');
     setIssueDate(new Date().toISOString().split('T')[0]);
     setDueDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
-    setCreatedInvoice(null);
-    setShowPrintModal(false);
     onClose();
   };
 
@@ -635,14 +636,6 @@ export const InvoiceWizardModal: React.FC<InvoiceWizardModalProps> = ({
           </button>
         </div>
       </DialogContent>
-
-      {/* Print Invoice Modal - shown after creating invoice */}
-      <PrintInvoiceModal
-        isOpen={showPrintModal}
-        onClose={handleClose}
-        invoice={createdInvoice}
-        customer={currentCustomer}
-      />
     </Dialog>
   );
 };

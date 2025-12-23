@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { Invoice } from '../types/index';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
-import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
+import { printInvoice } from '../components/modals/PrintInvoiceModal';
 import { useIsMobile } from '../hooks/use-mobile';
 import { SearchableSelect } from '../components/ui/searchable-select';
 import { Pagination } from '../components/ui/data-table';
@@ -32,8 +32,6 @@ export const Invoices: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [invoiceToPrint, setInvoiceToPrint] = useState<Invoice | null>(null);
-  const [showPrintModal, setShowPrintModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showFilters, setShowFilters] = useState(false);
@@ -131,8 +129,22 @@ export const Invoices: React.FC = () => {
   };
 
   const handlePrintClick = (invoice: Invoice) => {
-    setInvoiceToPrint(invoice);
-    setShowPrintModal(true);
+    const customer = customers.find(c => c.id === invoice.customerId) || {
+      id: invoice.customerId || 'walk-in',
+      name: invoice.customerName,
+      businessName: invoice.customerName,
+      email: '',
+      phone: '',
+      address: '',
+      registrationDate: new Date().toISOString(),
+      totalSpent: 0,
+      customerType: 'regular' as const,
+      isActive: true,
+      loanBalance: 0
+    };
+    printInvoice(invoice, customer).catch(() => {
+      // Handle print error silently or show toast
+    });
   };
 
   const handleViewClick = (invoice: Invoice) => {
@@ -607,12 +619,6 @@ export const Invoices: React.FC = () => {
         onCancel={() => setShowDeleteModal(false)}
       />
 
-      <PrintInvoiceModal
-        isOpen={showPrintModal}
-        onClose={() => setShowPrintModal(false)}
-        invoice={invoiceToPrint}
-        customer={customers.find(c => c.id === invoiceToPrint?.customerId)}
-      />
     </div>
   );
 };

@@ -6,7 +6,7 @@ import { useIsMobile } from '../hooks/use-mobile';
 import { mockCustomers, mockProducts, mockInvoices } from '../data/mockData';
 import { Customer, Product, Invoice, InvoiceItem, FlattenedProduct } from '../types/index';
 import { flattenProducts } from '../lib/utils';
-import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
+import { printInvoice } from '../components/modals/PrintInvoiceModal';
 import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
 import {
   FileText, User, Package, CheckCircle, ChevronLeft, ChevronRight,
@@ -84,9 +84,7 @@ export const CreateInvoice: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'bank_transfer' | 'credit'>('cash');
   
-  const [createdInvoice, setCreatedInvoice] = useState<Invoice | null>(null);
-  const [showPrintModal, setShowPrintModal] = useState(false);
-  
+
   // Refs for keyboard navigation
   const customerSearchRef = useRef<HTMLInputElement>(null);
   const productSearchRef = useRef<HTMLInputElement>(null);
@@ -319,8 +317,43 @@ export const CreateInvoice: React.FC = () => {
     // Add to mockInvoices at the beginning so it appears at top of list
     mockInvoices.unshift(invoice);
 
-    setCreatedInvoice(invoice);
-    setShowPrintModal(true);
+    // Prepare customer for printing
+    const printCustomer: Customer = isWalkIn ? {
+      id: 'walk-in',
+      name: t('invoice.walkInCustomer'),
+      businessName: t('invoice.walkInCustomer'),
+      email: '',
+      phone: '',
+      address: '',
+      registrationDate: new Date().toISOString(),
+      totalSpent: 0,
+      customerType: 'regular',
+      isActive: true,
+      loanBalance: 0
+    } : (currentCustomer || {
+      id: customerId || '',
+      name: customerName,
+      businessName: customerName,
+      email: '',
+      phone: '',
+      address: '',
+      registrationDate: new Date().toISOString(),
+      totalSpent: 0,
+      customerType: 'regular',
+      isActive: true,
+      loanBalance: 0
+    });
+
+    // Print directly without preview
+    printInvoice(invoice, printCustomer)
+      .then(() => {
+        toast.success(`${t('invoice.invoiceCreated')}: ${invoiceNumber}`);
+        navigate('/invoices');
+      })
+      .catch(() => {
+        toast.error(t('invoice.printBlocked'));
+        navigate('/invoices');
+      });
   };
 
   // Quick Save without print preview (F9)
@@ -373,7 +406,6 @@ export const CreateInvoice: React.FC = () => {
   }, [selectedCustomer, isWalkIn, items, currentCustomer, subtotal, discountAmount, discountType, discount, enableTax, taxRate, tax, total, issueDate, dueDate, paymentMethod, notes, t, navigate]);
 
   const handlePrintClose = () => {
-    setShowPrintModal(false);
     navigate('/invoices');
   };
 
@@ -2306,26 +2338,6 @@ export const CreateInvoice: React.FC = () => {
           </button>
         )}
       </div>
-
-      {/* Print Modal */}
-      <PrintInvoiceModal
-        isOpen={showPrintModal}
-        onClose={handlePrintClose}
-        invoice={createdInvoice}
-        customer={isWalkIn ? { 
-          id: 'walk-in', 
-          name: t('invoice.walkInCustomer'), 
-          businessName: t('invoice.walkInCustomer'),
-          email: '',
-          phone: '',
-          address: '',
-          registrationDate: new Date().toISOString(),
-          totalSpent: 0,
-          customerType: 'regular',
-          isActive: true,
-          loanBalance: 0
-        } : currentCustomer}
-      />
 
       {/* Shortcut Hints Bar - Fixed at bottom */}
       <ShortcutHintsBar

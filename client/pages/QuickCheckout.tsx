@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { mockProducts } from '../data/mockData';
-import { Product, Invoice, InvoiceItem, FlattenedProduct } from '../types/index';
+import { Product, Invoice, InvoiceItem, FlattenedProduct, Customer } from '../types/index';
 import { flattenProducts } from '../lib/utils';
-import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
+import { printInvoice } from '../components/modals/PrintInvoiceModal';
 import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
 import {
   Zap, Search, Plus, Trash2, ArrowLeft, Printer, ShoppingCart,
@@ -79,8 +79,6 @@ export const QuickCheckout: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<QuickCheckoutStep>('products');
   const [currentMode, setCurrentMode] = useState<CheckoutMode>('search');
   
-  const [createdInvoice, setCreatedInvoice] = useState<Invoice | null>(null);
-  const [showPrintModal, setShowPrintModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isQuantityFocused, setIsQuantityFocused] = useState(false);
   
@@ -420,6 +418,19 @@ export const QuickCheckout: React.FC = () => {
     searchInputRef.current?.focus();
   }, []);
 
+  // Finalize sale helper
+  const finalizeSale = useCallback((invoiceNumber?: string) => {
+    setItems([]);
+    setDiscount(0);
+    setIsProcessing(false);
+    searchInputRef.current?.focus();
+    if (invoiceNumber) {
+      toast.success(`${t('quickCheckout.saleCompleted')}: ${invoiceNumber}`);
+    } else {
+      toast.success(t('quickCheckout.saleCompleted'));
+    }
+  }, [t]);
+
   // Process checkout
   const handleCheckout = useCallback(() => {
     if (items.length === 0 || isProcessing) return;
@@ -446,22 +457,34 @@ export const QuickCheckout: React.FC = () => {
         : t('quickCheckout.quickSaleNote'),
     };
 
-    setCreatedInvoice(invoice);
     playBeep('success');
-    setShowPrintModal(true);
-    setIsProcessing(false);
-    setDiscount(0);
-  }, [items, subtotal, total, discountAmount, paymentMethod, playBeep, t, isProcessing]);
 
-  // Handle print modal close
-  const handlePrintClose = useCallback(() => {
-    setShowPrintModal(false);
-    setItems([]);
-    setDiscount(0);
-    setCreatedInvoice(null);
-    searchInputRef.current?.focus();
-    toast.success(t('quickCheckout.saleCompleted'));
-  }, [t]);
+    // Prepare a walk-in customer object for printing
+    const walkInCustomer: Customer = {
+      id: 'walk-in',
+      name: t('invoice.walkInCustomer'),
+      businessName: t('invoice.walkInCustomer'),
+      email: '',
+      phone: '',
+      address: '',
+      registrationDate: new Date().toISOString(),
+      totalSpent: 0,
+      customerType: 'regular',
+      isActive: true,
+      loanBalance: 0
+    };
+
+    // Print directly in the browser without showing a preview modal
+    printInvoice(invoice, walkInCustomer)
+      .then(() => {
+        finalizeSale(invoice.invoiceNumber);
+      })
+      .catch(() => {
+        // Fallback: still finalize the sale but inform about the print issue
+        toast.error(t('quickCheckout.printBlocked'));
+        finalizeSale(invoice.invoiceNumber);
+      });
+  }, [items, subtotal, total, discountAmount, paymentMethod, playBeep, t, finalizeSale]);
 
   // Quick save without print preview (F9)
   const handleQuickSave = useCallback(() => {
@@ -1443,25 +1466,7 @@ export const QuickCheckout: React.FC = () => {
           </div>
         </div>
 
-        {/* Print Modal */}
-        <PrintInvoiceModal
-          isOpen={showPrintModal}
-          onClose={handlePrintClose}
-          invoice={createdInvoice}
-          customer={{
-            id: 'walk-in',
-            name: t('invoice.walkInCustomer'),
-            businessName: t('invoice.walkInCustomer'),
-            email: '',
-            phone: '',
-            address: '',
-            registrationDate: new Date().toISOString(),
-            totalSpent: 0,
-            customerType: 'regular',
-            isActive: true,
-            loanBalance: 0
-          }}
-        />
+
       </div>
     );
   }
@@ -2288,25 +2293,7 @@ export const QuickCheckout: React.FC = () => {
         </div>
       </div>
 
-      {/* Print Modal */}
-      <PrintInvoiceModal
-        isOpen={showPrintModal}
-        onClose={handlePrintClose}
-        invoice={createdInvoice}
-        customer={{
-          id: 'walk-in',
-          name: t('invoice.walkInCustomer'),
-          businessName: t('invoice.walkInCustomer'),
-          email: '',
-          phone: '',
-          address: '',
-          registrationDate: new Date().toISOString(),
-          totalSpent: 0,
-          customerType: 'regular',
-          isActive: true,
-          loanBalance: 0
-        }}
-      />
+
 
       {/* Shortcut Hints Bar */}
       {!isMobile && (

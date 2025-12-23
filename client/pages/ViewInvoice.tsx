@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { mockInvoices, mockCustomers, mockProducts } from '../data/mockData';
 import { Invoice, Customer, InvoiceItem } from '../types/index';
-import { PrintInvoiceModal } from '../components/modals/PrintInvoiceModal';
+import { printInvoice } from '../components/modals/PrintInvoiceModal';
 import {
   FileText, ArrowLeft, Printer, Edit3, Calendar, User, Phone,
   Building2, CreditCard, DollarSign, Package, CheckCircle, Clock,
@@ -27,7 +27,6 @@ export const ViewInvoice: React.FC = () => {
   const { t } = useTranslation();
   const { theme } = useTheme();
 
-  const [showPrintModal, setShowPrintModal] = useState(false);
   const [showActions, setShowActions] = useState(false);
 
   // Find the invoice
@@ -193,7 +192,11 @@ export const ViewInvoice: React.FC = () => {
 
             {/* Action Buttons */}
             <button
-              onClick={() => setShowPrintModal(true)}
+              onClick={() => {
+                if (invoice && customer) {
+                  printInvoice(invoice, customer).catch(() => {});
+                }
+              }}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
                 theme === 'dark'
                   ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
@@ -691,13 +694,6 @@ export const ViewInvoice: React.FC = () => {
         </div>
       </div>
 
-      {/* Print Modal */}
-      <PrintInvoiceModal
-        isOpen={showPrintModal}
-        onClose={() => setShowPrintModal(false)}
-        invoice={invoice}
-        customer={customer}
-      />
     </div>
   );
 };
