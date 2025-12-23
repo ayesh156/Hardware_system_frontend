@@ -51,7 +51,7 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
           <style>
             @page {
               size: A5 portrait;
-              margin: 5mm;
+              margin: 0;
             }
             
             * {
@@ -65,61 +65,51 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
             body {
               font-family: 'Inter', -apple-system, sans-serif;
               background: white;
-              color: #1e293b;
-              font-size: 8pt;
-              line-height: 1.3;
+              color: #000;
+              font-size: 15pt;
+              line-height: 1.4;
             }
             
             .a5-invoice {
-              width: 138mm;
+              width: 146mm;
               min-height: 200mm;
-              padding: 8mm;
+              padding: 2mm;
               margin: 0 auto;
               background: white;
               position: relative;
             }
 
-            /* Header with gradient accent */
+            /* Header - Black & White */
             .inv-header {
               display: flex;
               justify-content: space-between;
               align-items: flex-start;
-              padding-bottom: 10px;
-              border-bottom: 2px solid #0ea5e9;
-              margin-bottom: 10px;
+              padding-bottom: 12px;
+              border-bottom: 2px solid #000;
+              margin-bottom: 12px;
               position: relative;
             }
 
-            .inv-header::before {
-              content: '';
-              position: absolute;
-              bottom: -2px;
-              left: 0;
-              width: 60px;
-              height: 2px;
-              background: linear-gradient(90deg, #8b5cf6, #ec4899);
-            }
-
             .company-block h1 {
-              font-size: 14pt;
+              font-size: 26pt;
               font-weight: 800;
-              color: #0f172a;
+              color: #000;
               margin-bottom: 2px;
               letter-spacing: -0.3px;
             }
 
             .company-block .slogan {
-              font-size: 6pt;
-              color: #64748b;
+              font-size: 12pt;
+              color: #333;
               text-transform: uppercase;
               letter-spacing: 1.5px;
               margin-bottom: 6px;
             }
 
             .company-block .contact-line {
-              font-size: 6.5pt;
-              color: #475569;
-              line-height: 1.4;
+              font-size: 13pt;
+              color: #333;
+              line-height: 1.5;
             }
 
             .inv-badge {
@@ -127,216 +117,206 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
             }
 
             .inv-badge .badge-title {
-              font-size: 18pt;
+              font-size: 28pt;
               font-weight: 800;
-              background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
-              -webkit-background-clip: text;
-              -webkit-text-fill-color: transparent;
-              background-clip: text;
+              color: #000;
               letter-spacing: 1px;
+              white-space: nowrap;
+            }
+
+            /* Ensure item names and table cells don't wrap when printing */
+            .items-grid tbody td,
+            .items-grid tbody td .item-name {
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
             }
 
             .inv-badge .inv-num {
-              font-size: 8pt;
+              font-size: 17pt;
               font-weight: 600;
-              color: #334155;
+              color: #000;
               margin-top: 3px;
             }
 
             .inv-badge .inv-status {
               display: inline-block;
-              padding: 2px 8px;
-              border-radius: 10px;
-              font-size: 6pt;
-              font-weight: 600;
+              padding: 3px 10px;
+              border-radius: 4px;
+              font-size: 12pt;
+              font-weight: 700;
               text-transform: uppercase;
               letter-spacing: 0.3px;
               margin-top: 4px;
+              border: 2px solid #000;
+              background: white;
+              color: #000;
             }
 
             .status-paid {
-              background: linear-gradient(135deg, #10b981, #34d399);
+              background: #000;
               color: white;
             }
 
             .status-pending {
-              background: linear-gradient(135deg, #f59e0b, #fbbf24);
-              color: white;
+              background: white;
+              color: #000;
             }
 
             /* Info Row */
             .info-row {
               display: flex;
-              gap: 10px;
-              margin-bottom: 10px;
+              gap: 12px;
+              margin-bottom: 12px;
             }
 
             .info-card {
               flex: 1;
-              padding: 8px 10px;
-              background: #f8fafc;
-              border-radius: 6px;
-              border-left: 3px solid #0ea5e9;
-            }
-
-            .info-card.alt {
-              border-left-color: #8b5cf6;
+              padding: 10px 12px;
+              background: #f5f5f5;
+              border-radius: 4px;
+              border-left: 3px solid #000;
             }
 
             .info-card .card-label {
-              font-size: 5.5pt;
+              font-size: 12pt;
               font-weight: 700;
-              color: #0ea5e9;
+              color: #000;
               text-transform: uppercase;
               letter-spacing: 0.8px;
-              margin-bottom: 3px;
-            }
-
-            .info-card.alt .card-label {
-              color: #8b5cf6;
+              margin-bottom: 4px;
             }
 
             .info-card .card-main {
-              font-size: 8pt;
+              font-size: 17pt;
               font-weight: 600;
-              color: #0f172a;
+              color: #000;
             }
 
             .info-card .card-sub {
-              font-size: 6.5pt;
-              color: #64748b;
+              font-size: 13pt;
+              color: #333;
               margin-top: 2px;
             }
 
-            /* Items Table - Compact */
+            /* Items Table - Larger Text for B&W */
             .items-grid {
               width: 100%;
               border-collapse: collapse;
-              margin-bottom: 10px;
-              font-size: 7pt;
+              margin-bottom: 12px;
+              font-size: 15pt;
             }
 
             .items-grid thead {
-              background: linear-gradient(135deg, #0f172a, #1e293b);
+              background: #000;
             }
 
             .items-grid thead th {
               color: white;
-              font-weight: 600;
+              font-weight: 700;
               text-transform: uppercase;
               letter-spacing: 0.3px;
-              padding: 6px 8px;
-              font-size: 6pt;
+              padding: 8px 10px;
+              font-size: 13pt;
             }
 
             .items-grid thead th:first-child {
-              border-radius: 4px 0 0 4px;
               width: 6%;
             }
 
-            .items-grid thead th:last-child {
-              border-radius: 0 4px 4px 0;
-            }
-
-            .items-grid thead th.col-qty { width: 10%; text-align: center; }
-            .items-grid thead th.col-price { width: 20%; text-align: right; }
-            .items-grid thead th.col-total { width: 20%; text-align: right; }
+            .items-grid thead th.col-qty { width: 10%; text-align: center; white-space: nowrap; letter-spacing: 0; }
+            .items-grid thead th.col-price { width: 22%; text-align: right; }
+            .items-grid thead th.col-total { width: 22%; text-align: right; }
 
             .items-grid tbody tr {
-              border-bottom: 1px solid #e2e8f0;
+              border-bottom: 1px solid #ccc;
             }
 
             .items-grid tbody tr:nth-child(even) {
-              background: #f8fafc;
+              background: #f5f5f5;
             }
 
             .items-grid tbody td {
-              padding: 5px 8px;
+              padding: 8px 10px;
               vertical-align: middle;
+              font-size: 15pt;
             }
 
             .items-grid tbody td:first-child {
-              color: #94a3b8;
+              color: #666;
               text-align: center;
               font-weight: 500;
             }
 
             .items-grid tbody .item-name {
               font-weight: 500;
-              color: #0f172a;
+              color: #000;
             }
 
             .items-grid tbody .item-tag {
               display: inline-block;
-              padding: 1px 4px;
+              padding: 2px 6px;
               border-radius: 3px;
-              font-size: 5pt;
+              font-size: 11pt;
               font-weight: 600;
-              margin-left: 3px;
-            }
-
-            .tag-discount {
-              background: #fce7f3;
-              color: #db2777;
-            }
-
-            .tag-quick {
-              background: #fef3c7;
-              color: #d97706;
+              margin-left: 4px;
+              border: 1px solid #666;
+              background: white;
+              color: #000;
             }
 
             .items-grid tbody td.col-qty { text-align: center; }
             .items-grid tbody td.col-price { 
               text-align: right; 
               font-family: 'SF Mono', 'Consolas', monospace;
-              color: #64748b;
+              color: #333;
             }
             .items-grid tbody td.col-total { 
               text-align: right; 
               font-family: 'SF Mono', 'Consolas', monospace;
               font-weight: 600;
-              color: #0f172a;
+              color: #000;
             }
 
             /* Totals Block */
             .totals-block {
               display: flex;
               justify-content: flex-end;
-              margin-bottom: 10px;
+              margin-bottom: 12px;
             }
 
             .totals-inner {
-              width: 140px;
+              width: 160px;
             }
 
             .total-line {
               display: flex;
               justify-content: space-between;
-              padding: 3px 0;
-              font-size: 7pt;
+              padding: 4px 0;
+              font-size: 15pt;
             }
 
             .total-line .t-label {
-              color: #64748b;
+              color: #333;
             }
 
             .total-line .t-value {
               font-family: 'SF Mono', 'Consolas', monospace;
-              color: #334155;
+              color: #000;
             }
 
             .total-line.discount .t-value {
-              color: #ec4899;
+              color: #000;
             }
 
             .total-line.grand {
-              background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+              background: #000;
               color: white;
-              padding: 6px 10px;
-              margin-top: 5px;
-              border-radius: 5px;
+              padding: 8px 12px;
+              margin-top: 6px;
+              border-radius: 4px;
               font-weight: 700;
-              font-size: 9pt;
+              font-size: 18pt;
             }
 
             .total-line.grand .t-label,
@@ -348,87 +328,70 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
             .payment-row {
               display: flex;
               gap: 10px;
-              margin-bottom: 10px;
+              margin-bottom: 12px;
             }
 
             .pay-badge {
               display: inline-flex;
               align-items: center;
               gap: 4px;
-              padding: 4px 10px;
-              border-radius: 15px;
-              font-size: 6.5pt;
+              padding: 6px 12px;
+              border-radius: 4px;
+              font-size: 13pt;
               font-weight: 600;
+              border: 2px solid #000;
+              background: white;
+              color: #000;
             }
-
-            .pay-cash { background: #d1fae5; color: #047857; }
-            .pay-card { background: #dbeafe; color: #1d4ed8; }
-            .pay-bank { background: #ede9fe; color: #6d28d9; }
-            .pay-credit { background: #fef3c7; color: #b45309; }
 
             /* Notes Section */
             .notes-box {
-              background: #fffbeb;
-              border: 1px solid #fde68a;
-              border-radius: 5px;
-              padding: 8px 10px;
-              margin-bottom: 10px;
+              background: #f5f5f5;
+              border: 1px solid #ccc;
+              border-radius: 4px;
+              padding: 10px 12px;
+              margin-bottom: 12px;
             }
 
             .notes-box .n-label {
-              font-size: 5.5pt;
+              font-size: 12pt;
               font-weight: 700;
-              color: #b45309;
+              color: #000;
               text-transform: uppercase;
               letter-spacing: 0.5px;
-              margin-bottom: 3px;
+              margin-bottom: 4px;
             }
 
             .notes-box .n-text {
-              font-size: 6.5pt;
-              color: #92400e;
-              line-height: 1.4;
+              font-size: 13pt;
+              color: #333;
+              line-height: 1.5;
             }
 
             /* Footer */
             .inv-footer {
               text-align: center;
-              padding-top: 8px;
-              border-top: 1px dashed #cbd5e1;
+              padding-top: 10px;
+              border-top: 1px dashed #999;
             }
 
             .inv-footer .thanks {
-              font-size: 8pt;
+              font-size: 16pt;
               font-weight: 700;
-              background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
-              -webkit-background-clip: text;
-              -webkit-text-fill-color: transparent;
-              background-clip: text;
-              margin-bottom: 3px;
+              color: #000;
+              margin-bottom: 4px;
             }
 
             .inv-footer .footer-contact {
-              font-size: 6pt;
-              color: #64748b;
+              font-size: 12pt;
+              color: #333;
             }
 
             .inv-footer .powered {
-              font-size: 5.5pt;
-              color: #94a3b8;
-              margin-top: 5px;
+              font-size: 11pt;
+              color: #666;
+              margin-top: 6px;
               letter-spacing: 0.5px;
-            }
-
-            /* Decorative corner */
-            .corner-decor {
-              position: absolute;
-              top: 0;
-              right: 0;
-              width: 30px;
-              height: 30px;
-              background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
-              clip-path: polygon(100% 0, 0 0, 100% 100%);
-              opacity: 0.1;
             }
           </style>
         </head>
@@ -505,88 +468,68 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
             <div ref={printRef}>
               <div className="a5-invoice" style={{ 
                 background: 'white', 
-                padding: '24px',
+                padding: '20px',
                 fontFamily: "'Inter', sans-serif",
-                fontSize: '10px',
-                color: '#1e293b',
+                fontSize: '15px',
+                color: '#000',
                 position: 'relative'
               }}>
-                {/* Corner decoration */}
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  right: 0,
-                  width: '40px',
-                  height: '40px',
-                  background: 'linear-gradient(135deg, #0ea5e9, #8b5cf6)',
-                  clipPath: 'polygon(100% 0, 0 0, 100% 100%)',
-                  opacity: 0.15
-                }} />
-
                 {/* Header */}
                 <div className="inv-header" style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'flex-start',
                   paddingBottom: '12px',
-                  borderBottom: '2px solid #0ea5e9',
+                  borderBottom: '2px solid #000',
                   marginBottom: '12px',
                   position: 'relative'
                 }}>
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '-2px',
-                    left: 0,
-                    width: '60px',
-                    height: '2px',
-                    background: 'linear-gradient(90deg, #8b5cf6, #ec4899)'
-                  }} />
                   
                   <div>
                     <h1 style={{ 
-                      fontSize: '18px', 
+                      fontSize: '28px', 
                       fontWeight: 800, 
-                      color: '#0f172a',
+                      color: '#000',
                       marginBottom: '2px',
                       letterSpacing: '-0.3px'
                     }}>LIYANAGE HARDWARE</h1>
                     <p style={{ 
-                      fontSize: '8px', 
-                      color: '#64748b', 
+                      fontSize: '13px', 
+                      color: '#333', 
                       textTransform: 'uppercase',
                       letterSpacing: '1.5px',
                       marginBottom: '6px'
                     }}>Quality Building Materials</p>
-                    <p style={{ fontSize: '9px', color: '#475569', lineHeight: 1.4 }}>
-                      📍 Hakmana Rd, Deiyandara<br/>
-                      📞 0773751805 / 0412268217 | ✉️ info@liyanage.lk
+                    <p style={{ fontSize: '14px', color: '#333', lineHeight: 1.5 }}>
+                      Hakmana Rd, Deiyandara<br/>
+                      Tel: 0773751805 / 0412268217 | info@liyanage.lk
                     </p>
                   </div>
                   
                   <div style={{ textAlign: 'right' }}>
                     <h2 style={{
-                      fontSize: '22px',
+                      fontSize: '28px',
                       fontWeight: 800,
-                      background: 'linear-gradient(135deg, #0ea5e9, #8b5cf6)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      letterSpacing: '1px'
+                      color: '#000',
+                      letterSpacing: '1px',
+                      whiteSpace: 'nowrap'
                     }}>INVOICE</h2>
-                    <p style={{ fontSize: '11px', fontWeight: 600, color: '#334155', marginTop: '3px' }}>
+                    <p style={{ fontSize: '18px', fontWeight: 600, color: '#000', marginTop: '4px' }}>
                       {invoice.invoiceNumber}
                     </p>
                     <span style={{
                       display: 'inline-block',
-                      padding: '3px 10px',
-                      borderRadius: '12px',
-                      fontSize: '8px',
-                      fontWeight: 600,
+                      padding: '4px 12px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: 700,
                       textTransform: 'uppercase',
                       letterSpacing: '0.3px',
-                      marginTop: '5px',
-                      background: isPaid ? 'linear-gradient(135deg, #10b981, #34d399)' : 'linear-gradient(135deg, #f59e0b, #fbbf24)',
-                      color: 'white'
-                    }}>{isPaid ? '✓ Paid' : '⏳ Pending'}</span>
+                      marginTop: '6px',
+                      border: '2px solid #000',
+                      background: isPaid ? '#000' : 'white',
+                      color: isPaid ? 'white' : '#000'
+                    }}>{isPaid ? 'PAID' : 'PENDING'}</span>
                   </div>
                 </div>
 
@@ -594,49 +537,49 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
                   <div style={{
                     flex: 1,
-                    padding: '10px 12px',
-                    background: '#f8fafc',
-                    borderRadius: '6px',
-                    borderLeft: '3px solid #0ea5e9'
+                    padding: '12px 14px',
+                    background: '#f5f5f5',
+                    borderRadius: '4px',
+                    borderLeft: '3px solid #000'
                   }}>
                     <p style={{
-                      fontSize: '7px',
+                      fontSize: '12px',
                       fontWeight: 700,
-                      color: '#0ea5e9',
+                      color: '#000',
                       textTransform: 'uppercase',
                       letterSpacing: '0.8px',
                       marginBottom: '4px'
                     }}>Bill To</p>
-                    <p style={{ fontSize: '11px', fontWeight: 600, color: '#0f172a' }}>
+                    <p style={{ fontSize: '17px', fontWeight: 600, color: '#000' }}>
                       {customer?.name || 'Walk-in Customer'}
                     </p>
                     {customer && customer.id !== 'walk-in' && (
-                      <p style={{ fontSize: '9px', color: '#64748b', marginTop: '2px' }}>
+                      <p style={{ fontSize: '14px', color: '#333', marginTop: '2px' }}>
                         {customer.businessName}<br/>
-                        📞 {customer.phone}
+                        Tel: {customer.phone}
                       </p>
                     )}
                   </div>
                   
                   <div style={{
-                    width: '120px',
-                    padding: '10px 12px',
-                    background: '#f8fafc',
-                    borderRadius: '6px',
-                    borderLeft: '3px solid #8b5cf6'
+                    width: '130px',
+                    padding: '12px 14px',
+                    background: '#f5f5f5',
+                    borderRadius: '4px',
+                    borderLeft: '3px solid #000'
                   }}>
                     <p style={{
-                      fontSize: '7px',
+                      fontSize: '12px',
                       fontWeight: 700,
-                      color: '#8b5cf6',
+                      color: '#000',
                       textTransform: 'uppercase',
                       letterSpacing: '0.8px',
                       marginBottom: '4px'
                     }}>Date</p>
-                    <p style={{ fontSize: '10px', fontWeight: 600, color: '#0f172a' }}>
+                    <p style={{ fontSize: '16px', fontWeight: 600, color: '#000' }}>
                       {new Date(invoice.issueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </p>
-                    <p style={{ fontSize: '8px', color: '#64748b', marginTop: '3px' }}>
+                    <p style={{ fontSize: '13px', color: '#333', marginTop: '3px' }}>
                       Due: {new Date(invoice.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                     </p>
                   </div>
@@ -647,60 +590,59 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                   width: '100%',
                   borderCollapse: 'collapse',
                   marginBottom: '12px',
-                  fontSize: '9px'
+                  fontSize: '14px'
                 }}>
                   <thead>
-                    <tr style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)' }}>
+                    <tr style={{ background: '#000' }}>
                       <th style={{ 
                         color: 'white', 
-                        fontWeight: 600, 
+                        fontWeight: 700, 
                         textTransform: 'uppercase',
                         letterSpacing: '0.3px',
-                        padding: '8px',
-                        fontSize: '7px',
-                        borderRadius: '4px 0 0 4px',
+                        padding: '10px',
+                        fontSize: '12px',
                         width: '6%'
                       }}>#</th>
                       <th style={{ 
                         color: 'white', 
-                        fontWeight: 600, 
+                        fontWeight: 700, 
                         textTransform: 'uppercase',
                         letterSpacing: '0.3px',
-                        padding: '8px',
-                        fontSize: '7px',
+                        padding: '10px',
+                        fontSize: '12px',
                         textAlign: 'left'
                       }}>Item</th>
                       <th style={{ 
                         color: 'white', 
-                        fontWeight: 600, 
+                        fontWeight: 700, 
                         textTransform: 'uppercase',
-                        letterSpacing: '0.3px',
-                        padding: '8px',
-                        fontSize: '7px',
+                        letterSpacing: '0px',
+                        padding: '10px',
+                        fontSize: '12px',
                         width: '10%',
-                        textAlign: 'center'
-                      }}>Qty</th>
+                        textAlign: 'center',
+                        whiteSpace: 'nowrap'
+                      }}>QTY</th>
                       <th style={{ 
                         color: 'white', 
-                        fontWeight: 600, 
+                        fontWeight: 700, 
                         textTransform: 'uppercase',
                         letterSpacing: '0.3px',
-                        padding: '8px',
-                        fontSize: '7px',
+                        padding: '10px',
+                        fontSize: '12px',
                         width: '22%',
                         textAlign: 'right'
-                      }}>Price</th>
+                      }}>PRICE (Rs.)</th>
                       <th style={{ 
                         color: 'white', 
-                        fontWeight: 600, 
+                        fontWeight: 700, 
                         textTransform: 'uppercase',
                         letterSpacing: '0.3px',
-                        padding: '8px',
-                        fontSize: '7px',
+                        padding: '10px',
+                        fontSize: '12px',
                         width: '22%',
-                        textAlign: 'right',
-                        borderRadius: '0 4px 4px 0'
-                      }}>Total</th>
+                        textAlign: 'right'
+                      }}>TOTAL</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -708,142 +650,172 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                       const extItem = item as ExtendedInvoiceItem;
                       return (
                         <tr key={item.id} style={{ 
-                          borderBottom: '1px solid #e2e8f0',
-                          background: idx % 2 === 1 ? '#f8fafc' : 'white'
+                          borderBottom: '1px solid #ccc',
+                          background: idx % 2 === 1 ? '#f5f5f5' : 'white'
                         }}>
-                          <td style={{ padding: '6px 8px', textAlign: 'center', color: '#94a3b8', fontWeight: 500 }}>
+                          <td style={{ padding: '8px 10px', textAlign: 'center', color: '#666', fontWeight: 500, fontSize: '14px' }}>
                             {idx + 1}
                           </td>
-                          <td style={{ padding: '6px 8px' }}>
-                            <span style={{ fontWeight: 500, color: '#0f172a' }}>{item.productName}</span>
+                          <td style={{ padding: '8px 10px', fontSize: '14px' }}>
+                            <span style={{ fontWeight: 500, color: '#000' }}>{item.productName}</span>
                             {extItem.discountType && (
                               <span style={{
                                 display: 'inline-block',
-                                padding: '1px 5px',
+                                padding: '2px 6px',
                                 borderRadius: '3px',
-                                fontSize: '6px',
+                                fontSize: '11px',
                                 fontWeight: 600,
                                 marginLeft: '4px',
-                                background: '#fce7f3',
-                                color: '#db2777'
+                                border: '1px solid #666',
+                                background: 'white',
+                                color: '#000'
                               }}>
-                                {extItem.discountType === 'percentage' ? `${extItem.discountValue}%` : `Rs.${extItem.discountValue}`} off
+                                {extItem.discountType === 'percentage' ? `${extItem.discountValue}%` : `${extItem.discountValue}`} off
                               </span>
                             )}
                             {extItem.isQuickAdd && (
                               <span style={{
                                 display: 'inline-block',
-                                padding: '1px 5px',
+                                padding: '2px 6px',
                                 borderRadius: '3px',
-                                fontSize: '6px',
+                                fontSize: '11px',
                                 fontWeight: 600,
                                 marginLeft: '4px',
-                                background: '#fef3c7',
-                                color: '#d97706'
+                                border: '1px solid #666',
+                                background: 'white',
+                                color: '#000'
                               }}>Quick</span>
                             )}
                           </td>
-                          <td style={{ padding: '6px 8px', textAlign: 'center' }}>{item.quantity}</td>
+                          <td style={{ padding: '8px 10px', textAlign: 'center', fontSize: '14px' }}>{item.quantity}</td>
                           <td style={{ 
-                            padding: '6px 8px', 
+                            padding: '8px 10px', 
                             textAlign: 'right',
                             fontFamily: "'SF Mono', Consolas, monospace",
-                            color: '#64748b'
-                          }}>Rs. {item.unitPrice.toLocaleString()}</td>
+                            color: '#333',
+                            fontSize: '14px'
+                          }}>{item.unitPrice.toLocaleString()}</td>
                           <td style={{ 
-                            padding: '6px 8px', 
+                            padding: '8px 10px', 
                             textAlign: 'right',
                             fontFamily: "'SF Mono', Consolas, monospace",
                             fontWeight: 600,
-                            color: '#0f172a'
-                          }}>Rs. {item.total.toLocaleString()}</td>
+                            color: '#000',
+                            fontSize: '14px'
+                          }}>{item.total.toLocaleString()}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
 
-                {/* Totals */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-                  <div style={{ width: '160px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '9px' }}>
-                      <span style={{ color: '#64748b' }}>Subtotal</span>
-                      <span style={{ fontFamily: "'SF Mono', Consolas, monospace", color: '#334155' }}>
-                        Rs. {invoice.subtotal.toLocaleString()}
+                {/* Totals + Payment */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
+                  {/* Payment Badge (left) */}
+                  <div>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '6px 14px',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      border: '2px solid #000',
+                      background: 'white',
+                      color: '#000'
+                    }}>
+                      {invoice.paymentMethod === 'cash' ? 'Cash' :
+                       invoice.paymentMethod === 'card' ? 'Card' :
+                       invoice.paymentMethod === 'bank_transfer' ? 'Bank Transfer' : 'Credit'} Payment
+                    </span>
+                  </div>
+
+                  {/* Totals Block (right) */}
+                  <div style={{ width: '180px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: '14px' }}>
+                      <span style={{ color: '#333' }}>Subtotal</span>
+                      <span style={{ fontFamily: "'SF Mono', Consolas, monospace", color: '#000' }}>
+                        {invoice.subtotal.toLocaleString()}
                       </span>
                     </div>
-                    {invoice.discount > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '9px' }}>
-                        <span style={{ color: '#64748b' }}>Discount ({invoice.discount}%)</span>
-                        <span style={{ fontFamily: "'SF Mono', Consolas, monospace", color: '#ec4899' }}>
-                          - Rs. {((invoice.subtotal * invoice.discount) / 100).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '9px' }}>
-                      <span style={{ color: '#64748b' }}>Tax</span>
-                      <span style={{ fontFamily: "'SF Mono', Consolas, monospace", color: '#334155' }}>
-                        Rs. {invoice.tax.toLocaleString()}
+                    {invoice.discount > 0 && (() => {
+                      // Determine discount label and amount. Handle three cases:
+                      // 1) invoice.discountType === 'percentage' -> show (X%) and compute amount from subtotal
+                      // 2) invoice.discountType === 'fixed' -> show (Rs. X) and amount is the fixed value
+                      // 3) No discountType (e.g., quick checkout) -> treat invoice.discount as monetary amount
+                      const discType = (invoice as any).discountType;
+                      const discValue = (invoice as any).discountValue;
+
+                      let label = 'Discount';
+                      let amount = invoice.discount; // default to monetary discount stored in invoice.discount
+
+                      if (discType === 'percentage') {
+                        const perc = typeof discValue === 'number' ? discValue : invoice.discount;
+                        label = `Discount (${perc}%)`;
+                        amount = Math.round((invoice.subtotal * (perc || 0)) / 100);
+                      } else if (discType === 'fixed') {
+                        const val = typeof discValue === 'number' ? discValue : invoice.discount;
+                        label = `Discount (Rs. ${val.toLocaleString()})`;
+                        amount = val;
+                      } else {
+                        // quick checkout or legacy: invoice.discount is already amount
+                        label = 'Discount';
+                        amount = invoice.discount;
+                      }
+
+                      return (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: '14px' }}>
+                          <span style={{ color: '#333' }}>{label}</span>
+                          <span style={{ fontFamily: "'SF Mono', Consolas, monospace", color: '#000' }}>
+                            - {Number(amount).toLocaleString()}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: '14px' }}>
+                      <span style={{ color: '#333' }}>Tax</span>
+                      <span style={{ fontFamily: "'SF Mono', Consolas, monospace", color: '#000' }}>
+                        {invoice.tax.toLocaleString()}
                       </span>
                     </div>
                     <div style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      padding: '8px 12px',
+                      padding: '10px 14px',
                       marginTop: '6px',
-                      borderRadius: '6px',
-                      background: 'linear-gradient(135deg, #0ea5e9, #8b5cf6)',
+                      borderRadius: '4px',
+                      background: '#000',
                       color: 'white',
                       fontWeight: 700,
-                      fontSize: '11px'
+                      fontSize: '18px'
                     }}>
                       <span>Total</span>
                       <span style={{ fontFamily: "'SF Mono', Consolas, monospace" }}>
-                        Rs. {invoice.total.toLocaleString()}
+                        {invoice.total.toLocaleString()}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Payment Badge */}
-                <div style={{ marginBottom: '12px' }}>
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '5px 12px',
-                    borderRadius: '15px',
-                    fontSize: '9px',
-                    fontWeight: 600,
-                    background: invoice.paymentMethod === 'cash' ? '#d1fae5' :
-                               invoice.paymentMethod === 'card' ? '#dbeafe' :
-                               invoice.paymentMethod === 'bank_transfer' ? '#ede9fe' : '#fef3c7',
-                    color: invoice.paymentMethod === 'cash' ? '#047857' :
-                           invoice.paymentMethod === 'card' ? '#1d4ed8' :
-                           invoice.paymentMethod === 'bank_transfer' ? '#6d28d9' : '#b45309'
-                  }}>
-                    {payInfo.label} Payment
-                  </span>
-                </div>
-
                 {/* Notes */}
                 {invoice.notes && (
                   <div style={{
-                    background: '#fffbeb',
-                    border: '1px solid #fde68a',
-                    borderRadius: '6px',
-                    padding: '10px 12px',
+                    background: '#f5f5f5',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    padding: '12px 14px',
                     marginBottom: '12px'
                   }}>
                     <p style={{
-                      fontSize: '7px',
+                      fontSize: '12px',
                       fontWeight: 700,
-                      color: '#b45309',
+                      color: '#000',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px',
                       marginBottom: '4px'
-                    }}>📝 Notes</p>
-                    <p style={{ fontSize: '9px', color: '#92400e', lineHeight: 1.4 }}>{invoice.notes}</p>
+                    }}>Notes</p>
+                    <p style={{ fontSize: '13px', color: '#333', lineHeight: 1.5 }}>{invoice.notes}</p>
                   </div>
                 )}
 
@@ -851,20 +823,18 @@ export const PrintInvoiceModal: React.FC<PrintInvoiceModalProps> = ({
                 <div style={{
                   textAlign: 'center',
                   paddingTop: '10px',
-                  borderTop: '1px dashed #cbd5e1'
+                  borderTop: '1px dashed #999'
                 }}>
                   <p style={{
-                    fontSize: '11px',
+                    fontSize: '16px',
                     fontWeight: 700,
-                    background: 'linear-gradient(135deg, #f59e0b, #ea580c)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
+                    color: '#000',
                     marginBottom: '4px'
                   }}>Thank you for your business!</p>
-                  <p style={{ fontSize: '8px', color: '#64748b' }}>
+                  <p style={{ fontSize: '12px', color: '#333' }}>
                     Questions? Contact us at info@liyanage.lk or 0773751805 / 0412268217
                   </p>
-                  <p style={{ fontSize: '7px', color: '#94a3b8', marginTop: '6px', letterSpacing: '0.5px' }}>
+                  <p style={{ fontSize: '11px', color: '#666', marginTop: '6px', letterSpacing: '0.5px' }}>
                     © 2025 Powered by Nebulainfinite
                   </p>
                 </div>
