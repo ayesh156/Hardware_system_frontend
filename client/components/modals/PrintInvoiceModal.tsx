@@ -9,8 +9,11 @@ interface ExtendedInvoiceItem extends InvoiceItem {
   isQuickAdd?: boolean;
 }
 
-// Helper function to generate print HTML content
-const generatePrintContent = (invoice: Invoice, customer?: Customer | null): string => {
+// ============================================================
+// A5 PRINT DESIGN (148mm × 210mm) - COMMENTED OUT FOR LATER USE
+// ============================================================
+/*
+const generatePrintContentA5 = (invoice: Invoice, customer?: Customer | null): string => {
   const isPaid = invoice.status === 'paid';
   
   // Calculate discount
@@ -169,12 +172,219 @@ const generatePrintContent = (invoice: Invoice, customer?: Customer | null): str
     </html>
   `;
 };
+*/
+// ============================================================
+// END OF A5 PRINT DESIGN
+// ============================================================
+
+// ============================================================
+// 80mm THERMAL RECEIPT PRINTER (Xprinter) - Variable Length
+// ============================================================
+
+const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null): string => {
+  const isPaid = invoice.status === 'paid';
+  
+  // Calculate discount
+  const discType = (invoice as any).discountType;
+  const discValue = (invoice as any).discountValue;
+  let discountLabel = 'Discount';
+  let discountAmount = invoice.discount;
+
+  if (discType === 'percentage') {
+    const perc = typeof discValue === 'number' ? discValue : invoice.discount;
+    discountLabel = `Discount (${perc}%)`;
+    discountAmount = Math.round((invoice.subtotal * (perc || 0)) / 100);
+  } else if (discType === 'fixed') {
+    discountLabel = 'Discount';
+    discountAmount = typeof discValue === 'number' ? discValue : invoice.discount;
+  }
+
+  // Generate items rows - compact format for 80mm
+  const itemsHtml = invoice.items.map((item, idx) => {
+    const extItem = item as ExtendedInvoiceItem;
+    const discountTag = extItem.discountType ? 
+      ` <span style="font-size: 9px; color: #666;">(-${extItem.discountType === 'percentage' ? `${extItem.discountValue}%` : extItem.discountValue})</span>` : '';
+    
+    return `
+      <div style="border-bottom: 1px dotted #ccc; padding: 6px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div style="flex: 1; padding-right: 8px;">
+            <span style="font-weight: 600; font-size: 14px; color: #000;">${idx + 1}. ${item.productName}</span>${discountTag}
+          </div>
+          <div style="text-align: right; white-space: nowrap;">
+            <span style="font-weight: 700; font-size: 15px; font-family: 'Courier New', monospace;">${item.total.toLocaleString()}</span>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 13px; color: #666;">
+          <span>${item.quantity} × ${item.unitPrice.toLocaleString()}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Customer info for receipt
+  const customerName = customer?.name || 'Walk-in Customer';
+  const customerPhone = customer && customer.id !== 'walk-in' ? customer.phone : '';
+
+  // Payment method icon
+  const paymentIcon = invoice.paymentMethod === 'cash' ? '💵' : 
+                      invoice.paymentMethod === 'card' ? '💳' : 
+                      invoice.paymentMethod === 'bank_transfer' ? '🏦' : '📝';
+  const paymentLabel = invoice.paymentMethod === 'cash' ? 'CASH' : 
+                       invoice.paymentMethod === 'card' ? 'CARD' : 
+                       invoice.paymentMethod === 'bank_transfer' ? 'BANK' : 'CREDIT';
+
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Receipt ${invoice.invoiceNumber}</title>
+        <style>
+          @page { 
+            size: 80mm auto; 
+            margin: 0 2px; 
+          }
+          @media print {
+            html, body { 
+              width: 80mm; 
+              margin: 0; 
+              padding: 0;
+            }
+            body, .receipt-container { padding-left: 2px !important; padding-right: 2px !important; }
+          }
+
+          /* Force all text to black, but allow exceptions for specific components */
+          .receipt-container, .receipt-container * { color: #000 !important; }
+          .total-box, .total-box * { color: #fff !important; }
+          .status-badge, .status-badge * { color: ${isPaid ? "#fff" : "#000"} !important; }
+
+          * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+            -webkit-print-color-adjust: exact !important; 
+            print-color-adjust: exact !important; 
+          }
+          body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            background: white; 
+            color: #000; 
+            font-size: 11px; 
+            line-height: 1.3; 
+            width: 80mm;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt-container" style="width: 76mm; max-width: 100%; padding: 2px; margin: 0 auto; background: white; font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #000;">
+          
+          <!-- ═══ HEADER ═══ -->
+          <div style="text-align: center; padding-bottom: 8px; border-bottom: 2px double #000;">
+            <div style="font-size: 18px; font-weight: 900; letter-spacing: 1px; color: #000;">LIYANAGE</div>
+            <div style="font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #000;">HARDWARE</div>
+            <div style="font-size: 10px; letter-spacing: 1px; color: #666; margin-top: 3px;">★ QUALITY BUILDING MATERIALS ★</div>
+            <div style="font-size: 11px; color: #333; margin-top: 6px; line-height: 1.4;">
+              Hakmana Rd, Deiyandara<br/>
+              Tel: 0773751805 / 0412268217
+            </div>
+          </div>
+
+          <!-- ═══ INVOICE INFO BAR ═══ -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #999;">
+            <div>
+              <div style="font-size: 9px; color: #666; text-transform: uppercase;">Invoice</div>
+              <div style="font-size: 13px; font-weight: 700; font-family: 'Courier New', monospace;">${invoice.invoiceNumber}</div>
+            </div>
+            <div style="text-align: center;">
+              <div class="status-badge" style="display: inline-block; padding: 3px 8px; border: 1.5px solid #000; border-radius: 3px; font-size: 11px; font-weight: 700; background: ${isPaid ? '#000' : 'white'}; color: ${isPaid ? 'white' : '#000'};">
+                ${isPaid ? '✓ PAID' : '○ PENDING'}
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 9px; color: #666;">Date</div>
+              <div style="font-size: 11px; font-weight: 600;">${new Date(invoice.issueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</div>
+            </div>
+          </div>
+
+          <!-- ═══ CUSTOMER ═══ -->
+          <div style="padding: 6px 0; border-bottom: 1px dashed #999;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="font-size: 9px; color: #666;">Customer: </span>
+                <span style="font-size: 12px; font-weight: 600;">${customerName}</span>
+              </div>
+              ${customerPhone ? `<span style="font-size: 10px; color: #666;">${customerPhone}</span>` : ''}
+            </div>
+          </div>
+
+          <!-- ═══ ITEMS HEADER ═══ -->
+          <div style="display: flex; justify-content: space-between; padding: 6px 0 4px 0; border-bottom: 1px solid #000; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #000;">
+            <span>Items</span>
+            <span>Amount (Rs.)</span>
+          </div>
+
+          <!-- ═══ ITEMS LIST ═══ -->
+          <div style="padding: 4px 0;">
+            ${itemsHtml}
+          </div>
+
+          <!-- ═══ TOTALS SECTION ═══ -->
+          <div style="border-top: 1px solid #000; padding-top: 8px; margin-top: 4px;">
+            <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px;">
+              <span>Subtotal</span>
+              <span style="font-family: 'Courier New', monospace;">${invoice.subtotal.toLocaleString()}</span>
+            </div>
+            ${invoice.discount > 0 ? `
+            <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; color: #666;">
+              <span>${discountLabel}</span>
+              <span style="font-family: 'Courier New', monospace;">- ${Number(discountAmount).toLocaleString()}</span>
+            </div>
+            ` : ''}
+            ${invoice.tax > 0 ? `
+            <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; color: #666;">
+              <span>Tax</span>
+              <span style="font-family: 'Courier New', monospace;">${invoice.tax.toLocaleString()}</span>
+            </div>
+            ` : ''}
+            
+            <!-- ═══ GRAND TOTAL BOX ═══ -->
+            <div class="total-box" style="background: #000; color: white; padding: 10px 8px; margin-top: 6px; border-radius: 4px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 14px; font-weight: 700;">TOTAL</span>
+                <span style="font-size: 18px; font-weight: 900; font-family: 'Courier New', monospace; letter-spacing: 1px;">Rs. ${invoice.total.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ PAYMENT METHOD ═══ -->
+          <div style="display: flex; justify-content: center; padding: 8px 0; border-bottom: 1px dashed #999;">
+            <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border: 1px solid #999; border-radius: 12px; font-size: 12px; font-weight: 600;">
+              <span>${paymentIcon}</span>
+              <span>${paymentLabel} PAYMENT</span>
+            </div>
+          </div>
+
+          <!-- ═══ FOOTER ═══ -->
+          <div style="text-align: center; padding-top: 10px;">
+            <div style="font-size: 15px; font-weight: 700; color: #000;">Thank You!</div>
+            <div style="font-size: 13px; color: #000; margin-top: 2px;">Visit us again</div>
+            <div style="margin: 8px 0; border-top: 1px dotted #ccc;"></div>
+            <div style="font-size: 12px; color: #000; letter-spacing: 0.5px;">© 2025 Powered by Nebulainfinite</div>
+            <div style="font-size: 12px; color: #000;">0783233760</div>
+          </div>
+
+        </div>
+      </body>
+    </html>
+  `;
+};
 
 export const printInvoice = (invoice: Invoice, customer?: Customer | null): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
-      const printContent = generatePrintContent(invoice, customer);
-      const printWindow = window.open('', '_blank', 'width=600,height=850');
+      // Using 80mm Xprinter thermal receipt design
+      const printContent = generate80mmReceiptContent(invoice, customer);
+      const printWindow = window.open('', '_blank', 'width=320,height=600');
 
       if (!printWindow) {
         alert('Please allow pop-ups to print the invoice');
