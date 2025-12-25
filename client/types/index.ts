@@ -3,6 +3,7 @@ export type CustomerType = 'regular' | 'wholesale' | 'credit';
 export interface Customer {
   id: string;
   name: string;
+  nameSi?: string; // Sinhala name
   businessName: string;
   email: string;
   phone: string;
@@ -159,6 +160,7 @@ export interface InvoiceItem {
   id: string;
   productId: string;
   productName: string;
+  productNameSi?: string; // Sinhala product name
   variantId?: string;
   size?: string;
   quantity: number;

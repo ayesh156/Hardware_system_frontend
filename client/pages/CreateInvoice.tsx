@@ -13,17 +13,18 @@ import {
   Search, Plus, Trash2, Calendar, ArrowLeft, UserX, CreditCard,
   AlertTriangle, Building2, Phone, DollarSign, ShoppingCart, Receipt,
   Percent, Tag, Box, Edit3, PackagePlus, Boxes, Calculator, Zap,
-  Keyboard, Barcode
+  Keyboard, Barcode, Banknote
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Extended Invoice Item with discount tracking
+// Extended Invoice Item with discount tracking and Sinhala translation
 interface ExtendedInvoiceItem extends InvoiceItem {
   originalPrice: number;
   discountType?: 'percentage' | 'fixed';
   discountValue?: number;
   isCustomPrice?: boolean;
   isQuickAdd?: boolean;
+  productNameSi?: string; // Sinhala product name for printing
 }
 
 type Step = 1 | 2 | 3;
@@ -33,10 +34,11 @@ const PRICE_MODES: ('auto' | 'retail' | 'wholesale' | 'custom')[] = ['auto', 're
 const DISCOUNT_TYPES: ('none' | 'percentage' | 'fixed')[] = ['none', 'percentage', 'fixed'];
 
 export const CreateInvoice: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const isSinhala = i18n.language === 'si';
   
   const [customers] = useState<Customer[]>(mockCustomers);
   const [products] = useState<Product[]>(mockProducts);
@@ -207,10 +209,14 @@ export const CreateInvoice: React.FC = () => {
     const { price: basePrice } = getProductPrice(flatProduct);
     const finalPrice = priceMode === 'custom' ? customPrice : calculateFinalPrice(basePrice);
     
+    // Get Sinhala product name from the product's nameAlt field
+    const sinhalaName = flatProduct.product.nameAlt || flatProduct.displayName;
+    
     const newItem: ExtendedInvoiceItem = {
       id: `item-${Date.now()}`,
       productId: flatProduct.flatId,
       productName: flatProduct.displayName,
+      productNameSi: sinhalaName,
       variantId: flatProduct.variant?.id,
       size: flatProduct.variant?.size,
       quantity,
@@ -345,7 +351,7 @@ export const CreateInvoice: React.FC = () => {
     });
 
     // Print directly without preview
-    printInvoice(invoice, printCustomer)
+    printInvoice(invoice, printCustomer, i18n.language as 'en' | 'si')
       .then(() => {
         toast.success(`${t('invoice.invoiceCreated')}: ${invoiceNumber}`);
         navigate('/invoices');
@@ -1076,7 +1082,7 @@ export const CreateInvoice: React.FC = () => {
                               ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 text-blue-400' 
                               : 'bg-gradient-to-br from-blue-100 to-cyan-100 text-blue-600'
                           }`}>
-                            {customer.name.charAt(0).toUpperCase()}
+                            {(isSinhala && customer.nameSi ? customer.nameSi : customer.name).charAt(0).toUpperCase()}
                           </div>
                           
                           <div className="flex-1 min-w-0">
@@ -1084,7 +1090,7 @@ export const CreateInvoice: React.FC = () => {
                               <p className={`font-semibold truncate ${
                                 isKeyboardSelected ? 'text-cyan-400' : theme === 'dark' ? 'text-white' : 'text-slate-900'
                               }`}>
-                                {customer.name}
+                                {isSinhala && customer.nameSi ? customer.nameSi : customer.name}
                               </p>
                               {customer.customerType === 'wholesale' && (
                                 <span className="px-2 py-0.5 text-xs font-medium bg-purple-500/10 text-purple-400 rounded-full">
@@ -1401,7 +1407,7 @@ export const CreateInvoice: React.FC = () => {
                                 <p className={`font-medium truncate ${
                                   isKeyboardSelected ? 'text-cyan-400' : isSelected ? 'text-cyan-400' : (theme === 'dark' ? 'text-white' : 'text-slate-900')
                                 }`}>
-                                  {fp.displayName}
+                                  {isSinhala ? (fp.product.nameAlt || fp.displayName) : fp.displayName}
                                 </p>
                                 {isOutOfStock && (
                                   <span className="px-1.5 py-0.5 text-xs font-medium bg-red-500/10 text-red-400 rounded">
@@ -1454,7 +1460,7 @@ export const CreateInvoice: React.FC = () => {
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <h4 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                          {currentProduct.displayName}
+                          {isSinhala ? (currentProduct.product.nameAlt || currentProduct.displayName) : currentProduct.displayName}
                         </h4>
                         <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                           {currentProduct.displaySku} • {t('invoice.available')}: <span className={currentProduct.stock <= currentProduct.minStock ? 'text-amber-400 font-medium' : 'text-emerald-400 font-medium'}>{currentProduct.stock} {currentProduct.product.unit || 'pcs'}</span>
@@ -1744,7 +1750,7 @@ export const CreateInvoice: React.FC = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className={`font-medium truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                                  {item.productName}
+                                  {isSinhala ? (item.productNameSi || item.productName) : item.productName}
                                 </p>
                                 {extItem.isQuickAdd && (
                                   <span className="px-1.5 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-400 rounded">
@@ -1858,10 +1864,10 @@ export const CreateInvoice: React.FC = () => {
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold ${
                         theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
                       }`}>
-                        {currentCustomer.name.charAt(0)}
+                        {(isSinhala && currentCustomer.nameSi ? currentCustomer.nameSi : currentCustomer.name).charAt(0)}
                       </div>
                       <div>
-                        <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{currentCustomer.name}</p>
+                        <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{isSinhala && currentCustomer.nameSi ? currentCustomer.nameSi : currentCustomer.name}</p>
                         <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{currentCustomer.businessName}</p>
                         <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{currentCustomer.phone}</p>
                       </div>
@@ -2152,7 +2158,7 @@ export const CreateInvoice: React.FC = () => {
                       <div>
                         <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>{t('invoice.billTo')}</p>
                         <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                          {isWalkIn ? t('invoice.walkInCustomer') : currentCustomer?.name}
+                          {isWalkIn ? t('invoice.walkInCustomer') : (isSinhala && currentCustomer?.nameSi ? currentCustomer.nameSi : currentCustomer?.name)}
                         </p>
                         {!isWalkIn && currentCustomer && (
                           <>
@@ -2196,7 +2202,7 @@ export const CreateInvoice: React.FC = () => {
                               <tr key={item.id} className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                                 <td className={`py-2 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{index + 1}</td>
                                 <td className="py-2">
-                                  <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{item.productName}</span>
+                                  <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{isSinhala ? (item.productNameSi || item.productName) : item.productName}</span>
                                   {extItem.discountType && (
                                     <span className="ml-2 text-xs text-pink-400">
                                       ({extItem.discountType === 'percentage' ? `${extItem.discountValue}% ${t('invoice.off')}` : `${t('common.currency')} ${extItem.discountValue} ${t('invoice.off')}`})
@@ -2261,10 +2267,10 @@ export const CreateInvoice: React.FC = () => {
                         paymentMethod === 'bank_transfer' ? 'bg-purple-500/10 text-purple-400' :
                         'bg-amber-500/10 text-amber-400'
                       }`}>
-                        {paymentMethod === 'cash' ? `💵 ${t('invoice.cashPayment')}` :
-                         paymentMethod === 'card' ? `💳 ${t('invoice.cardPayment')}` :
-                         paymentMethod === 'bank_transfer' ? `🏦 ${t('invoice.bankTransferPayment')}` :
-                         `📝 ${t('invoice.creditDue')}`}
+                        {paymentMethod === 'cash' ? <>💵 {t('invoice.cashPayment')}</> :
+                         paymentMethod === 'card' ? <>💳 {t('invoice.cardPayment')}</> :
+                         paymentMethod === 'bank_transfer' ? <>🏦 {t('invoice.bankTransferPayment')}</> :
+                         <>📝 {t('invoice.creditDue')}</>}
                       </div>
                       <div className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
                         paymentMethod === 'credit' ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'

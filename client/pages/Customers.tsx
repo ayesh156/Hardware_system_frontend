@@ -43,7 +43,7 @@ type ViewMode = 'grid' | 'table';
 type LoanFilter = 'all' | 'no-loan' | 'has-loan' | 'overdue';
 
 export const Customers: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
@@ -458,8 +458,8 @@ export const Customers: React.FC = () => {
               {paginatedCustomers.map((customer, index) => {
                 const typeBadge = getCustomerTypeBadge(customer.customerType);
                 const TypeIcon = typeBadge.icon;
-                const overdue = isLoanOverdue(customer);
-                
+                const overdue = isLoanOverdue(customer);                const displayName = (i18n.language === 'si' && customer.nameSi) ? customer.nameSi : customer.name;
+                const avatarInitial = displayName ? displayName.charAt(0).toUpperCase() : '';                
                 return (
                   <div
                     key={customer.id}
@@ -495,7 +495,7 @@ export const Customers: React.FC = () => {
                           {customer.photo ? (
                             <img 
                               src={customer.photo} 
-                              alt={customer.name}
+                              alt={displayName}
                               className="w-14 h-14 rounded-2xl object-cover"
                             />
                           ) : (
@@ -504,7 +504,7 @@ export const Customers: React.FC = () => {
                                 ? 'bg-gradient-to-br from-orange-500/20 to-rose-500/20 text-orange-400' 
                                 : 'bg-gradient-to-br from-orange-100 to-rose-100 text-orange-600'
                             }`}>
-                              {customer.name.charAt(0).toUpperCase()}
+                              {avatarInitial}
                             </div>
                           )}
                           {customer.isActive && (
@@ -516,7 +516,7 @@ export const Customers: React.FC = () => {
                         
                         <div className="flex-1 min-w-0">
                           <h3 className={`font-semibold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                            {customer.name}
+                            {displayName}
                           </h3>
                           <div className={`flex items-center gap-1.5 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                             <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
@@ -698,6 +698,8 @@ export const Customers: React.FC = () => {
                       const typeBadge = getCustomerTypeBadge(customer.customerType);
                       const TypeIcon = typeBadge.icon;
                       const overdue = isLoanOverdue(customer);
+                      const displayName = (i18n.language === 'si' && customer.nameSi) ? customer.nameSi : customer.name;
+                      const avatarInitial = displayName ? displayName.charAt(0).toUpperCase() : '';
                       
                       return (
                         <tr
@@ -716,7 +718,7 @@ export const Customers: React.FC = () => {
                               {customer.photo ? (
                                 <img 
                                   src={customer.photo} 
-                                  alt={customer.name}
+                                  alt={displayName}
                                   className="w-10 h-10 rounded-xl object-cover"
                                 />
                               ) : (
@@ -725,12 +727,12 @@ export const Customers: React.FC = () => {
                                     ? 'bg-gradient-to-br from-orange-500/20 to-rose-500/20 text-orange-400' 
                                     : 'bg-gradient-to-br from-orange-100 to-rose-100 text-orange-600'
                                 }`}>
-                                  {customer.name.charAt(0).toUpperCase()}
+                                  {avatarInitial}
                                 </div>
                               )}
                               <div>
                                 <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                                  {customer.name}
+                                  {displayName}
                                 </span>
                                 <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                                   {customer.businessName}

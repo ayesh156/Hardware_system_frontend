@@ -3,6 +3,7 @@ import { Product, ProductVariant } from '../../types/index';
 import { mockBrands, mockCategories, mockSuppliers } from '../../data/mockData';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
+import { translateToSinhala } from '../../lib/sinhalaTranslator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Package, Tag, DollarSign, Boxes, FileText, Grid3X3, Save, Plus, Building2, Layers, Trash2, ChevronDown, ChevronUp, Scale, Box, Truck } from 'lucide-react';
 import { SearchableSelect } from '../ui/searchable-select';
@@ -16,6 +17,7 @@ interface ProductFormModalProps {
 
 interface ProductFormData {
   name: string;
+  
   nameAlt?: string;
   sku: string;
   barcode?: string;
@@ -217,10 +219,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     e.preventDefault();
     // Clear main barcode when product has variants (each variant has its own barcode)
     const effectiveBarcode = formData.hasVariants && formData.variants.length > 0 ? '' : formData.barcode;
+    
+    // Auto-translate product name to Sinhala if nameAlt is empty
+    const sinhalaName = formData.nameAlt || translateToSinhala(formData.name);
+    
     const newProduct: Product = {
       id: product?.id || `prod-${Date.now()}`,
       name: formData.name,
-      nameAlt: formData.nameAlt,
+      nameAlt: sinhalaName,
       sku: formData.sku,
       barcode: effectiveBarcode,
       categoryId: formData.categoryId,

@@ -266,6 +266,7 @@ export const mockCustomers: Customer[] = [
   {
     id: 'cust-001',
     name: 'Nimal Rajapaksha',
+    nameSi: 'නිමල් රාජපක්ෂ',
     businessName: 'Rajapaksha Builders & Co.',
     email: 'nimal@rajapakshabuilders.lk',
     phone: '+94 71 555 1234',
@@ -284,6 +285,7 @@ export const mockCustomers: Customer[] = [
   {
     id: 'cust-002',
     name: 'Chamari Silva',
+    nameSi: 'චමරි සිල්වා',
     businessName: 'Silva Home Décor',
     email: 'chamari@silvahomedecor.lk',
     phone: '+94 77 888 4567',
@@ -297,6 +299,7 @@ export const mockCustomers: Customer[] = [
   {
     id: 'cust-003',
     name: 'Dinesh Wickramasinghe',
+    nameSi: 'දිනේශ් වික්‍රමසිංහ',
     businessName: 'D.W. Electrical Solutions',
     email: 'dinesh@dwelectrical.lk',
     phone: '+94 70 222 7890',
@@ -314,6 +317,7 @@ export const mockCustomers: Customer[] = [
   {
     id: 'cust-004',
     name: 'Amali Gunasekara',
+    nameSi: 'අමාලි ගුණසේකර',
     businessName: 'Gunasekara Hardware Mart',
     email: 'amali@ghmart.lk',
     phone: '+94 76 333 2468',
@@ -328,6 +332,7 @@ export const mockCustomers: Customer[] = [
   {
     id: 'cust-005',
     name: 'Kasun Bandara',
+    nameSi: 'කසුන් බණ්ඩාර',
     businessName: 'Bandara Industrial Supplies',
     email: 'kasun@bandaraindustrial.lk',
     phone: '+94 78 444 1357',
@@ -345,6 +350,7 @@ export const mockCustomers: Customer[] = [
   {
     id: 'cust-006',
     name: 'Sanduni Herath',
+    nameSi: 'සඳුනි හෙරත්',
     businessName: 'Herath Construction',
     email: 'sanduni@herathconstruction.lk',
     phone: '+94 75 666 9876',
@@ -360,6 +366,7 @@ export const mockCustomers: Customer[] = [
   {
     id: 'cust-007',
     name: 'Pradeep Fernando',
+    nameSi: 'ප්‍රදීප් ෆර්නාන්දෝ',
     businessName: 'Fernando & Sons Hardware',
     email: 'pradeep@fernandohardware.lk',
     phone: '+94 72 111 2233',
@@ -376,6 +383,7 @@ export const mockCustomers: Customer[] = [
   {
     id: 'cust-008',
     name: 'Malika Perera',
+    nameSi: 'මලිකා පෙරේරා',
     businessName: 'Perera Paints & More',
     email: 'malika@pererapaints.lk',
     phone: '+94 77 999 8877',
@@ -1235,9 +1243,9 @@ export const mockInvoices: Invoice[] = [
     customerId: 'cust-001',
     customerName: 'Rajapaksha Builders & Co.',
     items: [
-      { id: 'item-001', productId: 'prod-001', productName: 'INSEE Sanstha Cement', quantity: 50, unitPrice: 2100, total: 105000 },
-      { id: 'item-002', productId: 'prod-003', productName: 'Lanwa Steel Bar 10mm', variantId: 'var-003-2', size: '10mm', quantity: 200, unitPrice: 350, total: 70000 },
-      { id: 'item-003', productId: 'prod-008', productName: 'National PVC Pipe 1"', variantId: 'var-008-3', size: '1"', quantity: 20, unitPrice: 620, total: 12400 },
+      { id: 'item-001', productId: 'prod-001', productName: 'INSEE Sanstha Cement', productNameSi: 'ඉන්සී සංස්ථා සිමෙන්ති', quantity: 50, unitPrice: 2100, total: 105000 },
+      { id: 'item-002', productId: 'prod-003', productName: 'Lanwa Steel Bar 10mm', productNameSi: 'ලන්වා වානේ කූරු', variantId: 'var-003-2', size: '10mm', quantity: 200, unitPrice: 350, total: 70000 },
+      { id: 'item-003', productId: 'prod-008', productName: 'National PVC Pipe 1"', productNameSi: 'නැෂනල් PVC නල', variantId: 'var-008-3', size: '1"', quantity: 20, unitPrice: 620, total: 12400 },
     ],
     subtotal: 187400,
     tax: 9370,
@@ -1254,9 +1262,9 @@ export const mockInvoices: Invoice[] = [
     customerId: 'cust-003',
     customerName: 'D.W. Electrical Solutions',
     items: [
-      { id: 'item-004', productId: 'prod-005', productName: 'Kelani House Wire 2.5mm² Red', variantId: 'var-005-3', size: '2.5mm²', quantity: 500, unitPrice: 175, total: 87500 },
-      { id: 'item-005', productId: 'prod-007', productName: 'ACL MCB 32A', variantId: 'var-007-3', size: '32A', quantity: 20, unitPrice: 550, total: 11000 },
-      { id: 'item-006', productId: 'prod-006', productName: 'Orange 1-Way Switch White', variantId: 'var-006-1', quantity: 50, unitPrice: 185, total: 9250 },
+      { id: 'item-004', productId: 'prod-005', productName: 'Kelani House Wire 2.5mm² Red', productNameSi: 'කෙළණි ගෘහ කේබල්', variantId: 'var-005-3', size: '2.5mm²', quantity: 500, unitPrice: 175, total: 87500 },
+      { id: 'item-005', productId: 'prod-007', productName: 'ACL MCB 32A', productNameSi: 'ACL MCB තනි ධ්‍රැවය', variantId: 'var-007-3', size: '32A', quantity: 20, unitPrice: 550, total: 11000 },
+      { id: 'item-006', productId: 'prod-006', productName: 'Orange 1-Way Switch White', productNameSi: 'ඔරේන්ජ් 1-මාර්ග ස්විචය', variantId: 'var-006-1', quantity: 50, unitPrice: 185, total: 9250 },
     ],
     subtotal: 107750,
     tax: 5388,
@@ -1273,9 +1281,9 @@ export const mockInvoices: Invoice[] = [
     customerId: 'cust-005',
     customerName: 'Bandara Industrial Supplies',
     items: [
-      { id: 'item-007', productId: 'prod-002', productName: 'Tokyo Super Cement', quantity: 100, unitPrice: 2200, total: 220000 },
-      { id: 'item-008', productId: 'prod-003', productName: 'Lanwa Steel Bar 16mm', variantId: 'var-003-4', size: '16mm', quantity: 500, unitPrice: 365, total: 182500 },
-      { id: 'item-009', productId: 'prod-015', productName: 'Amano Roofing Sheet 12ft Red', variantId: 'var-015-3', size: '12ft', quantity: 50, unitPrice: 1350, total: 67500 },
+      { id: 'item-007', productId: 'prod-002', productName: 'Tokyo Super Cement', productNameSi: 'ටෝකියෝ සුපර් සිමෙන්ති', quantity: 100, unitPrice: 2200, total: 220000 },
+      { id: 'item-008', productId: 'prod-003', productName: 'Lanwa Steel Bar 16mm', productNameSi: 'ලන්වා වානේ කූරු', variantId: 'var-003-4', size: '16mm', quantity: 500, unitPrice: 365, total: 182500 },
+      { id: 'item-009', productId: 'prod-015', productName: 'Amano Roofing Sheet 12ft Red', productNameSi: 'අමානෝ වහල පත්‍ර', variantId: 'var-015-3', size: '12ft', quantity: 50, unitPrice: 1350, total: 67500 },
     ],
     subtotal: 470000,
     tax: 23500,
@@ -1292,8 +1300,8 @@ export const mockInvoices: Invoice[] = [
     customerId: 'cust-002',
     customerName: 'Silva Home Décor',
     items: [
-      { id: 'item-010', productId: 'prod-009', productName: 'Nippon Weatherbond 10L White', variantId: 'var-009-3', size: '10L', quantity: 10, unitPrice: 5200, total: 52000 },
-      { id: 'item-011', productId: 'prod-010', productName: 'Dulux Super Gloss 4L White', variantId: 'var-010-3', size: '4L', quantity: 8, unitPrice: 6200, total: 49600 },
+      { id: 'item-010', productId: 'prod-009', productName: 'Nippon Weatherbond 10L White', productNameSi: 'නිපොන් වෙදර්බොන්ඩ්', variantId: 'var-009-3', size: '10L', quantity: 10, unitPrice: 5200, total: 52000 },
+      { id: 'item-011', productId: 'prod-010', productName: 'Dulux Super Gloss 4L White', productNameSi: 'ඩල්ක්ස් සුපර් ග්ලොස් එනමල්', variantId: 'var-010-3', size: '4L', quantity: 8, unitPrice: 6200, total: 49600 },
     ],
     subtotal: 101600,
     tax: 5080,
@@ -1310,9 +1318,9 @@ export const mockInvoices: Invoice[] = [
     customerId: 'cust-004',
     customerName: 'Gunasekara Hardware Mart',
     items: [
-      { id: 'item-012', productId: 'prod-011', productName: 'Bosch GSB 550 Impact Drill', quantity: 5, unitPrice: 15500, total: 77500 },
-      { id: 'item-013', productId: 'prod-012', productName: 'Stanley FatMax Tape 8m', variantId: 'var-012-2', size: '8m', quantity: 20, unitPrice: 2400, total: 48000 },
-      { id: 'item-014', productId: 'prod-013', productName: 'Wire Nails 3"', variantId: 'var-013-3', size: '3"', quantity: 50, unitPrice: 260, total: 13000 },
+      { id: 'item-012', productId: 'prod-011', productName: 'Bosch GSB 550 Impact Drill', productNameSi: 'බොෂ් GSB 550 ඉම්පැක්ට් ඩ්‍රිල්', quantity: 5, unitPrice: 15500, total: 77500 },
+      { id: 'item-013', productId: 'prod-012', productName: 'Stanley FatMax Tape 8m', productNameSi: 'ස්ටැන්ලි FatMax මීටර් පටිය', variantId: 'var-012-2', size: '8m', quantity: 20, unitPrice: 2400, total: 48000 },
+      { id: 'item-014', productId: 'prod-013', productName: 'Wire Nails 3"', productNameSi: 'වයර් ඇණ', variantId: 'var-013-3', size: '3"', quantity: 50, unitPrice: 260, total: 13000 },
     ],
     subtotal: 138500,
     tax: 6925,
@@ -1328,9 +1336,9 @@ export const mockInvoices: Invoice[] = [
     customerId: 'cust-006',
     customerName: 'Herath Construction',
     items: [
-      { id: 'item-015', productId: 'prod-001', productName: 'INSEE Sanstha Cement', quantity: 30, unitPrice: 2100, total: 63000 },
-      { id: 'item-016', productId: 'prod-016', productName: 'Safety Helmet Yellow', variantId: 'var-016-2', quantity: 20, unitPrice: 650, total: 13000 },
-      { id: 'item-017', productId: 'prod-004', productName: 'Melwa GI Pipe 1"', variantId: 'var-004-3', size: '1"', quantity: 15, unitPrice: 1100, total: 16500 },
+      { id: 'item-015', productId: 'prod-001', productName: 'INSEE Sanstha Cement', productNameSi: 'ඉන්සී සංස්ථා සිමෙන්ති', quantity: 30, unitPrice: 2100, total: 63000 },
+      { id: 'item-016', productId: 'prod-016', productName: 'Safety Helmet Yellow', productNameSi: 'ආරක්ෂක හිස්වැසුම', variantId: 'var-016-2', quantity: 20, unitPrice: 650, total: 13000 },
+      { id: 'item-017', productId: 'prod-004', productName: 'Melwa GI Pipe 1"', productNameSi: 'මෙල්වා GI නල', variantId: 'var-004-3', size: '1"', quantity: 15, unitPrice: 1100, total: 16500 },
     ],
     subtotal: 92500,
     tax: 4625,

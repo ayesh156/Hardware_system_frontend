@@ -1,4 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import { Invoice, Customer, InvoiceItem } from '../../types/index';
+import { translateToSinhala, getInvoiceHeaderSinhala } from '../../lib/sinhalaTranslator';
 
 // Extended invoice item type for discounts and quick add
 interface ExtendedInvoiceItem extends InvoiceItem {
@@ -181,27 +183,35 @@ const generatePrintContentA5 = (invoice: Invoice, customer?: Customer | null): s
 // 80mm THERMAL RECEIPT PRINTER (Xprinter) - Variable Length
 // ============================================================
 
-const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null): string => {
+const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null, language: 'en' | 'si' = 'en'): string => {
   const isPaid = invoice.status === 'paid';
+  const isSinhala = language === 'si';
   
   // Calculate discount
   const discType = (invoice as any).discountType;
   const discValue = (invoice as any).discountValue;
-  let discountLabel = 'Discount';
+  let discountLabel = isSinhala ? 'වට්ටම' : 'Discount';
   let discountAmount = invoice.discount;
 
   if (discType === 'percentage') {
     const perc = typeof discValue === 'number' ? discValue : invoice.discount;
-    discountLabel = `Discount (${perc}%)`;
+    discountLabel = `${isSinhala ? 'වට්ටම' : 'Discount'} (${perc}%)`;
     discountAmount = Math.round((invoice.subtotal * (perc || 0)) / 100);
   } else if (discType === 'fixed') {
-    discountLabel = 'Discount';
+    discountLabel = isSinhala ? 'වට්ටම' : 'Discount';
     discountAmount = typeof discValue === 'number' ? discValue : invoice.discount;
   }
+
+  // Get Sinhala headers if needed
+  const headers = isSinhala ? getInvoiceHeaderSinhala() : {};
 
   // Generate items rows - compact format for 80mm
   const itemsHtml = invoice.items.map((item, idx) => {
     const extItem = item as ExtendedInvoiceItem;
+    // Use saved Sinhala name if available, otherwise translate
+    const displayName = isSinhala 
+      ? (item.productNameSi || translateToSinhala(item.productName)) 
+      : item.productName;
     const discountTag = extItem.discountType ? 
       ` <span style="font-size: 9px; color: #666;">(-${extItem.discountType === 'percentage' ? `${extItem.discountValue}%` : extItem.discountValue})</span>` : '';
     
@@ -209,7 +219,7 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
       <div style="border-bottom: 1px dotted #ccc; padding: 6px 0;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div style="flex: 1; padding-right: 8px;">
-            <span style="font-weight: 600; font-size: 14px; color: #000;">${idx + 1}. ${item.productName}</span>${discountTag}
+            <span style="font-weight: 600; font-size: 14px; color: #000;">${idx + 1}. ${displayName}</span>${discountTag}
           </div>
           <div style="text-align: right; white-space: nowrap;">
             <span style="font-weight: 700; font-size: 15px; font-family: 'Courier New', monospace;">${item.total.toLocaleString()}</span>
@@ -223,16 +233,22 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
   }).join('');
 
   // Customer info for receipt
-  const customerName = customer?.name || 'Walk-in Customer';
+  const customerName = customer?.name 
+    ? (isSinhala ? (customer.nameSi || translateToSinhala(customer.name)) : customer.name)
+    : (isSinhala ? 'සාමාන්‍ය පාරිභෝගිකයා' : 'Walk-in Customer');
   const customerPhone = customer && customer.id !== 'walk-in' ? customer.phone : '';
 
-  // Payment method icon
-  const paymentIcon = invoice.paymentMethod === 'cash' ? '💵' : 
-                      invoice.paymentMethod === 'card' ? '💳' : 
-                      invoice.paymentMethod === 'bank_transfer' ? '🏦' : '📝';
-  const paymentLabel = invoice.paymentMethod === 'cash' ? 'CASH' : 
-                       invoice.paymentMethod === 'card' ? 'CARD' : 
-                       invoice.paymentMethod === 'bank_transfer' ? 'BANK' : 'CREDIT';
+  // Payment method icon and label
+  const paymentIcon = invoice.paymentMethod === 'cash' ? 
+    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>` : 
+    invoice.paymentMethod === 'card' ? 
+    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>` : 
+    invoice.paymentMethod === 'bank_transfer' ? 
+    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M3 21h18M5 21v-7M9 21v-7M13 21v-7M17 21v-7M2 10l10-5 10 5v4H2v-4z"/></svg>` : 
+    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`;
+  const paymentLabel = invoice.paymentMethod === 'cash' ? (isSinhala ? 'මුදල්' : 'CASH') : 
+                       invoice.paymentMethod === 'card' ? (isSinhala ? 'කාඩ්පත' : 'CARD') : 
+                       invoice.paymentMethod === 'bank_transfer' ? (isSinhala ? 'බැංකුව' : 'BANK') : (isSinhala ? 'ණය' : 'CREDIT');
 
   return `
     <!DOCTYPE html>
@@ -280,29 +296,48 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
           
           <!-- ═══ HEADER ═══ -->
           <div style="text-align: center; padding-bottom: 8px; border-bottom: 2px double #000;">
-            <div style="font-size: 18px; font-weight: 900; letter-spacing: 1px; color: #000;">LIYANAGE</div>
-            <div style="font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #000;">HARDWARE</div>
-            <div style="font-size: 10px; letter-spacing: 1px; color: #666; margin-top: 3px;">★ QUALITY BUILDING MATERIALS ★</div>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+              <!-- Creative Hardware Store Logo with L -->
+              <div style="position: relative; width: 44px; height: 44px;">
+                <!-- Outer hexagon badge -->
+                <svg width="44" height="44" viewBox="0 0 50 50" style="position: absolute; top: 0; left: 0;">
+                  <polygon points="25,2 46,14 46,36 25,48 4,36 4,14" fill="none" stroke="#000" stroke-width="2"/>
+                </svg>
+                <!-- Bold L letter with wrench accent -->
+                <svg width="44" height="44" viewBox="0 0 50 50" style="position: absolute; top: 0; left: 0;">
+                  <!-- Letter L -->
+                  <path d="M16 12 L16 38 L34 38" fill="none" stroke="#000" stroke-width="5" stroke-linecap="square" stroke-linejoin="miter"/>
+                  <!-- Small wrench detail at top right -->
+                  <circle cx="34" cy="16" r="4" fill="none" stroke="#000" stroke-width="2"/>
+                  <line x1="30" y1="20" x2="24" y2="26" stroke="#000" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div>
+                <div style="font-size: 18px; font-weight: 900; color: #000; letter-spacing: 1px;">${isSinhala ? 'ලියනගේ' : 'LIYANAGE'}</div>
+                <div style="font-size: 13px; font-weight: 700; color: #000; letter-spacing: 1px; border-top: 1px solid #000; padding-top: 2px;">${isSinhala ? 'හාඩ්වෙයාර්' : 'HARDWARE'}</div>
+              </div>
+            </div>
+            <div style="font-size: 10px; color: #666; margin-top: 3px;">★ ${isSinhala ? 'උසස් තත්ත්වයේ ගොඩනැගිලි ද්‍රව්‍ය' : 'QUALITY BUILDING MATERIALS'} ★</div>
             <div style="font-size: 11px; color: #333; margin-top: 6px; line-height: 1.4;">
-              Hakmana Rd, Deiyandara<br/>
-              Tel: 0773751805 / 0412268217
+              ${isSinhala ? 'හක්මන පාර, දෙයියන්දර' : 'Hakmana Rd, Deiyandara'}<br/>
+              ${isSinhala ? 'දුරකථන' : 'Tel'}: 0773751805 / 0412268217
             </div>
           </div>
 
           <!-- ═══ INVOICE INFO BAR ═══ -->
           <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #999;">
             <div>
-              <div style="font-size: 9px; color: #666; text-transform: uppercase;">Invoice</div>
+              <div style="font-size: 9px; color: #666; text-transform: uppercase;">${isSinhala ? 'බිල්පත' : 'Invoice'}</div>
               <div style="font-size: 13px; font-weight: 700; font-family: 'Courier New', monospace;">${invoice.invoiceNumber}</div>
             </div>
             <div style="text-align: center;">
               <div class="status-badge" style="display: inline-block; padding: 3px 8px; border: 1.5px solid #000; border-radius: 3px; font-size: 11px; font-weight: 700; background: ${isPaid ? '#000' : 'white'}; color: ${isPaid ? 'white' : '#000'};">
-                ${isPaid ? '✓ PAID' : '○ PENDING'}
+                ${isPaid ? (isSinhala ? '✓ ගෙවා ඇත' : '✓ PAID') : (isSinhala ? '○ ගෙවිය යුතු' : '○ PENDING')}
               </div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 9px; color: #666;">Date</div>
-              <div style="font-size: 11px; font-weight: 600;">${new Date(invoice.issueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</div>
+              <div style="font-size: 9px; color: #666;">${isSinhala ? 'දිනය' : 'Date'}</div>
+              <div style="font-size: 11px; font-weight: 600;">${new Date(invoice.issueDate).toLocaleDateString(isSinhala ? 'si-LK' : 'en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</div>
             </div>
           </div>
 
@@ -310,7 +345,7 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
           <div style="padding: 6px 0; border-bottom: 1px dashed #999;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
-                <span style="font-size: 9px; color: #666;">Customer: </span>
+                <span style="font-size: 9px; color: #666;">${isSinhala ? 'පාරිභෝගිකයා' : 'Customer'}: </span>
                 <span style="font-size: 12px; font-weight: 600;">${customerName}</span>
               </div>
               ${customerPhone ? `<span style="font-size: 10px; color: #666;">${customerPhone}</span>` : ''}
@@ -319,8 +354,8 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
 
           <!-- ═══ ITEMS HEADER ═══ -->
           <div style="display: flex; justify-content: space-between; padding: 6px 0 4px 0; border-bottom: 1px solid #000; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #000;">
-            <span>Items</span>
-            <span>Amount (Rs.)</span>
+            <span>${isSinhala ? 'භාණ්ඩ' : 'Items'}</span>
+            <span>${isSinhala ? 'මුදල් (රු.)' : 'Amount (Rs.)'}</span>
           </div>
 
           <!-- ═══ ITEMS LIST ═══ -->
@@ -331,18 +366,18 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
           <!-- ═══ TOTALS SECTION ═══ -->
           <div style="border-top: 1px solid #000; padding-top: 8px; margin-top: 4px;">
             <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px;">
-              <span>Subtotal</span>
+              <span>${isSinhala ? 'උප එකතුව' : 'Subtotal'}</span>
               <span style="font-family: 'Courier New', monospace;">${invoice.subtotal.toLocaleString()}</span>
             </div>
             ${invoice.discount > 0 ? `
             <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; color: #666;">
-              <span>${discountLabel}</span>
-              <span style="font-family: 'Courier New', monospace;">- ${Number(discountAmount).toLocaleString()}</span>
+              <span>- ${discountLabel}</span>
+              <span style="font-family: 'Courier New', monospace;">-${discountAmount.toLocaleString()}</span>
             </div>
             ` : ''}
             ${invoice.tax > 0 ? `
             <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; color: #666;">
-              <span>Tax</span>
+              <span>${isSinhala ? 'බදු' : 'Tax'}</span>
               <span style="font-family: 'Courier New', monospace;">${invoice.tax.toLocaleString()}</span>
             </div>
             ` : ''}
@@ -350,8 +385,8 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
             <!-- ═══ GRAND TOTAL BOX ═══ -->
             <div class="total-box" style="background: #000; color: white; padding: 10px 8px; margin-top: 6px; border-radius: 4px;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 14px; font-weight: 700;">TOTAL</span>
-                <span style="font-size: 18px; font-weight: 900; font-family: 'Courier New', monospace; letter-spacing: 1px;">Rs. ${invoice.total.toLocaleString()}</span>
+                <span style="font-size: 14px; font-weight: 700;">${isSinhala ? 'මුළු එකතුව' : 'TOTAL'}</span>
+                <span style="font-size: 18px; font-weight: 900; font-family: 'Courier New', monospace; letter-spacing: 1px;">${isSinhala ? 'රු.' : 'Rs.'} ${invoice.total.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -360,14 +395,14 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
           <div style="display: flex; justify-content: center; padding: 8px 0; border-bottom: 1px dashed #999;">
             <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border: 1px solid #999; border-radius: 12px; font-size: 12px; font-weight: 600;">
               <span>${paymentIcon}</span>
-              <span>${paymentLabel} PAYMENT</span>
+              <span>${paymentLabel} ${isSinhala ? 'ගෙවීම' : 'PAYMENT'}</span>
             </div>
           </div>
 
           <!-- ═══ FOOTER ═══ -->
           <div style="text-align: center; padding-top: 10px;">
-            <div style="font-size: 15px; font-weight: 700; color: #000;">Thank You!</div>
-            <div style="font-size: 13px; color: #000; margin-top: 2px;">Visit us again</div>
+            <div style="font-size: 15px; font-weight: 700; color: #000;">${isSinhala ? 'ස්තූතියි!' : 'Thank You!'}</div>
+            <div style="font-size: 13px; color: #000; margin-top: 2px;">${isSinhala ? 'නැවත එන්න' : 'Visit us again'}</div>
             <div style="margin: 8px 0; border-top: 1px dotted #ccc;"></div>
             <div style="font-size: 12px; color: #000; letter-spacing: 0.5px;">© 2025 Powered by Nebulainfinite</div>
             <div style="font-size: 12px; color: #000;">0783233760</div>
@@ -379,11 +414,11 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
   `;
 };
 
-export const printInvoice = (invoice: Invoice, customer?: Customer | null): Promise<void> => {
+export const printInvoice = (invoice: Invoice, customer?: Customer | null, language: 'en' | 'si' = 'en'): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
-      // Using 80mm Xprinter thermal receipt design
-      const printContent = generate80mmReceiptContent(invoice, customer);
+      // Using 80mm Xprinter thermal receipt design with language support
+      const printContent = generate80mmReceiptContent(invoice, customer, language);
       const printWindow = window.open('', '_blank', 'width=320,height=600');
 
       if (!printWindow) {

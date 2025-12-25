@@ -23,10 +23,11 @@ interface ExtendedInvoiceItem extends InvoiceItem {
 
 export const EditInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const isSinhala = i18n.language === 'si';
   
   const [customers] = useState<Customer[]>(mockCustomers);
   const [products] = useState<Product[]>(mockProducts);
@@ -360,7 +361,7 @@ export const EditInvoice: React.FC = () => {
                   Customer
                 </h3>
                 <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {isWalkIn ? 'Walk-in sale' : currentCustomer?.name || 'Select customer'}
+                  {isWalkIn ? 'Walk-in sale' : (isSinhala && currentCustomer?.nameSi ? currentCustomer.nameSi : currentCustomer?.name) || 'Select customer'}
                 </p>
               </div>
             </div>
@@ -819,7 +820,7 @@ export const EditInvoice: React.FC = () => {
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
                               <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                                {item.productName}
+                                {isSinhala ? ((item as any).productNameSi || item.productName) : item.productName}
                               </p>
                               <div className="flex flex-wrap items-center gap-2 mt-1">
                                 {extItem.discountType && (
@@ -1002,7 +1003,7 @@ export const EditInvoice: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span>{emoji}</span>
+                      <span className="text-lg">{emoji}</span>
                       <span className={`text-sm font-medium ${
                         paymentMethod === value
                           ? 'text-blue-400'

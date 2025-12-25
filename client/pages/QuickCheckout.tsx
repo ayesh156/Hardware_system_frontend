@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 
 interface QuickInvoiceItem extends InvoiceItem {
   originalPrice: number;
+  productNameSi?: string;
 }
 
 // Step configuration for Quick Checkout
@@ -55,8 +56,9 @@ const CART_SHORTCUTS = {
 };
 
 export const QuickCheckout: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme } = useTheme();
+  const isSinhala = i18n.language === 'si';
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   
@@ -271,6 +273,7 @@ export const QuickCheckout: React.FC = () => {
         id: `item-${Date.now()}`,
         productId: flatProduct.flatId,
         productName: flatProduct.displayName,
+        productNameSi: flatProduct.product.nameAlt || flatProduct.displayName,
         variantId: flatProduct.variant?.id,
         size: flatProduct.variant?.size,
         quantity: addQty,
@@ -475,7 +478,7 @@ export const QuickCheckout: React.FC = () => {
     };
 
     // Print directly in the browser without showing a preview modal
-    printInvoice(invoice, walkInCustomer)
+    printInvoice(invoice, walkInCustomer, isSinhala ? 'si' : 'en')
       .then(() => {
         finalizeSale(invoice.invoiceNumber);
       })
@@ -1097,7 +1100,7 @@ export const QuickCheckout: React.FC = () => {
                   <Package className={`w-5 h-5 ${isDark ? 'text-amber-400' : 'text-amber-700'}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`font-semibold truncate ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{pendingProduct.displayName}</p>
+                  <p className={`font-semibold truncate ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{isSinhala ? (pendingProduct.product.nameAlt || pendingProduct.displayName) : pendingProduct.displayName}</p>
                   <p className={`text-xs ${isDark ? 'text-amber-400/70' : 'text-amber-600'}`}>
                     {t('common.currency')} {pendingProduct.retailPrice.toLocaleString()}
                   </p>
@@ -1228,7 +1231,7 @@ export const QuickCheckout: React.FC = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {flatProduct.displayName}
+                          {isSinhala ? (flatProduct.product.nameAlt || flatProduct.displayName) : flatProduct.displayName}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -1328,7 +1331,7 @@ export const QuickCheckout: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <p className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {item.productName}
+                          {isSinhala ? (item.productNameSi || item.productName) : item.productName}
                         </p>
                         <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                           {t('common.currency')} {item.unitPrice.toLocaleString()} × {item.quantity}
@@ -1556,7 +1559,7 @@ export const QuickCheckout: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <Package className={`w-5 h-5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
                     <div>
-                      <p className={`font-medium ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{pendingProduct.displayName}</p>
+                      <p className={`font-medium ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{isSinhala ? (pendingProduct.product.nameAlt || pendingProduct.displayName) : pendingProduct.displayName}</p>
                       <p className={`text-xs ${isDark ? 'text-amber-400/70' : 'text-amber-600'}`}>
                         {t('quickCheckout.enterQuantityPrompt')} • {t('common.currency')} {pendingProduct.retailPrice.toLocaleString()}
                       </p>
@@ -1742,7 +1745,7 @@ export const QuickCheckout: React.FC = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {flatProduct.displayName}
+                          {isSinhala ? (flatProduct.product.nameAlt || flatProduct.displayName) : flatProduct.displayName}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -1952,7 +1955,7 @@ export const QuickCheckout: React.FC = () => {
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {item.productName}
+                          {isSinhala ? (item.productNameSi || item.productName) : item.productName}
                         </p>
                         <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                           {t('common.currency')} {item.unitPrice.toLocaleString()} × {item.quantity}

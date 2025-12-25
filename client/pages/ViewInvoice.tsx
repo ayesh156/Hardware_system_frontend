@@ -24,8 +24,9 @@ interface ExtendedInvoiceItem extends InvoiceItem {
 export const ViewInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme } = useTheme();
+  const isSinhala = i18n.language === 'si';
 
   const [showActions, setShowActions] = useState(false);
 
@@ -297,7 +298,7 @@ export const ViewInvoice: React.FC = () => {
                     theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
                   }`}>Bill To</p>
                   <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    {invoice.customerName}
+                    {isSinhala && customer && customer.id !== 'walk-in' && customer.nameSi ? customer.nameSi : invoice.customerName}
                   </p>
                   {customer && customer.id !== 'walk-in' && (
                     <>
@@ -346,7 +347,7 @@ export const ViewInvoice: React.FC = () => {
                       theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
                     }`}>Payment Method</p>
                     <div className="flex items-center gap-2">
-                      <span>{paymentMethod.emoji}</span>
+                      <span className="text-lg">{invoice.paymentMethod === 'cash' ? '💵' : invoice.paymentMethod === 'card' ? '💳' : invoice.paymentMethod === 'bank_transfer' ? '🏦' : '📝'}</span>
                       <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         {paymentMethod.label}
                       </span>
@@ -400,7 +401,7 @@ export const ViewInvoice: React.FC = () => {
                                 </div>
                                 <div>
                                   <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                                    {item.productName}
+                                    {isSinhala ? ((item as any).productNameSi || item.productName) : item.productName}
                                   </p>
                                   <div className="flex items-center gap-2 mt-1">
                                     {extItem.discountType && (

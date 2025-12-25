@@ -14,7 +14,7 @@ interface InvoiceDetailProps {
 export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoices, customers = [] }) => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme } = useTheme();
 
   const invoice = invoices.find((inv) => inv.id === id);
@@ -53,7 +53,7 @@ export const InvoiceDetail: React.FC<InvoiceDetailProps> = ({ invoices, customer
       isActive: true,
       loanBalance: 0
     };
-    printInvoice(invoice, printCustomer).catch(() => {});
+    printInvoice(invoice, printCustomer, i18n.language as 'en' | 'si').catch(() => {});
   };
 
   return (

@@ -42,6 +42,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   
   const [formData, setFormData] = useState<Omit<Customer, 'id'>>({
     name: '',
+    nameSi: '',
     businessName: '',
     email: '',
     phone: '',
@@ -62,6 +63,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     if (customer) {
       setFormData({
         name: customer.name,
+        nameSi: customer.nameSi || '',
         businessName: customer.businessName,
         email: customer.email,
         phone: customer.phone,
@@ -80,6 +82,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     } else {
       setFormData({
         name: '',
+        nameSi: '',
         businessName: '',
         email: '',
         phone: '',
@@ -103,6 +106,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     const newCustomer: Customer = {
       id: customer?.id || `cust-${Date.now()}`,
       ...formData,
+      nameSi: formData.nameSi || undefined,
       phone2: formData.phone2 || undefined,
       nic: formData.nic || undefined,
       photo: formData.photo || undefined,
@@ -239,6 +243,24 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400'
                   }`}
                   placeholder={t('customers.enterName')}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={`flex items-center gap-2 text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <User className="w-4 h-4 text-emerald-500" />
+                  {t('customers.sinhalaName')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.nameSi}
+                  onChange={(e) => setFormData({ ...formData, nameSi: e.target.value })}
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
+                    theme === 'dark'
+                      ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
+                      : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400'
+                  }`}
+                  placeholder={t('customers.enterSinhalaName')}
                 />
               </div>
 

@@ -18,7 +18,7 @@ import { Pagination } from '../components/ui/data-table';
 type ViewMode = 'grid' | 'table';
 
 export const Invoices: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -142,7 +142,7 @@ export const Invoices: React.FC = () => {
       isActive: true,
       loanBalance: 0
     };
-    printInvoice(invoice, customer).catch(() => {
+    printInvoice(invoice, customer, i18n.language as 'en' | 'si').catch(() => {
       // Handle print error silently or show toast
     });
   };
