@@ -93,6 +93,7 @@ export const CreateInvoice: React.FC = () => {
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const discountInputRef = useRef<HTMLInputElement>(null);
+  const itemDiscountInputRef = useRef<HTMLInputElement>(null);
   const notesInputRef = useRef<HTMLTextAreaElement>(null);
   // Walk-in button ref for quick focus
   const walkInButtonRef = useRef<HTMLButtonElement>(null);
@@ -702,11 +703,18 @@ export const CreateInvoice: React.FC = () => {
         // F5 to select/activate discount (None)
         if (e.key === 'F5' && !isInInput) {
           e.preventDefault();
-          // Select 'None' discount immediately
-          setDiscountType('none');
-          setDiscount(0);
-          discountNoneRef.current?.focus();
-          toast.info(t('invoice.discountNoneSelected'));
+          // If discount is 'none', switch to 'percentage' and focus the input
+          if (discountType === 'none') {
+            setDiscountType('percentage');
+            setTimeout(() => {
+              discountInputRef.current?.focus();
+              discountInputRef.current?.select();
+            }, 50);
+          } else {
+            // Already has discount type, just focus the input
+            discountInputRef.current?.focus();
+            discountInputRef.current?.select();
+          }
           return;
         }
         
@@ -727,13 +735,7 @@ export const CreateInvoice: React.FC = () => {
         if (e.key === 'F7' && !isInInput) {
           e.preventDefault();
           notesInputRef.current?.focus();
-          return;
-        }
-        
-        // F7 to focus notes
-        if (e.key === 'F7' && !isInInput) {
-          e.preventDefault();
-          notesInputRef.current?.focus();
+          notesInputRef.current?.select();
           return;
         }
         
@@ -1256,9 +1258,10 @@ export const CreateInvoice: React.FC = () => {
                     <input
                       type="number"
                       placeholder={t('invoice.qtyPlaceholder')}
-                      min="1"
+                      min="0.1"
+                      step="0.1"
                       value={quickAddQty}
-                      onChange={(e) => setQuickAddQty(parseInt(e.target.value) || 1)}
+                      onChange={(e) => setQuickAddQty(parseFloat(e.target.value) || 0.1)}
                       className={`w-20 px-3 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 ${
                         theme === 'dark'
                           ? 'border-slate-600 bg-slate-800 text-white'
@@ -1568,7 +1571,13 @@ export const CreateInvoice: React.FC = () => {
                             {t('invoice.none')}
                           </button>
                           <button
-                            onClick={() => setItemDiscountType('percentage')}
+                            onClick={() => {
+                              setItemDiscountType('percentage');
+                              setTimeout(() => {
+                                itemDiscountInputRef.current?.focus();
+                                itemDiscountInputRef.current?.select();
+                              }, 50);
+                            }}
                             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
                               itemDiscountType === 'percentage'
                                 ? 'bg-pink-500 text-white'
@@ -1579,7 +1588,13 @@ export const CreateInvoice: React.FC = () => {
                             {t('invoice.percentage')}
                           </button>
                           <button
-                            onClick={() => setItemDiscountType('fixed')}
+                            onClick={() => {
+                              setItemDiscountType('fixed');
+                              setTimeout(() => {
+                                itemDiscountInputRef.current?.focus();
+                                itemDiscountInputRef.current?.select();
+                              }, 50);
+                            }}
                             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
                               itemDiscountType === 'fixed'
                                 ? 'bg-pink-500 text-white'
@@ -1596,6 +1611,7 @@ export const CreateInvoice: React.FC = () => {
                               <span className={`absolute left-3 top-2.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('common.currency')}</span>
                             )}
                             <input
+                              ref={itemDiscountInputRef}
                               type="number"
                               placeholder={itemDiscountType === 'percentage' ? t('invoice.discountPercentPlaceholder') : t('invoice.discountAmountPlaceholder')}
                               value={itemDiscountValue || ''}
@@ -1678,10 +1694,11 @@ export const CreateInvoice: React.FC = () => {
                           <input
                             ref={quantityInputRef}
                             type="number"
-                            min="1"
+                            min="0.1"
+                            step="0.1"
                             max={currentProduct.stock}
                             value={quantity}
-                            onChange={(e) => setQuantity(Math.min(parseInt(e.target.value) || 1, currentProduct.stock))}
+                            onChange={(e) => setQuantity(Math.min(parseFloat(e.target.value) || 0.1, currentProduct.stock))}
                             className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-center text-lg font-bold ${
                               theme === 'dark'
                                 ? 'border-slate-600 bg-slate-800 text-white'
@@ -1775,9 +1792,10 @@ export const CreateInvoice: React.FC = () => {
                             <div className="flex items-center gap-2">
                               <input
                                 type="number"
-                                min="1"
+                                min="0.1"
+                                step="0.1"
                                 value={item.quantity}
-                                onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value) || 1)}
+                                onChange={(e) => updateItemQuantity(item.id, parseFloat(e.target.value) || 0.1)}
                                 className={`w-16 px-2 py-1 text-center border rounded-lg text-sm ${
                                   theme === 'dark'
                                     ? 'border-slate-600 bg-slate-700 text-white'
@@ -1994,7 +2012,15 @@ export const CreateInvoice: React.FC = () => {
                           ref={value === 'none' ? discountNoneRef : undefined}
                           onClick={() => {
                             setDiscountType(value as typeof discountType);
-                            if (value === 'none') setDiscount(0);
+                            if (value === 'none') {
+                              setDiscount(0);
+                            } else {
+                              // Focus on discount input when percentage or fixed is selected
+                              setTimeout(() => {
+                                discountInputRef.current?.focus();
+                                discountInputRef.current?.select();
+                              }, 50);
+                            }
                           }}
                           className={`p-2 rounded-lg border-2 text-center transition-all ${
                             discountType === value
