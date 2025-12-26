@@ -407,8 +407,13 @@ export const QuickCheckout: React.FC = () => {
 
   // Calculate totals
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  // Calculate total item-level discounts (difference between original price and current unit price)
+  const totalItemDiscounts = items.reduce((sum, item) => {
+    const itemDiscount = (item.originalPrice - item.unitPrice) * item.quantity;
+    return sum + (itemDiscount > 0 ? itemDiscount : 0);
+  }, 0);
   const discountAmount = Math.min(discount, subtotal); // Can't discount more than subtotal
-  const total = subtotal - discountAmount;
+  const total = subtotal - discountAmount - totalItemDiscounts;
 
   // Clear cart
   const clearCart = useCallback(() => {
@@ -441,6 +446,7 @@ export const QuickCheckout: React.FC = () => {
     setIsProcessing(true);
     
     const invoiceNumber = `QC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const combinedDiscount = discountAmount + totalItemDiscounts;
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
       invoiceNumber,
@@ -449,14 +455,14 @@ export const QuickCheckout: React.FC = () => {
       items,
       subtotal: Math.round(subtotal * 100) / 100,
       tax: 0,
-      discount: Math.round(discountAmount * 100) / 100,
+      discount: Math.round(combinedDiscount * 100) / 100,
       total: Math.round(total * 100) / 100,
       issueDate: new Date().toISOString().split('T')[0],
       dueDate: new Date().toISOString().split('T')[0],
       status: paymentMethod === 'credit' ? 'pending' : 'paid',
       paymentMethod: paymentMethod, // 'cash' or 'credit' (credit prints as credit payment)
-      notes: discountAmount > 0 
-        ? `${t('quickCheckout.quickSaleNote')} - ${t('quickCheckout.discount')}: ${t('common.currency')} ${discountAmount.toLocaleString()}`
+      notes: combinedDiscount > 0 
+        ? `${t('quickCheckout.quickSaleNote')} - ${t('quickCheckout.discount')}: ${t('common.currency')} ${combinedDiscount.toLocaleString()}`
         : t('quickCheckout.quickSaleNote'),
     };
 
@@ -487,7 +493,7 @@ export const QuickCheckout: React.FC = () => {
         toast.error(t('quickCheckout.printBlocked'));
         finalizeSale(invoice.invoiceNumber);
       });
-  }, [items, subtotal, total, discountAmount, paymentMethod, playBeep, t, finalizeSale]);
+  }, [items, subtotal, total, discountAmount, totalItemDiscounts, paymentMethod, playBeep, t, finalizeSale]);
 
   // Quick save without print preview (F9)
   const handleQuickSave = useCallback(() => {
@@ -496,6 +502,7 @@ export const QuickCheckout: React.FC = () => {
     setIsProcessing(true);
     
     const invoiceNumber = `QC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const combinedDiscountSave = discountAmount + totalItemDiscounts;
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
       invoiceNumber,
@@ -504,14 +511,14 @@ export const QuickCheckout: React.FC = () => {
       items,
       subtotal: Math.round(subtotal * 100) / 100,
       tax: 0,
-      discount: Math.round(discountAmount * 100) / 100,
+      discount: Math.round(combinedDiscountSave * 100) / 100,
       total: Math.round(total * 100) / 100,
       issueDate: new Date().toISOString().split('T')[0],
       dueDate: new Date().toISOString().split('T')[0],
       status: paymentMethod === 'credit' ? 'pending' : 'paid',
       paymentMethod: paymentMethod,
-      notes: discountAmount > 0 
-        ? `${t('quickCheckout.quickSaleNote')} - ${t('quickCheckout.discount')}: ${t('common.currency')} ${discountAmount.toLocaleString()}`
+      notes: combinedDiscountSave > 0 
+        ? `${t('quickCheckout.quickSaleNote')} - ${t('quickCheckout.discount')}: ${t('common.currency')} ${combinedDiscountSave.toLocaleString()}`
         : t('quickCheckout.quickSaleNote'),
     };
 
@@ -527,7 +534,7 @@ export const QuickCheckout: React.FC = () => {
     setDiscount(0);
     setIsProcessing(false);
     searchInputRef.current?.focus();
-  }, [items, subtotal, total, discountAmount, paymentMethod, playBeep, t, isProcessing]);
+  }, [items, subtotal, total, discountAmount, totalItemDiscounts, paymentMethod, playBeep, t, isProcessing]);
 
   // Keyboard event handler
   useEffect(() => {
@@ -2028,6 +2035,18 @@ export const QuickCheckout: React.FC = () => {
                         )}
                       </div>
                       
+                      {/* Creative Item Discount Badge */}
+                      {item.unitPrice < item.originalPrice && (
+                        <div className={`absolute -top-2 -right-14 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold animate-pulse ${
+                          isDark 
+                            ? 'bg-gradient-to-r from-pink-500/90 to-rose-500/90 text-white shadow-lg shadow-pink-500/30' 
+                            : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-500/30'
+                        }`}>
+                          <Sparkles className="w-3 h-3" />
+                          -{t('common.currency')} {((item.originalPrice - item.unitPrice) * item.quantity).toLocaleString()}
+                        </div>
+                      )}
+                      
                       {/* Line Total */}
                       <p className={`w-24 text-right font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
                         {t('common.currency')} {item.total.toLocaleString()}
@@ -2142,10 +2161,13 @@ export const QuickCheckout: React.FC = () => {
                   <span>{t('invoice.subtotal')}</span>
                   <span className="font-mono">{t('common.currency')} {subtotal.toLocaleString()}</span>
                 </div>
-                {discountAmount > 0 && (
-                  <div className={`flex justify-between text-red-500`}>
-                    <span>{t('quickCheckout.discount')}</span>
-                    <span className="font-mono">- {t('common.currency')} {discountAmount.toLocaleString()}</span>
+                {(discountAmount > 0 || totalItemDiscounts > 0) && (
+                  <div className={`flex justify-between items-center text-red-500`}>
+                    <span className="flex items-center gap-1.5">
+                      {totalItemDiscounts > 0 && <Sparkles className="w-3.5 h-3.5" />}
+                      {t('quickCheckout.discount')}
+                    </span>
+                    <span className="font-mono">- {t('common.currency')} {(discountAmount + totalItemDiscounts).toLocaleString()}</span>
                   </div>
                 )}
                 

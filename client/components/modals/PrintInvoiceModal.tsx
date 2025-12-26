@@ -212,8 +212,22 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
     const displayName = isSinhala 
       ? (item.productNameSi || translateToSinhala(item.productName)) 
       : item.productName;
-    const discountTag = extItem.discountType ? 
-      ` <span style="font-size: 9px; color: #666;">(-${extItem.discountType === 'percentage' ? `${extItem.discountValue}%` : extItem.discountValue})</span>` : '';
+    
+    // Calculate item-level discount (difference between original and unit price)
+    const hasItemDiscount = extItem.originalPrice && extItem.originalPrice > item.unitPrice;
+    const itemDiscount = hasItemDiscount 
+      ? (extItem.originalPrice - item.unitPrice) * item.quantity 
+      : 0;
+    const discountTag = itemDiscount > 0 
+      ? ` <span style="font-size: 10px; color: #d63384; font-weight: 600;">✨ -${itemDiscount.toLocaleString()}</span>` 
+      : (extItem.discountType 
+          ? ` <span style="font-size: 9px; color: #666;">(-${extItem.discountType === 'percentage' ? `${extItem.discountValue}%` : extItem.discountValue})</span>` 
+          : '');
+    
+    // Price display: show original with strikethrough and new price if discounted
+    const priceDisplay = hasItemDiscount
+      ? `<span style="text-decoration: line-through; color: #999; font-size: 11px;">${extItem.originalPrice.toLocaleString()}</span> <span style="color: #d63384; font-weight: 600;">${item.unitPrice.toLocaleString()}</span>`
+      : `${item.unitPrice.toLocaleString()}`;
     
     return `
       <div style="border-bottom: 1px dotted #ccc; padding: 6px 0;">
@@ -226,7 +240,7 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
           </div>
         </div>
         <div style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 13px; color: #666;">
-          <span>${item.quantity} × ${item.unitPrice.toLocaleString()}</span>
+          <span>${item.quantity} × ${priceDisplay}</span>
         </div>
       </div>
     `;

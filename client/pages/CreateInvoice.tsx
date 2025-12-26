@@ -13,7 +13,7 @@ import {
   Search, Plus, Trash2, Calendar, ArrowLeft, UserX, CreditCard,
   AlertTriangle, Building2, Phone, DollarSign, ShoppingCart, Receipt,
   Percent, Tag, Box, Edit3, PackagePlus, Boxes, Calculator, Zap,
-  Keyboard, Barcode, Banknote
+  Keyboard, Barcode, Banknote, Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -288,8 +288,17 @@ export const CreateInvoice: React.FC = () => {
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  // Calculate total item-level discounts (from price reductions and percentage/fixed discounts)
+  const totalItemDiscounts = items.reduce((sum, item) => {
+    const extItem = item as ExtendedInvoiceItem;
+    // Calculate discount from reduced unit price
+    const priceDiscount = (extItem.originalPrice - item.unitPrice) * item.quantity;
+    return sum + (priceDiscount > 0 ? priceDiscount : 0);
+  }, 0);
   const discountAmount = discountType === 'none' ? 0 : (discountType === 'percentage' ? (subtotal * discount) / 100 : discount);
-  const taxableAmount = subtotal - discountAmount;
+  // Combined discount for display and calculation
+  const combinedDiscount = discountAmount + totalItemDiscounts;
+  const taxableAmount = subtotal - combinedDiscount;
   const tax = enableTax ? taxableAmount * (taxRate / 100) : 0;
   const total = taxableAmount + tax;
 
@@ -307,7 +316,7 @@ export const CreateInvoice: React.FC = () => {
       customerName,
       items,
       subtotal: Math.round(subtotal * 100) / 100,
-      discount: discountType !== 'none' ? Math.round(discountAmount * 100) / 100 : 0,
+      discount: Math.round(combinedDiscount * 100) / 100,
       discountType,
       discountValue: discount,
       enableTax,
@@ -1754,15 +1763,27 @@ export const CreateInvoice: React.FC = () => {
                   <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
                     {items.map((item) => {
                       const extItem = item as ExtendedInvoiceItem;
+                      const itemSavings = (extItem.originalPrice - item.unitPrice) * item.quantity;
                       return (
                         <div
                           key={item.id}
-                          className={`p-3 rounded-xl border ${
+                          className={`p-3 rounded-xl border relative ${
                             extItem.isQuickAdd
                               ? theme === 'dark' ? 'bg-amber-500/5 border-amber-500/30' : 'bg-amber-50 border-amber-200'
                               : theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
                           }`}
                         >
+                          {/* Creative Item Discount Badge */}
+                          {itemSavings > 0 && (
+                            <div className={`absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold animate-pulse ${
+                              theme === 'dark' 
+                                ? 'bg-gradient-to-r from-pink-500/90 to-rose-500/90 text-white shadow-lg shadow-pink-500/30' 
+                                : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-500/30'
+                            }`}>
+                              <Sparkles className="w-3 h-3" />
+                              -{t('common.currency')} {itemSavings.toLocaleString()}
+                            </div>
+                          )}
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
@@ -2266,10 +2287,13 @@ export const CreateInvoice: React.FC = () => {
                           <span>{t('invoice.subtotal')}</span>
                           <span className="font-mono">{t('common.currency')} {subtotal.toLocaleString()}</span>
                         </div>
-                        {discountAmount > 0 && (
-                          <div className="flex justify-between py-2 text-sm text-pink-400">
-                            <span>{t('invoice.discount')} {discountType === 'percentage' ? `(${discount}%)` : `(${t('invoice.fixed')})`}</span>
-                            <span className="font-mono">- {t('common.currency')} {discountAmount.toLocaleString()}</span>
+                        {combinedDiscount > 0 && (
+                          <div className="flex justify-between py-2 text-sm text-pink-400 items-center">
+                            <span className="flex items-center gap-1.5">
+                              {totalItemDiscounts > 0 && <Sparkles className="w-3.5 h-3.5" />}
+                              {t('invoice.discount')} {discountType === 'percentage' && discountAmount > 0 ? `(${discount}%)` : ''}
+                            </span>
+                            <span className="font-mono">- {t('common.currency')} {combinedDiscount.toLocaleString()}</span>
                           </div>
                         )}
                         {enableTax && (
