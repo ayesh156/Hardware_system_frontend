@@ -50,6 +50,9 @@ export function flattenProducts(products: Product[]): FlattenedProduct[] {
         if (variant.size) labelParts.push(variant.size);
         if (variant.color) labelParts.push(variant.color);
         const variantLabel = labelParts.join(' - ');
+        
+        // Check if variant has a discounted price
+        const hasDiscount = !!(variant.discountedPrice && variant.discountedPrice > 0 && variant.discountedPrice < variant.retailPrice);
 
         const flatProduct: FlattenedProduct = {
           flatId: `${product.id}__${variant.id}`,
@@ -61,15 +64,20 @@ export function flattenProducts(products: Product[]): FlattenedProduct[] {
           costPrice: variant.costPrice,
           wholesalePrice: variant.wholesalePrice,
           retailPrice: variant.retailPrice,
+          discountedPrice: variant.discountedPrice,
           stock: variant.stock,
           minStock: variant.minStock,
           isVariant: true,
           variantLabel,
+          hasDiscount,
         };
         result.push(flatProduct);
       }
     } else {
       // Non-variant product: include as single entry
+      // Check if product has a discounted price
+      const hasDiscount = !!(product.discountedPrice && product.discountedPrice > 0 && product.discountedPrice < (product.retailPrice || product.price || 0));
+      
       const flatProduct: FlattenedProduct = {
         flatId: product.id,
         product,
@@ -80,10 +88,12 @@ export function flattenProducts(products: Product[]): FlattenedProduct[] {
         costPrice: product.costPrice || 0,
         wholesalePrice: product.wholesalePrice || product.price || 0,
         retailPrice: product.retailPrice || product.price || 0,
+        discountedPrice: product.discountedPrice,
         stock: product.stock,
         minStock: product.minStock || 0,
         isVariant: false,
         variantLabel: undefined,
+        hasDiscount,
       };
       result.push(flatProduct);
     }

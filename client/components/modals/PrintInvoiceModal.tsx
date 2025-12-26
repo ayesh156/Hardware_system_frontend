@@ -187,20 +187,18 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
   const isPaid = invoice.status === 'paid';
   const isSinhala = language === 'si';
   
-  // Calculate discount
-  const discType = (invoice as any).discountType;
-  const discValue = (invoice as any).discountValue;
-  let discountLabel = isSinhala ? 'වට්ටම' : 'Discount';
-  let discountAmount = invoice.discount;
-
-  if (discType === 'percentage') {
-    const perc = typeof discValue === 'number' ? discValue : invoice.discount;
-    discountLabel = `${isSinhala ? 'වට්ටම' : 'Discount'} (${perc}%)`;
-    discountAmount = Math.round((invoice.subtotal * (perc || 0)) / 100);
-  } else if (discType === 'fixed') {
-    discountLabel = isSinhala ? 'වට්ටම' : 'Discount';
-    discountAmount = typeof discValue === 'number' ? discValue : invoice.discount;
-  }
+  // Final discount (fixed amount)
+  const finalDiscount1 = invoice.discount || 0;
+  const totalFinalDiscount = finalDiscount1;
+  
+  // Calculate total item-level discounts (sum of per-item discounts)
+  const totalItemDiscounts = invoice.items.reduce((sum, item) => {
+    const extItem = item as ExtendedInvoiceItem;
+    if (extItem.originalPrice && extItem.originalPrice > item.unitPrice) {
+      return sum + (extItem.originalPrice - item.unitPrice) * item.quantity;
+    }
+    return sum;
+  }, 0);
 
   // Get Sinhala headers if needed
   const headers = isSinhala ? getInvoiceHeaderSinhala() : {};
@@ -218,8 +216,11 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
     const itemDiscount = hasItemDiscount 
       ? (extItem.originalPrice - item.unitPrice) * item.quantity 
       : 0;
+    
+    // Per-item discount label
+    const perItemDiscountLabel = isSinhala ? 'අයිතම වට්ටම' : 'Per-item discount';
     const discountTag = itemDiscount > 0 
-      ? ` <span style="font-size: 10px; color: #d63384; font-weight: 600;">✨ -${itemDiscount.toLocaleString()}</span>` 
+      ? ` <span style="font-size: 10px; color: #d63384; font-weight: 600;" title="${perItemDiscountLabel}">✨ -${itemDiscount.toLocaleString()}</span>` 
       : (extItem.discountType 
           ? ` <span style="font-size: 9px; color: #666;">(-${extItem.discountType === 'percentage' ? `${extItem.discountValue}%` : extItem.discountValue})</span>` 
           : '');
@@ -383,10 +384,16 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
               <span>${isSinhala ? 'උප එකතුව' : 'Subtotal'}</span>
               <span style="font-family: 'Courier New', monospace;">${invoice.subtotal.toLocaleString()}</span>
             </div>
-            ${invoice.discount > 0 ? `
-            <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; color: #666;">
-              <span>- ${discountLabel}</span>
-              <span style="font-family: 'Courier New', monospace;">-${discountAmount.toLocaleString()}</span>
+            ${totalItemDiscounts > 0 ? `
+            <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; color: #d63384;">
+              <span>${isSinhala ? 'අයිතම වට්ටම්' : 'Item Disc.'} ✨</span>
+              <span style="font-family: 'Courier New', monospace;">(${totalItemDiscounts.toLocaleString()})</span>
+            </div>
+            ` : ''}
+            ${finalDiscount1 > 0 ? `
+            <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; color: #d63384;">
+              <span>- ${isSinhala ? 'වට්ටම' : 'Discount'}</span>
+              <span style="font-family: 'Courier New', monospace;">-${finalDiscount1.toLocaleString()}</span>
             </div>
             ` : ''}
             ${invoice.tax > 0 ? `

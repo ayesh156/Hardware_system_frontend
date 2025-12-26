@@ -54,8 +54,9 @@ export const CreateInvoice: React.FC = () => {
   const [items, setItems] = useState<ExtendedInvoiceItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
-  const [discount, setDiscount] = useState<number>(0);
+  const [discount, setDiscount] = useState<number>(0); // Final Discount 1 (fixed amount)
   const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [bulkDiscountPercent, setBulkDiscountPercent] = useState<number>(0);
   const [enableTax, setEnableTax] = useState<boolean>(false);
   const [taxRate, setTaxRate] = useState<number>(15);
   
@@ -86,6 +87,12 @@ export const CreateInvoice: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'bank_transfer' | 'credit'>('cash');
   
+  // Cart item editing state
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingPrice, setEditingPrice] = useState<number>(0);
+  const [editingDiscountType, setEditingDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none');
+  const [editingDiscountValue, setEditingDiscountValue] = useState<number>(0);
+  
 
   // Refs for keyboard navigation
   const customerSearchRef = useRef<HTMLInputElement>(null);
@@ -107,6 +114,7 @@ export const CreateInvoice: React.FC = () => {
   const productItemRefs = useRef<Map<number, HTMLElement>>(new Map());
 
   const currentCustomer = customers.find((c) => c.id === selectedCustomer);
+  const isWholesaleCustomer = currentCustomer?.customerType === 'wholesale';
   // selectedProductId now holds flatId (product or variant identifier)
   const currentProduct = flattenedProducts.find((fp) => fp.flatId === selectedProductId);
 
@@ -155,16 +163,35 @@ export const CreateInvoice: React.FC = () => {
   }, [flattenedProducts, productSearch, selectedProductId]);
 
   // Determine the best price based on customer type (uses FlattenedProduct)
-  const getProductPrice = (flatProduct: FlattenedProduct): { price: number; label: string } => {
-    // Retail is the global primary price. Wholesale is only used when explicitly selected.
+  const getProductPrice = (flatProduct: FlattenedProduct): { price: number; label: string; originalPrice: number } => {
+    // For wholesale customers: use wholesale price directly, skip discounted price
+    if (isWholesaleCustomer) {
+      if (priceMode === 'custom' && customPrice > 0) {
+        return { price: customPrice, label: 'Custom', originalPrice: flatProduct.wholesalePrice };
+      }
+      // Default to wholesale price for wholesale customers
+      return { price: flatProduct.wholesalePrice, label: 'Wholesale', originalPrice: flatProduct.wholesalePrice };
+    }
+    
+    // For regular/retail customers:
+    const retailPrice = flatProduct.retailPrice;
+    
+    // Check if product has a discounted price (only for non-wholesale)
+    const hasDiscount = flatProduct.hasDiscount && flatProduct.discountedPrice && flatProduct.discountedPrice < retailPrice;
+    const effectiveRetailPrice = hasDiscount ? flatProduct.discountedPrice! : retailPrice;
+    
     if (priceMode === 'custom' && customPrice > 0) {
-      return { price: customPrice, label: 'Custom' };
+      return { price: customPrice, label: 'Custom', originalPrice: retailPrice };
     }
     if (priceMode === 'wholesale') {
-      return { price: flatProduct.wholesalePrice, label: 'Wholesale' };
+      return { price: flatProduct.wholesalePrice, label: 'Wholesale', originalPrice: retailPrice };
     }
-    // Default to retail price
-    return { price: flatProduct.retailPrice, label: 'Retail' };
+    // Default to retail/discounted price
+    return { 
+      price: effectiveRetailPrice, 
+      label: hasDiscount ? 'Discounted' : 'Retail',
+      originalPrice: retailPrice 
+    };
   };
 
   // Calculate final price after item discount
@@ -183,13 +210,17 @@ export const CreateInvoice: React.FC = () => {
 
   useEffect(() => {
     if (currentProduct) {
-      // Default to retail pricing for explicitness in the UI
+      // Default to retail price for all customers
       setPriceMode('retail');
-      setCustomPrice(currentProduct.retailPrice || 0);
+      if (isWholesaleCustomer) {
+        setCustomPrice(currentProduct.wholesalePrice || 0);
+      } else {
+        setCustomPrice(currentProduct.retailPrice || 0);
+      }
       setItemDiscountType('none');
       setItemDiscountValue(0);
     }
-  }, [selectedProductId]);
+  }, [selectedProductId, isWholesaleCustomer]);
 
   // Focus the custom price input when custom mode is selected
   useEffect(() => {
@@ -207,7 +238,7 @@ export const CreateInvoice: React.FC = () => {
     const flatProduct = flattenedProducts.find((fp) => fp.flatId === selectedProductId);
     if (!flatProduct) return;
 
-    const { price: basePrice } = getProductPrice(flatProduct);
+    const { price: basePrice, originalPrice } = getProductPrice(flatProduct);
     const finalPrice = priceMode === 'custom' ? customPrice : calculateFinalPrice(basePrice);
     
     // Get Sinhala product name from the product's nameAlt field
@@ -222,7 +253,7 @@ export const CreateInvoice: React.FC = () => {
       size: flatProduct.variant?.size,
       quantity,
       unitPrice: finalPrice,
-      originalPrice: basePrice,
+      originalPrice: originalPrice, // Store the original retail price for discount calculation
       total: quantity * finalPrice,
       discountType: itemDiscountType !== 'none' ? itemDiscountType : undefined,
       discountValue: itemDiscountValue > 0 ? itemDiscountValue : undefined,
@@ -240,6 +271,14 @@ export const CreateInvoice: React.FC = () => {
       );
     } else {
       setItems([...items, newItem]);
+      
+      // Show toast with discount info if applicable
+      if (flatProduct.hasDiscount && priceMode !== 'custom') {
+        const savings = originalPrice - finalPrice;
+        if (savings > 0) {
+          toast.success(`${flatProduct.displayName} - ${t('invoice.perItemDiscount')}: ${t('common.currency')} ${savings.toLocaleString()}`);
+        }
+      }
     }
 
     // Reset all
@@ -283,23 +322,82 @@ export const CreateInvoice: React.FC = () => {
     ));
   };
 
+  const updateItemPrice = (itemId: string, newPrice: number, discountType: 'none' | 'percentage' | 'fixed', discountValue: number) => {
+    if (newPrice < 0) return;
+    
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+    
+    const extItem = item as ExtendedInvoiceItem;
+    let finalPrice = newPrice;
+    
+    // Apply discount if specified
+    if (discountType === 'percentage' && discountValue > 0) {
+      finalPrice = newPrice * (1 - discountValue / 100);
+    } else if (discountType === 'fixed' && discountValue > 0) {
+      finalPrice = Math.max(0, newPrice - discountValue);
+    }
+    
+    setItems(items.map(i => 
+      i.id === itemId 
+        ? { 
+            ...i, 
+            unitPrice: finalPrice,
+            total: i.quantity * finalPrice,
+            discountType: discountType !== 'none' ? discountType : undefined,
+            discountValue: discountValue > 0 ? discountValue : undefined,
+          }
+        : i
+    ));
+    
+    // Exit editing mode
+    setEditingItemId(null);
+  };
+
   const removeItem = (itemId: string) => {
     setItems(items.filter((i) => i.id !== itemId));
   };
 
+  // Apply bulk discount to all items
+  const applyDiscountToAll = (percent: number) => {
+    if (items.length === 0) {
+      toast.error(t('invoice.noItemsYet'));
+      return;
+    }
+    if (percent <= 0 || percent > 100) {
+      toast.error(t('invoice.enterDiscountPercent'));
+      return;
+    }
+    
+    setItems(items.map(item => {
+      const extItem = item as ExtendedInvoiceItem;
+      const discountedPrice = Math.round(extItem.originalPrice * (1 - percent / 100));
+      return {
+        ...item,
+        unitPrice: discountedPrice,
+        total: item.quantity * discountedPrice,
+      };
+    }));
+    
+    toast.success(`${percent}% ${t('invoice.discountApplied')}`);
+    setBulkDiscountPercent(0);
+  };
+
+  // Current subtotal (after item-level discounts applied) - this is the only subtotal we show
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  // Calculate total item-level discounts (from price reductions and percentage/fixed discounts)
+  // Calculate total item-level discounts for informational display
   const totalItemDiscounts = items.reduce((sum, item) => {
     const extItem = item as ExtendedInvoiceItem;
-    // Calculate discount from reduced unit price
     const priceDiscount = (extItem.originalPrice - item.unitPrice) * item.quantity;
     return sum + (priceDiscount > 0 ? priceDiscount : 0);
   }, 0);
-  const discountAmount = discountType === 'none' ? 0 : (discountType === 'percentage' ? (subtotal * discount) / 100 : discount);
-  // Combined discount for display and calculation
-  const combinedDiscount = discountAmount + totalItemDiscounts;
-  const taxableAmount = subtotal - combinedDiscount;
+  // Two final discount fields (both fixed amounts)
+  const finalDiscount1 = discount; // First final discount (fixed amount)
+  const totalFinalDiscount = finalDiscount1;
+  // Taxable amount = subtotal minus final discounts
+  const taxableAmount = subtotal - totalFinalDiscount;
   const tax = enableTax ? taxableAmount * (taxRate / 100) : 0;
+  // Total = Subtotal - Final Discounts + Tax
   const total = taxableAmount + tax;
 
   const handleCreateInvoice = () => {
@@ -316,9 +414,9 @@ export const CreateInvoice: React.FC = () => {
       customerName,
       items,
       subtotal: Math.round(subtotal * 100) / 100,
-      discount: Math.round(combinedDiscount * 100) / 100,
-      discountType,
-      discountValue: discount,
+      discount: Math.round(finalDiscount1 * 100) / 100,
+      discountType: 'fixed', // Always fixed for final discounts
+      discountValue: totalFinalDiscount,
       enableTax,
       taxRate: enableTax ? taxRate : 0,
       tax: Math.round(tax * 100) / 100,
@@ -387,9 +485,9 @@ export const CreateInvoice: React.FC = () => {
       customerName,
       items,
       subtotal: Math.round(subtotal * 100) / 100,
-      discount: discountType !== 'none' ? Math.round(discountAmount * 100) / 100 : 0,
-      discountType,
-      discountValue: discount,
+      discount: Math.round(finalDiscount1 * 100) / 100,
+      discountType: 'fixed',
+      discountValue: totalFinalDiscount,
       enableTax,
       taxRate: enableTax ? taxRate : 0,
       tax: Math.round(tax * 100) / 100,
@@ -419,7 +517,7 @@ export const CreateInvoice: React.FC = () => {
     setNotes('');
     setStep(1);
     navigate('/invoices');
-  }, [selectedCustomer, isWalkIn, items, currentCustomer, subtotal, discountAmount, discountType, discount, enableTax, taxRate, tax, total, issueDate, dueDate, paymentMethod, notes, t, navigate]);
+  }, [selectedCustomer, isWalkIn, items, currentCustomer, subtotal, finalDiscount1, totalFinalDiscount, enableTax, taxRate, tax, total, issueDate, dueDate, paymentMethod, notes, t, navigate]);
 
   const handlePrintClose = () => {
     navigate('/invoices');
@@ -1438,10 +1536,21 @@ export const CreateInvoice: React.FC = () => {
                             </div>
                             <div className="text-right flex-shrink-0">
                               <div className="flex flex-col items-end">
-                                {/* Primary price is Retail globally */}
-                                <p className="font-bold text-emerald-500">
-                                  {t('common.currency')} {fp.retailPrice.toLocaleString()}
-                                </p>
+                                {/* Show discounted price if available */}
+                                {fp.hasDiscount && fp.discountedPrice ? (
+                                  <>
+                                    <p className={`text-xs line-through ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                      {t('common.currency')} {fp.retailPrice.toLocaleString()}
+                                    </p>
+                                    <p className="font-bold text-pink-500">
+                                      {t('common.currency')} {fp.discountedPrice.toLocaleString()}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p className="font-bold text-emerald-500">
+                                    {t('common.currency')} {fp.retailPrice.toLocaleString()}
+                                  </p>
+                                )}
                                 {/* If customer is wholesale, show wholesale rate as secondary info */}
                                 {isWholesale && fp.wholesalePrice && (
                                   <p className="text-xs text-purple-400">
@@ -1493,49 +1602,110 @@ export const CreateInvoice: React.FC = () => {
                         {t('invoice.priceMode')}
                       </label>
                       <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => setPriceMode('auto')}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                            priceMode === 'auto'
-                              ? 'bg-cyan-500 text-white'
-                              : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
-                        >
-                          {t('invoice.auto')} ({t('invoice.retail')})
-                        </button>
-                        <button
-                          onClick={() => setPriceMode('retail')}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                            priceMode === 'retail'
-                              ? 'bg-emerald-500 text-white'
-                              : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
-                        >
-                          {t('invoice.retail')}: {t('common.currency')} {currentProduct.retailPrice.toLocaleString()}
-                        </button>
-                        {currentProduct.wholesalePrice && (
-                          <button
-                            onClick={() => setPriceMode('wholesale')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                              priceMode === 'wholesale'
-                                ? 'bg-purple-500 text-white'
-                                : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
-                          >
-                            {t('invoice.wholesale')}: {t('common.currency')} {currentProduct.wholesalePrice.toLocaleString()}
-                          </button>
+                        {/* For wholesale customers: show retail + wholesale + custom */}
+                        {isWholesaleCustomer ? (
+                          <>
+                            {/* Show retail price option (with discount if available) */}
+                            {currentProduct.hasDiscount && currentProduct.discountedPrice && currentProduct.discountedPrice < currentProduct.retailPrice ? (
+                              <button
+                                onClick={() => setPriceMode('retail')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                  priceMode === 'retail'
+                                    ? 'bg-pink-500 text-white'
+                                    : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                }`}
+                              >
+                                <span className="line-through opacity-60 mr-1">{t('common.currency')} {currentProduct.retailPrice.toLocaleString()}</span>
+                                {t('common.currency')} {currentProduct.discountedPrice.toLocaleString()}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setPriceMode('retail')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                  priceMode === 'retail'
+                                    ? 'bg-emerald-500 text-white'
+                                    : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                }`}
+                              >
+                                {t('invoice.retail')}: {t('common.currency')} {currentProduct.retailPrice.toLocaleString()}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setPriceMode('wholesale')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                priceMode === 'wholesale'
+                                  ? 'bg-purple-500 text-white'
+                                  : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              {t('invoice.wholesale')}: {t('common.currency')} {currentProduct.wholesalePrice.toLocaleString()}
+                            </button>
+                            <button
+                              onClick={() => setPriceMode('custom')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                priceMode === 'custom'
+                                  ? 'bg-amber-500 text-white'
+                                  : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              <Edit3 className="w-3 h-3 inline mr-1" />
+                              {t('invoice.custom')}
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {/* For retail customers: show retail/discounted + wholesale + custom */}
+                            {currentProduct.hasDiscount && currentProduct.discountedPrice && currentProduct.discountedPrice < currentProduct.retailPrice ? (
+                              <>
+                                <button
+                                  onClick={() => setPriceMode('retail')}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                    priceMode === 'retail' || priceMode === 'auto'
+                                      ? 'bg-pink-500 text-white'
+                                      : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  <span className="line-through opacity-60 mr-1">{t('common.currency')} {currentProduct.retailPrice.toLocaleString()}</span>
+                                  {t('common.currency')} {currentProduct.discountedPrice.toLocaleString()}
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setPriceMode('retail')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                  priceMode === 'retail' || priceMode === 'auto'
+                                    ? 'bg-emerald-500 text-white'
+                                    : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                }`}
+                              >
+                                {t('invoice.retail')}: {t('common.currency')} {currentProduct.retailPrice.toLocaleString()}
+                              </button>
+                            )}
+                            {currentProduct.wholesalePrice && (
+                              <button
+                                onClick={() => setPriceMode('wholesale')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                  priceMode === 'wholesale'
+                                    ? 'bg-purple-500 text-white'
+                                    : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                }`}
+                              >
+                                {t('invoice.wholesale')}: {t('common.currency')} {currentProduct.wholesalePrice.toLocaleString()}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setPriceMode('custom')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                priceMode === 'custom'
+                                  ? 'bg-amber-500 text-white'
+                                  : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              <Edit3 className="w-3 h-3 inline mr-1" />
+                              {t('invoice.custom')}
+                            </button>
+                          </>
                         )}
-                        <button
-                          onClick={() => setPriceMode('custom')}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                            priceMode === 'custom'
-                              ? 'bg-amber-500 text-white'
-                              : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
-                        >
-                          <Edit3 className="w-3 h-3 inline mr-1" />
-                          {t('invoice.custom')}
-                        </button>
                       </div>
                     </div>
 
@@ -1644,30 +1814,47 @@ export const CreateInvoice: React.FC = () => {
                       const { price: basePrice, label } = getProductPrice(currentProduct);
                       const finalPrice = priceMode === 'custom' ? customPrice : calculateFinalPrice(basePrice);
                       const hasDiscount = itemDiscountType !== 'none' && itemDiscountValue > 0;
+                      const hasProductDiscount = currentProduct.hasDiscount && currentProduct.discountedPrice && currentProduct.discountedPrice < currentProduct.retailPrice;
                       
                       return (
                         <div className={`p-3 rounded-xl mb-4 ${
                           theme === 'dark' ? 'bg-slate-900/50' : 'bg-white'
                         }`}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              {priceMode === 'custom' ? t('invoice.customPrice') : `${label === 'Wholesale' ? t('invoice.wholesale') : t('invoice.retail')} ${t('invoice.price')}`}
+                          {/* Selected Price Mode Display */}
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                              {priceMode === 'custom' ? t('invoice.customPrice') : 
+                               priceMode === 'wholesale' ? t('invoice.wholesale') + ' ' + t('invoice.price') : 
+                               t('invoice.retail') + ' ' + t('invoice.price')}
                             </span>
-                            <span className={`text-sm ${hasDiscount ? 'line-through text-slate-500' : 'font-medium ' + (theme === 'dark' ? 'text-white' : 'text-slate-900')}`}>
-                              {t('common.currency')} {basePrice.toLocaleString()}
-                            </span>
+                            {priceMode === 'retail' && hasProductDiscount ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm line-through text-slate-400">
+                                  {t('common.currency')} {currentProduct.retailPrice.toLocaleString()}
+                                </span>
+                                <span className="text-sm font-semibold text-pink-500">
+                                  {t('common.currency')} {currentProduct.discountedPrice.toLocaleString()}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                {t('common.currency')} {basePrice.toLocaleString()}
+                              </span>
+                            )}
                           </div>
-                          {hasDiscount && priceMode !== 'custom' && (
+                          
+                          {/* Additional Item Discount */}
+                          {hasDiscount && (
                             <>
                               <div className="flex items-center justify-between mb-1">
                                 <span className={`text-xs text-pink-400`}>
-                                  {t('invoice.discount')} ({itemDiscountType === 'percentage' ? `${itemDiscountValue}%` : `${t('common.currency')} ${itemDiscountValue}`})
+                                  {t('invoice.itemDiscount')} ({itemDiscountType === 'percentage' ? `${itemDiscountValue}%` : `${t('common.currency')} ${itemDiscountValue}`})
                                 </span>
                                 <span className="text-sm text-pink-400">
                                   - {t('common.currency')} {(basePrice - finalPrice).toLocaleString()}
                                 </span>
                               </div>
-                              <div className={`border-t pt-1 mt-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                              <div className={`border-t pt-1 mt-1 mb-2 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                                 <div className="flex items-center justify-between">
                                   <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                                     {t('invoice.finalUnitPrice')}
@@ -1679,6 +1866,8 @@ export const CreateInvoice: React.FC = () => {
                               </div>
                             </>
                           )}
+                          
+                          {/* Invoice Total */}
                           <div className={`flex items-center justify-between mt-2 pt-2 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                             <span className={`text-sm font-medium flex items-center gap-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                               <Calculator className="w-3.5 h-3.5" />
@@ -1760,22 +1949,24 @@ export const CreateInvoice: React.FC = () => {
                     <p className="text-xs mt-1">{t('invoice.selectProductsHint')}</p>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto overflow-x-hidden pr-1">
                     {items.map((item) => {
                       const extItem = item as ExtendedInvoiceItem;
                       const itemSavings = (extItem.originalPrice - item.unitPrice) * item.quantity;
+                      const isEditing = editingItemId === item.id;
+                      
                       return (
                         <div
                           key={item.id}
-                          className={`p-3 rounded-xl border relative ${
+                          className={`p-3 rounded-xl border relative overflow-hidden ${
                             extItem.isQuickAdd
                               ? theme === 'dark' ? 'bg-amber-500/5 border-amber-500/30' : 'bg-amber-50 border-amber-200'
                               : theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
                           }`}
                         >
                           {/* Creative Item Discount Badge */}
-                          {itemSavings > 0 && (
-                            <div className={`absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold animate-pulse ${
+                          {itemSavings > 0 && !isEditing && (
+                            <div className={`absolute -top-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold animate-pulse ${
                               theme === 'dark' 
                                 ? 'bg-gradient-to-r from-pink-500/90 to-rose-500/90 text-white shadow-lg shadow-pink-500/30' 
                                 : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-500/30'
@@ -1784,58 +1975,183 @@ export const CreateInvoice: React.FC = () => {
                               -{t('common.currency')} {itemSavings.toLocaleString()}
                             </div>
                           )}
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className={`font-medium truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                          
+                          {!isEditing ? (
+                            // Normal View Mode
+                            <>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className={`font-medium truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                      {isSinhala ? (item.productNameSi || item.productName) : item.productName}
+                                    </p>
+                                    {extItem.isQuickAdd && (
+                                      <span className="px-1.5 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-400 rounded">
+                                        {t('invoice.quickBadge')}
+                                      </span>
+                                    )}
+                                    {extItem.isCustomPrice && (
+                                      <span className="px-1.5 py-0.5 text-xs font-medium bg-purple-500/10 text-purple-400 rounded">
+                                        {t('invoice.customBadge')}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className={`text-xs flex items-center gap-2 flex-wrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    {extItem.originalPrice !== item.unitPrice && (
+                                      <span className="line-through">
+                                        {t('common.currency')} {extItem.originalPrice.toLocaleString()}
+                                      </span>
+                                    )}
+                                    <span className={extItem.originalPrice !== item.unitPrice ? 'text-emerald-500 font-medium' : ''}>
+                                      {t('common.currency')} {item.unitPrice.toLocaleString()}
+                                    </span>
+                                    <span>× {item.quantity}</span>
+                                    {extItem.discountType && (
+                                      <span className="text-pink-400">
+                                        ({extItem.discountType === 'percentage' ? `${extItem.discountValue}% ${t('invoice.off')}` : `${t('common.currency')} ${extItem.discountValue} ${t('invoice.off')}`})
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    min="0.1"
+                                    step="0.1"
+                                    value={item.quantity}
+                                    onChange={(e) => updateItemQuantity(item.id, parseFloat(e.target.value) || 0.1)}
+                                    className={`w-16 px-2 py-1 text-center border rounded-lg text-sm ${
+                                      theme === 'dark'
+                                        ? 'border-slate-600 bg-slate-700 text-white'
+                                        : 'border-slate-200 bg-slate-50 text-slate-900'
+                                    }`}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      setEditingItemId(item.id);
+                                      setEditingPrice(extItem.originalPrice || item.unitPrice);
+                                      setEditingDiscountType(extItem.discountType || 'none');
+                                      setEditingDiscountValue(extItem.discountValue || 0);
+                                    }}
+                                    className="p-1.5 hover:bg-blue-500/10 rounded-lg transition-colors"
+                                    title="Edit price/discount"
+                                  >
+                                    <Edit3 className="w-4 h-4 text-blue-400" />
+                                  </button>
+                                  <button
+                                    onClick={() => removeItem(item.id)}
+                                    className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-400" />
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex justify-end mt-1">
+                                <span className="text-emerald-500 font-semibold">
+                                  {t('common.currency')} {item.total.toLocaleString()}
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            // Edit Mode
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                                   {isSinhala ? (item.productNameSi || item.productName) : item.productName}
                                 </p>
-                                {extItem.isQuickAdd && (
-                                  <span className="px-1.5 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-400 rounded">
-                                    {t('invoice.quickBadge')}
-                                  </span>
-                                )}
-                                {extItem.isCustomPrice && (
-                                  <span className="px-1.5 py-0.5 text-xs font-medium bg-purple-500/10 text-purple-400 rounded">
-                                    {t('invoice.customBadge')}
-                                  </span>
+                                <span className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 rounded">
+                                  {t('invoice.editing')}
+                                </span>
+                              </div>
+                              
+                              {/* Base Price Input */}
+                              <div>
+                                <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  {t('invoice.basePrice')}
+                                </label>
+                                <input
+                                  type="number"
+                                  value={editingPrice}
+                                  onChange={(e) => setEditingPrice(parseFloat(e.target.value) || 0)}
+                                  className={`w-full px-3 py-2 border rounded-lg ${
+                                    theme === 'dark'
+                                      ? 'border-slate-600 bg-slate-700 text-white'
+                                      : 'border-slate-200 bg-white text-slate-900'
+                                  }`}
+                                />
+                              </div>
+                              
+                              {/* Discount Type */}
+                              <div>
+                                <label className={`block text-xs mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  {t('invoice.itemDiscountOptional')}
+                                </label>
+                                <div className="flex gap-2 mb-2">
+                                  <button
+                                    onClick={() => setEditingDiscountType('none')}
+                                    className={`px-2 py-1 rounded text-xs ${
+                                      editingDiscountType === 'none'
+                                        ? 'bg-slate-500 text-white'
+                                        : theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'
+                                    }`}
+                                  >
+                                    {t('invoice.none')}
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingDiscountType('percentage')}
+                                    className={`px-2 py-1 rounded text-xs ${
+                                      editingDiscountType === 'percentage'
+                                        ? 'bg-pink-500 text-white'
+                                        : theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'
+                                    }`}
+                                  >
+                                    %
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingDiscountType('fixed')}
+                                    className={`px-2 py-1 rounded text-xs ${
+                                      editingDiscountType === 'fixed'
+                                        ? 'bg-pink-500 text-white'
+                                        : theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'
+                                    }`}
+                                  >
+                                    {t('invoice.fixed')}
+                                  </button>
+                                </div>
+                                {editingDiscountType !== 'none' && (
+                                  <input
+                                    type="number"
+                                    placeholder={editingDiscountType === 'percentage' ? '0-100' : '0'}
+                                    value={editingDiscountValue}
+                                    onChange={(e) => setEditingDiscountValue(parseFloat(e.target.value) || 0)}
+                                    className={`w-full px-3 py-2 border rounded-lg ${
+                                      theme === 'dark'
+                                        ? 'border-slate-600 bg-slate-700 text-white'
+                                        : 'border-slate-200 bg-white text-slate-900'
+                                    }`}
+                                  />
                                 )}
                               </div>
-                              <div className={`text-xs flex items-center gap-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                <span>{t('common.currency')} {item.unitPrice.toLocaleString()} × {item.quantity}</span>
-                                {extItem.discountType && (
-                                  <span className="text-pink-400">
-                                    ({extItem.discountType === 'percentage' ? `${extItem.discountValue}% ${t('invoice.off')}` : `${t('common.currency')} ${extItem.discountValue} ${t('invoice.off')}`})
-                                  </span>
-                                )}
+                              
+                              {/* Action Buttons */}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => updateItemPrice(item.id, editingPrice, editingDiscountType, editingDiscountValue)}
+                                  className="flex-1 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium"
+                                >
+                                  {t('invoice.saveChanges')}
+                                </button>
+                                <button
+                                  onClick={() => setEditingItemId(null)}
+                                  className={`px-3 py-2 rounded-lg text-sm ${
+                                    theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  {t('common.cancel')}
+                                </button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                min="0.1"
-                                step="0.1"
-                                value={item.quantity}
-                                onChange={(e) => updateItemQuantity(item.id, parseFloat(e.target.value) || 0.1)}
-                                className={`w-16 px-2 py-1 text-center border rounded-lg text-sm ${
-                                  theme === 'dark'
-                                    ? 'border-slate-600 bg-slate-700 text-white'
-                                    : 'border-slate-200 bg-slate-50 text-slate-900'
-                                }`}
-                              />
-                              <button
-                                onClick={() => removeItem(item.id)}
-                                className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4 text-red-400" />
-                              </button>
-                            </div>
-                          </div>
-                          <div className="flex justify-end mt-1">
-                            <span className="text-emerald-500 font-semibold">
-                              {t('common.currency')} {item.total.toLocaleString()}
-                            </span>
-                          </div>
+                          )}
                         </div>
                       );
                     })}
@@ -2009,83 +2325,84 @@ export const CreateInvoice: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Overall Discount */}
+                {/* Final Discounts */}
                 <div className={`p-4 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
                   <h4 className={`font-semibold mb-3 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <span className="flex items-center gap-2">
-                      <Percent className="w-4 h-4 text-pink-400" />
-                      {t('invoice.overallDiscount')}
+                      <Tag className="w-4 h-4 text-pink-400" />
+                      {t('invoice.finalDiscount')}
                     </span>
                     <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F5</kbd>
                   </h4>
                   <div className="space-y-3">
-                    {/* Discount Type Selection */}
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { value: 'none', label: t('invoice.none') },
-                        { value: 'percentage', label: t('invoice.percentage') },
-                        { value: 'fixed', label: t('invoice.fixed') },
-                      ].map(({ value, label }) => (
-                        <button
-                          key={value}
-                          ref={value === 'none' ? discountNoneRef : undefined}
-                          onClick={() => {
-                            setDiscountType(value as typeof discountType);
-                            if (value === 'none') {
-                              setDiscount(0);
-                            } else {
-                              // Focus on discount input when percentage or fixed is selected
-                              setTimeout(() => {
-                                discountInputRef.current?.focus();
-                                discountInputRef.current?.select();
-                              }, 50);
-                            }
-                          }}
-                          className={`p-2 rounded-lg border-2 text-center transition-all ${
-                            discountType === value
-                              ? 'border-pink-500 bg-pink-500/10 text-pink-400'
-                              : theme === 'dark' ? 'border-slate-700 hover:border-slate-600 text-slate-400' : 'border-slate-200 hover:border-slate-300 text-slate-600'
-                          }`}
-                        >
-                          <span className="text-sm font-medium">{label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {/* Discount Value Input */}
-                    {discountType !== 'none' && (
+                    {/* Final Discount 1 */}
+                    <div>
+                      <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {t('invoice.finalDiscount1')}
+                      </label>
                       <div className="flex items-center gap-3">
-                        <input
-                          ref={discountInputRef}
-                          type="number"
-                          min="0"
-                          max={discountType === 'percentage' ? 100 : subtotal}
-                          value={discount}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            if (discountType === 'percentage') {
-                              setDiscount(Math.min(100, Math.max(0, val)));
-                            } else {
-                              setDiscount(Math.min(subtotal, Math.max(0, val)));
-                            }
-                          }}
-                          className={`w-28 px-3 py-2 text-center border rounded-lg ${
-                            theme === 'dark'
-                              ? 'border-slate-600 bg-slate-800 text-white'
-                              : 'border-slate-200 bg-slate-50 text-slate-900'
-                          }`}
-                        />
-                        <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>
-                          {discountType === 'percentage' ? '%' : t('common.currency')}
-                        </span>
-                        {discountAmount > 0 && (
-                          <span className="text-pink-400 font-medium">
-                            - {t('common.currency')} {discountAmount.toLocaleString()}
+                        <div className="relative flex-1">
+                          <span className={`absolute left-3 top-2.5 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('common.currency')}</span>
+                          <input
+                            ref={discountInputRef}
+                            type="number"
+                            min="0"
+                            max={subtotal}
+                            value={discount || ''}
+                            onChange={(e) => setDiscount(Math.min(subtotal, Math.max(0, parseFloat(e.target.value) || 0)))}
+                            placeholder="0"
+                            className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 ${
+                              theme === 'dark'
+                                ? 'border-slate-600 bg-slate-800 text-white placeholder-slate-500'
+                                : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400'
+                            }`}
+                          />
+                        </div>
+                        {discount > 0 && (
+                          <span className="text-pink-400 font-medium whitespace-nowrap">
+                            - {t('common.currency')} {discount.toLocaleString()}
                           </span>
                         )}
                       </div>
-                    )}
+                    </div>
+                    
+                    {/* Apply Discount to All Items */}
+                    <div className={`pt-3 mt-3 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                      <p className={`text-xs mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {t('invoice.applyDiscountToAll')}
+                      </p>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={bulkDiscountPercent || ''}
+                            onChange={(e) => setBulkDiscountPercent(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                            placeholder={t('invoice.enterDiscountPercent')}
+                            className={`w-full px-3 py-2 pr-8 text-sm border rounded-lg focus:outline-none transition-all ${
+                              theme === 'dark'
+                                ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-pink-500'
+                                : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-pink-500'
+                            }`}
+                          />
+                          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>%</span>
+                        </div>
+                        <button
+                          onClick={() => applyDiscountToAll(bulkDiscountPercent)}
+                          disabled={items.length === 0 || bulkDiscountPercent <= 0}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                            items.length > 0 && bulkDiscountPercent > 0
+                              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:shadow-pink-500/30'
+                              : theme === 'dark' ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          }`}
+                        >
+                          {t('common.apply')}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -2261,7 +2578,14 @@ export const CreateInvoice: React.FC = () => {
                                 </td>
                                 <td className="py-2 text-center">{item.quantity}</td>
                                 <td className={`py-2 text-right font-mono ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  {t('common.currency')} {item.unitPrice.toLocaleString()}
+                                  {extItem.originalPrice !== item.unitPrice && (
+                                    <span className="line-through text-xs mr-2 opacity-60">
+                                      {t('common.currency')} {extItem.originalPrice.toLocaleString()}
+                                    </span>
+                                  )}
+                                  <span className={extItem.originalPrice !== item.unitPrice ? 'text-emerald-500 font-medium' : ''}>
+                                    {t('common.currency')} {item.unitPrice.toLocaleString()}
+                                  </span>
                                 </td>
                                 <td className={`py-2 text-right font-mono font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                                   {t('common.currency')} {item.total.toLocaleString()}
@@ -2283,17 +2607,29 @@ export const CreateInvoice: React.FC = () => {
                     {/* Totals */}
                     <div className="flex justify-end">
                       <div className="w-64">
+                        {/* Subtotal (includes item discounts already) */}
                         <div className={`flex justify-between py-2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                           <span>{t('invoice.subtotal')}</span>
                           <span className="font-mono">{t('common.currency')} {subtotal.toLocaleString()}</span>
                         </div>
-                        {combinedDiscount > 0 && (
+                        {/* Item discounts info (if any) */}
+                        {totalItemDiscounts > 0 && (
+                          <div className="flex justify-between py-1 text-xs text-pink-400 items-center">
+                            <span className="flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" />
+                              {t('invoice.itemDiscounts')}
+                            </span>
+                            <span className="font-mono">({t('common.currency')} {totalItemDiscounts.toLocaleString()})</span>
+                          </div>
+                        )}
+                        {/* Final Discount 1 */}
+                        {finalDiscount1 > 0 && (
                           <div className="flex justify-between py-2 text-sm text-pink-400 items-center">
                             <span className="flex items-center gap-1.5">
-                              {totalItemDiscounts > 0 && <Sparkles className="w-3.5 h-3.5" />}
-                              {t('invoice.discount')} {discountType === 'percentage' && discountAmount > 0 ? `(${discount}%)` : ''}
+                              <Tag className="w-3.5 h-3.5" />
+                              {t('invoice.finalDiscount1')}
                             </span>
-                            <span className="font-mono">- {t('common.currency')} {combinedDiscount.toLocaleString()}</span>
+                            <span className="font-mono">- {t('common.currency')} {finalDiscount1.toLocaleString()}</span>
                           </div>
                         )}
                         {enableTax && (

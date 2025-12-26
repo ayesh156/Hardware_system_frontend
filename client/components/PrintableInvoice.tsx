@@ -466,14 +466,57 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
         {/* Totals */}
         <div className="totals-section">
           <div className="totals-box">
-            <div className="totals-row subtotal">
-              <span className="label">Subtotal</span>
-              <span className="value">{formatCurrency(invoice.subtotal)}</span>
-            </div>
-            <div className="totals-row">
-              <span className="label">Tax (15%)</span>
-              <span className="value">{formatCurrency(invoice.tax)}</span>
-            </div>
+            {/* Calculate original subtotal and item discounts */}
+            {(() => {
+              const originalSubtotal = invoice.items.reduce((sum, item) => {
+                const origPrice = item.originalPrice || item.unitPrice;
+                return sum + (origPrice * item.quantity);
+              }, 0);
+              const totalItemDiscounts = invoice.items.reduce((sum, item) => {
+                const origPrice = item.originalPrice || item.unitPrice;
+                const discount = (origPrice - item.unitPrice) * item.quantity;
+                return sum + (discount > 0 ? discount : 0);
+              }, 0);
+              const invoiceDiscount = invoice.discount || 0;
+              
+              return (
+                <>
+                  {/* Show original subtotal if there are item discounts */}
+                  {totalItemDiscounts > 0 && (
+                    <div className="totals-row">
+                      <span className="label">Original Subtotal</span>
+                      <span className="value">{formatCurrency(originalSubtotal)}</span>
+                    </div>
+                  )}
+                  {/* Item Discounts */}
+                  {totalItemDiscounts > 0 && (
+                    <div className="totals-row discount">
+                      <span className="label">- Item Discounts</span>
+                      <span className="value">-{formatCurrency(totalItemDiscounts)}</span>
+                    </div>
+                  )}
+                  {/* Subtotal (after item discounts) */}
+                  <div className="totals-row subtotal">
+                    <span className="label">Subtotal</span>
+                    <span className="value">{formatCurrency(invoice.subtotal)}</span>
+                  </div>
+                  {/* Invoice-level discount */}
+                  {invoiceDiscount > 0 && (
+                    <div className="totals-row discount">
+                      <span className="label">- Discount</span>
+                      <span className="value">-{formatCurrency(invoiceDiscount)}</span>
+                    </div>
+                  )}
+                  {/* Tax */}
+                  {invoice.tax > 0 && (
+                    <div className="totals-row">
+                      <span className="label">Tax ({invoice.taxRate || 15}%)</span>
+                      <span className="value">{formatCurrency(invoice.tax)}</span>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
             <div className="totals-row total">
               <span className="label">Total Amount</span>
               <span className="value">{formatCurrency(invoice.total)}</span>

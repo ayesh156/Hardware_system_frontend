@@ -63,6 +63,7 @@ export interface ProductVariant {
   costPrice: number;
   wholesalePrice: number;
   retailPrice: number;
+  discountedPrice?: number; // Special discounted price (if any)
   stock: number;
   minStock: number; // Reorder level
   maxStock?: number;
@@ -86,12 +87,14 @@ export interface FlattenedProduct {
   costPrice: number;
   wholesalePrice: number;
   retailPrice: number;
+  discountedPrice?: number; // Special discounted price (lower than retail)
   // Stock (from variant if present, else from product)
   stock: number;
   minStock: number;
   // Convenience flags
   isVariant: boolean;
   variantLabel?: string; // e.g., "10mm" or "Red - 1.5mm²"
+  hasDiscount: boolean; // Whether this product has a discounted price
 }
 
 // Enhanced Product Interface
@@ -114,7 +117,8 @@ export interface Product {
   price?: number;         // Legacy field for backward compatibility
   costPrice?: number;     // Purchase/cost price
   wholesalePrice?: number; // Bulk/dealer price
-  retailPrice?: number;   // Selling price to customers
+  retailPrice?: number;   // Selling price to customers (normal price)
+  discountedPrice?: number; // Special discounted price (lower than retail)
   
   // Stock Management
   stock: number;
@@ -165,6 +169,7 @@ export interface InvoiceItem {
   size?: string;
   quantity: number;
   unitPrice: number;
+  originalPrice?: number; // Original price before any discounts
   discount?: number;
   total: number;
 }
@@ -176,7 +181,7 @@ export interface Invoice {
   customerName: string;
   items: InvoiceItem[];
   subtotal: number;
-  discount?: number;
+  discount?: number; // Final discount (fixed amount)
   discountType?: 'percentage' | 'fixed' | 'none';
   discountValue?: number;
   enableTax?: boolean;

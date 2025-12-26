@@ -28,6 +28,7 @@ interface ProductFormData {
   costPrice: number;
   wholesalePrice: number;
   retailPrice: number;
+  discountedPrice: number;
   stock: number;
   minStock: number;
   maxStock: number;
@@ -66,6 +67,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     costPrice: 0,
     wholesalePrice: 0,
     retailPrice: 0,
+    discountedPrice: 0,
     stock: 0,
     minStock: 10,
     maxStock: 100,
@@ -89,6 +91,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     costPrice: 0,
     wholesalePrice: 0,
     retailPrice: 0,
+    discountedPrice: undefined,
     stock: 0,
   });
 
@@ -106,6 +109,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         costPrice: product.costPrice || 0,
         wholesalePrice: product.wholesalePrice || 0,
         retailPrice: product.retailPrice || product.price || 0,
+        discountedPrice: product.discountedPrice || 0,
         stock: product.stock,
         minStock: product.minStock || 10,
         maxStock: product.maxStock || 100,
@@ -134,6 +138,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         costPrice: 0,
         wholesalePrice: 0,
         retailPrice: 0,
+        discountedPrice: 0,
         stock: 0,
         minStock: 10,
         maxStock: 100,
@@ -184,6 +189,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       costPrice: newVariant.costPrice || 0,
       wholesalePrice: newVariant.wholesalePrice || 0,
       retailPrice: newVariant.retailPrice || 0,
+      discountedPrice: newVariant.discountedPrice,
       stock: newVariant.stock || 0,
       minStock: 5,
       isActive: true,
@@ -203,6 +209,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       costPrice: formData.costPrice,
       wholesalePrice: formData.wholesalePrice,
       retailPrice: formData.retailPrice,
+      discountedPrice: formData.discountedPrice,
       stock: 0,
     });
   };
@@ -236,6 +243,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       costPrice: formData.costPrice,
       wholesalePrice: formData.wholesalePrice,
       retailPrice: formData.retailPrice,
+      discountedPrice: formData.discountedPrice > 0 ? formData.discountedPrice : undefined,
       price: formData.retailPrice, // backward compatibility
       stock: formData.stock,
       minStock: formData.minStock,
@@ -466,7 +474,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className={labelClasses}>{t('productsForm.retailPrice')} *</label>
+                <label className={labelClasses}>{t('productsForm.retailPrice')} ({t('productsForm.normalPrice')}) *</label>
                 <input
                   type="number"
                   required
@@ -478,6 +486,26 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   placeholder="0.00"
                 />
               </div>
+              <div className="space-y-1.5">
+                <label className={labelClasses}>{t('productsForm.discountedPrice')}</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.discountedPrice || ''}
+                  onChange={(e) => setFormData({ ...formData, discountedPrice: parseFloat(e.target.value) || 0 })}
+                  className={`${inputClasses} border-pink-500/50`}
+                  placeholder={t('productsForm.placeholders.discountedPrice')}
+                />
+                {formData.discountedPrice > 0 && formData.discountedPrice < formData.retailPrice && (
+                  <p className="text-xs text-pink-500 mt-1">
+                    {t('productsForm.savingsLabel')}: {t('common.currency')} {(formData.retailPrice - formData.discountedPrice).toLocaleString()} ({Math.round((1 - formData.discountedPrice / formData.retailPrice) * 100)}% {t('invoice.off')})
+                  </p>
+                )}
+              </div>
+            </div>
+            {/* Profit Margin Row */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <label className={labelClasses}>{t('productsForm.profitMargin')}</label>
                 <div className={`px-4 py-2.5 rounded-xl text-sm font-semibold ${
@@ -605,7 +633,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             )}
                           </div>
                           <div className="flex items-center gap-4">
-                            <span className="text-sm text-green-500">{t('common.currency')} {variant.retailPrice.toLocaleString()}</span>
+                            <div className="flex items-center gap-2">
+                              {variant.discountedPrice && variant.discountedPrice < variant.retailPrice ? (
+                                <>
+                                  <span className="text-sm text-slate-400 line-through">{t('common.currency')} {variant.retailPrice.toLocaleString()}</span>
+                                  <span className="text-sm text-pink-500 font-medium">{t('common.currency')} {variant.discountedPrice.toLocaleString()}</span>
+                                </>
+                              ) : (
+                                <span className="text-sm text-green-500">{t('common.currency')} {variant.retailPrice.toLocaleString()}</span>
+                              )}
+                            </div>
                             <span className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('productsForm.placeholders.stock')}: {variant.stock}</span>
                             <button
                               type="button"
@@ -695,6 +732,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         onChange={(e) => setNewVariant({ ...newVariant, retailPrice: parseFloat(e.target.value) || 0 })}
                         className={`${inputClasses} text-xs`}
                         placeholder={t('productsForm.placeholders.retailPrice')}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className={labelClasses}>{t('productsForm.discountedPrice')}</label>
+                      <input
+                        type="number"
+                        value={newVariant.discountedPrice || ''}
+                        onChange={(e) => setNewVariant({ ...newVariant, discountedPrice: e.target.value ? parseFloat(e.target.value) : undefined })}
+                        className={`${inputClasses} text-xs`}
+                        placeholder={t('productsForm.placeholders.discountedPrice')}
                       />
                     </div>
                     <div className="space-y-1">

@@ -71,6 +71,7 @@ export const QuickCheckout: React.FC = () => {
   const [productSearch, setProductSearch] = useState('');
   const [quantity, setQuantity] = useState<number>(1);
   const [discount, setDiscount] = useState<number>(0);
+  const [bulkDiscountPercent, setBulkDiscountPercent] = useState<number>(0);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showShortcutMap, setShowShortcutMap] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -242,7 +243,11 @@ export const QuickCheckout: React.FC = () => {
 
   // Add product to cart (accepts FlattenedProduct for variant support)
   const addProductToCart = useCallback((flatProduct: FlattenedProduct, overrideQty?: number) => {
-    const price = flatProduct.retailPrice;
+    // Use discounted price if available, otherwise use retail price
+    const normalPrice = flatProduct.retailPrice;
+    const effectivePrice = flatProduct.hasDiscount && flatProduct.discountedPrice 
+      ? flatProduct.discountedPrice 
+      : normalPrice;
     const addQty = Math.max(1, overrideQty ?? quantity);
     
     // Use flatId as the unique identifier (includes variant info)
@@ -277,11 +282,17 @@ export const QuickCheckout: React.FC = () => {
         variantId: flatProduct.variant?.id,
         size: flatProduct.variant?.size,
         quantity: addQty,
-        unitPrice: price,
-        originalPrice: price,
-        total: addQty * price,
+        unitPrice: effectivePrice,
+        originalPrice: normalPrice, // Always store normal price for discount calculation
+        total: addQty * effectivePrice,
       };
       setItems([...items, newItem]);
+      
+      // Show toast with discount info if applicable
+      if (flatProduct.hasDiscount) {
+        const savings = normalPrice - effectivePrice;
+        toast.success(`${flatProduct.displayName} - ${t('invoice.perItemDiscount')}: ${t('common.currency')} ${savings.toLocaleString()}`);
+      }
     }
     
     playBeep('add');
@@ -303,6 +314,31 @@ export const QuickCheckout: React.FC = () => {
     setItems(items.filter((i) => i.id !== itemId));
     playBeep('remove');
   }, [items, playBeep]);
+
+  // Apply bulk discount to all items
+  const applyDiscountToAll = useCallback((percent: number) => {
+    if (items.length === 0) {
+      toast.error(t('invoice.noItemsYet'));
+      return;
+    }
+    if (percent <= 0 || percent > 100) {
+      toast.error(t('invoice.enterDiscountPercent'));
+      return;
+    }
+    
+    setItems(items.map(item => {
+      const discountedPrice = Math.round(item.originalPrice * (1 - percent / 100));
+      return {
+        ...item,
+        unitPrice: discountedPrice,
+        total: item.quantity * discountedPrice,
+      };
+    }));
+    
+    toast.success(`${percent}% ${t('invoice.discountApplied')}`);
+    setBulkDiscountPercent(0);
+    playBeep('add');
+  }, [items, t, playBeep]);
 
   // Update item quantity
   const updateItemQuantity = useCallback((itemId: string, newQuantity: number) => {
@@ -406,14 +442,18 @@ export const QuickCheckout: React.FC = () => {
   }, [quickAddName, quickAddPrice, quickAddQty, playBeep, t]);
 
   // Calculate totals
+  // Original subtotal (before any item-level discounts) for display
+  const originalSubtotal = items.reduce((sum, item) => sum + (item.originalPrice * item.quantity), 0);
+  // Current subtotal (after item-level discounts applied)
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  // Calculate total item-level discounts (difference between original price and current unit price)
+  // Calculate total item-level discounts for display (difference between original price and current unit price)
   const totalItemDiscounts = items.reduce((sum, item) => {
     const itemDiscount = (item.originalPrice - item.unitPrice) * item.quantity;
     return sum + (itemDiscount > 0 ? itemDiscount : 0);
   }, 0);
   const discountAmount = Math.min(discount, subtotal); // Can't discount more than subtotal
-  const total = subtotal - discountAmount - totalItemDiscounts;
+  // Total is subtotal minus invoice-level discount (item discounts already reflected in subtotal)
+  const total = subtotal - discountAmount;
 
   // Clear cart
   const clearCart = useCallback(() => {
@@ -446,7 +486,8 @@ export const QuickCheckout: React.FC = () => {
     setIsProcessing(true);
     
     const invoiceNumber = `QC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
-    const combinedDiscount = discountAmount + totalItemDiscounts;
+    // Invoice-level discount should be only the final invoice discount (not item-level discounts)
+    const invoiceDiscount = Math.round(discountAmount * 100) / 100;
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
       invoiceNumber,
@@ -455,14 +496,14 @@ export const QuickCheckout: React.FC = () => {
       items,
       subtotal: Math.round(subtotal * 100) / 100,
       tax: 0,
-      discount: Math.round(combinedDiscount * 100) / 100,
+      discount: invoiceDiscount,
       total: Math.round(total * 100) / 100,
       issueDate: new Date().toISOString().split('T')[0],
       dueDate: new Date().toISOString().split('T')[0],
       status: paymentMethod === 'credit' ? 'pending' : 'paid',
       paymentMethod: paymentMethod, // 'cash' or 'credit' (credit prints as credit payment)
-      notes: combinedDiscount > 0 
-        ? `${t('quickCheckout.quickSaleNote')} - ${t('quickCheckout.discount')}: ${t('common.currency')} ${combinedDiscount.toLocaleString()}`
+      notes: invoiceDiscount > 0 
+        ? `${t('quickCheckout.quickSaleNote')} - ${t('quickCheckout.discount')}: ${t('common.currency')} ${invoiceDiscount.toLocaleString()}`
         : t('quickCheckout.quickSaleNote'),
     };
 
@@ -502,7 +543,8 @@ export const QuickCheckout: React.FC = () => {
     setIsProcessing(true);
     
     const invoiceNumber = `QC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
-    const combinedDiscountSave = discountAmount + totalItemDiscounts;
+    // Invoice-level discount should be only the final invoice discount (not item-level discounts)
+    const invoiceDiscount = Math.round(discountAmount * 100) / 100;
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
       invoiceNumber,
@@ -511,14 +553,14 @@ export const QuickCheckout: React.FC = () => {
       items,
       subtotal: Math.round(subtotal * 100) / 100,
       tax: 0,
-      discount: Math.round(combinedDiscountSave * 100) / 100,
+      discount: invoiceDiscount,
       total: Math.round(total * 100) / 100,
       issueDate: new Date().toISOString().split('T')[0],
       dueDate: new Date().toISOString().split('T')[0],
       status: paymentMethod === 'credit' ? 'pending' : 'paid',
       paymentMethod: paymentMethod,
-      notes: combinedDiscountSave > 0 
-        ? `${t('quickCheckout.quickSaleNote')} - ${t('quickCheckout.discount')}: ${t('common.currency')} ${combinedDiscountSave.toLocaleString()}`
+      notes: invoiceDiscount > 0 
+        ? `${t('quickCheckout.quickSaleNote')} - ${t('quickCheckout.discount')}: ${t('common.currency')} ${invoiceDiscount.toLocaleString()}`
         : t('quickCheckout.quickSaleNote'),
     };
 
@@ -1256,9 +1298,20 @@ export const QuickCheckout: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
-                        </p>
+                        {flatProduct.hasDiscount && flatProduct.discountedPrice ? (
+                          <>
+                            <p className={`text-xs line-through ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                              {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
+                            </p>
+                            <p className="font-bold text-pink-500">
+                              {t('common.currency')} {flatProduct.discountedPrice.toLocaleString()}
+                            </p>
+                          </>
+                        ) : (
+                          <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                            {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
+                          </p>
+                        )}
                       </div>
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
                         <Plus className={`w-5 h-5 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
@@ -1340,9 +1393,17 @@ export const QuickCheckout: React.FC = () => {
                         <p className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {isSinhala ? (item.productNameSi || item.productName) : item.productName}
                         </p>
-                        <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {t('common.currency')} {item.unitPrice.toLocaleString()} × {item.quantity}
-                        </p>
+                        <div className={`text-sm flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {item.unitPrice !== item.originalPrice && (
+                            <span className="line-through text-xs">
+                              {t('common.currency')} {item.originalPrice.toLocaleString()}
+                            </span>
+                          )}
+                          <span className={item.unitPrice !== item.originalPrice ? 'text-emerald-500 font-medium' : ''}>
+                            {t('common.currency')} {item.unitPrice.toLocaleString()}
+                          </span>
+                          <span>× {item.quantity}</span>
+                        </div>
                       </div>
                       
                       {/* Quantity Controls */}
@@ -1429,6 +1490,34 @@ export const QuickCheckout: React.FC = () => {
                   placeholder={t('quickCheckout.discount')}
                   className={`flex-1 py-2.5 text-sm font-medium bg-transparent focus:outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
                 />
+              </div>
+              
+              {/* Apply Discount to All Items - Mobile */}
+              <div className={`flex items-center gap-2`}>
+                <div className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border ${isDark ? 'border-slate-700 bg-slate-700/50' : 'border-slate-200 bg-slate-50'}`}>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    max="100"
+                    value={bulkDiscountPercent || ''}
+                    onChange={(e) => setBulkDiscountPercent(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                    placeholder={t('invoice.enterDiscountPercent')}
+                    className={`flex-1 text-sm font-medium bg-transparent focus:outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
+                  />
+                  <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>%</span>
+                </div>
+                <button
+                  onClick={() => applyDiscountToAll(bulkDiscountPercent)}
+                  disabled={items.length === 0 || bulkDiscountPercent <= 0}
+                  className={`px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
+                    items.length > 0 && bulkDiscountPercent > 0
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white'
+                      : isDark ? 'bg-slate-700 text-slate-500' : 'bg-slate-200 text-slate-400'
+                  }`}
+                >
+                  {t('common.apply')}
+                </button>
               </div>
             </div>
           </div>
@@ -1775,9 +1864,20 @@ export const QuickCheckout: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
-                        </p>
+                        {flatProduct.hasDiscount && flatProduct.discountedPrice ? (
+                          <>
+                            <p className={`text-xs line-through ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                              {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
+                            </p>
+                            <p className="font-bold text-pink-500">
+                              {t('common.currency')} {flatProduct.discountedPrice.toLocaleString()}
+                            </p>
+                          </>
+                        ) : (
+                          <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                            {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
+                          </p>
+                        )}
                         <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                           {flatProduct.product.unit || 'piece'}
                         </p>
@@ -1964,9 +2064,17 @@ export const QuickCheckout: React.FC = () => {
                         <p className={`font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {isSinhala ? (item.productNameSi || item.productName) : item.productName}
                         </p>
-                        <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {t('common.currency')} {item.unitPrice.toLocaleString()} × {item.quantity}
-                        </p>
+                        <div className={`text-sm flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {item.unitPrice !== item.originalPrice && (
+                            <span className="line-through text-xs">
+                              {t('common.currency')} {item.originalPrice.toLocaleString()}
+                            </span>
+                          )}
+                          <span className={item.unitPrice !== item.originalPrice ? 'text-emerald-500 font-medium' : ''}>
+                            {t('common.currency')} {item.unitPrice.toLocaleString()}
+                          </span>
+                          <span>× {item.quantity}</span>
+                        </div>
                       </div>
                       
                       {/* Quantity Controls */}
@@ -2143,6 +2251,42 @@ export const QuickCheckout: React.FC = () => {
                   }`}
                 />
               </div>
+              
+              {/* Apply Discount to All Items */}
+              <div className={`mt-3 pt-3 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <p className={`text-xs mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {t('invoice.applyDiscountToAll')}
+                </p>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={bulkDiscountPercent || ''}
+                      onChange={(e) => setBulkDiscountPercent(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                      placeholder={t('invoice.enterDiscountPercent')}
+                      className={`w-full px-3 py-2 pr-8 text-sm border rounded-lg focus:outline-none transition-all ${
+                        isDark
+                          ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-pink-500'
+                          : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-pink-500'
+                      }`}
+                    />
+                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>%</span>
+                  </div>
+                  <button
+                    onClick={() => applyDiscountToAll(bulkDiscountPercent)}
+                    disabled={items.length === 0 || bulkDiscountPercent <= 0}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      items.length > 0 && bulkDiscountPercent > 0
+                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:shadow-pink-500/30'
+                        : isDark ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {t('common.apply')}
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Summary */}
@@ -2157,17 +2301,26 @@ export const QuickCheckout: React.FC = () => {
                   <span>{t('quickCheckout.itemCount')}</span>
                   <span className="font-medium">{items.reduce((sum, i) => sum + i.quantity, 0)} {t('invoice.units')}</span>
                 </div>
+                {totalItemDiscounts > 0 && (
+                  <div className={`flex justify-between items-center text-pink-500`}>
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {t('invoice.itemDiscounts')}
+                    </span>
+                    <span className="font-mono">- {t('common.currency')} {totalItemDiscounts.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className={`flex justify-between ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                   <span>{t('invoice.subtotal')}</span>
                   <span className="font-mono">{t('common.currency')} {subtotal.toLocaleString()}</span>
                 </div>
-                {(discountAmount > 0 || totalItemDiscounts > 0) && (
+                {discountAmount > 0 && (
                   <div className={`flex justify-between items-center text-red-500`}>
                     <span className="flex items-center gap-1.5">
-                      {totalItemDiscounts > 0 && <Sparkles className="w-3.5 h-3.5" />}
+                      <Percent className="w-3.5 h-3.5" />
                       {t('quickCheckout.discount')}
                     </span>
-                    <span className="font-mono">- {t('common.currency')} {(discountAmount + totalItemDiscounts).toLocaleString()}</span>
+                    <span className="font-mono">- {t('common.currency')} {discountAmount.toLocaleString()}</span>
                   </div>
                 )}
                 
