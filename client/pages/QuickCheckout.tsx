@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
-import { mockProducts } from '../data/mockData';
+import { mockProducts, mockInvoices } from '../data/mockData';
 import { Product, Invoice, InvoiceItem, FlattenedProduct, Customer } from '../types/index';
 import { flattenProducts } from '../lib/utils';
 import { printInvoice } from '../components/modals/PrintInvoiceModal';
@@ -54,6 +54,12 @@ const CART_SHORTCUTS = {
   increaseQty: '→',
   decreaseQty: '←',
 };
+
+// Import concurrency-safe invoice number generator
+import { generateNextInvoiceNumberSync, initializeFromExistingInvoices } from '../lib/invoiceNumberService';
+
+// Initialize invoice counter from existing data on module load
+initializeFromExistingInvoices(mockInvoices);
 
 export const QuickCheckout: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -454,6 +460,11 @@ export const QuickCheckout: React.FC = () => {
   const discountAmount = Math.min(discount, subtotal); // Can't discount more than subtotal
   // Total is subtotal minus invoice-level discount (item discounts already reflected in subtotal)
   const total = subtotal - discountAmount;
+  
+  // Received amount and change calculation
+  const [receivedAmount, setReceivedAmount] = useState<number>(0);
+  const receivedAmountInputRef = useRef<HTMLInputElement>(null);
+  const changeAmount = receivedAmount > 0 ? Math.max(0, receivedAmount - total) : 0;
 
   // Clear cart
   const clearCart = useCallback(() => {
@@ -461,6 +472,7 @@ export const QuickCheckout: React.FC = () => {
     setProductSearch('');
     setQuantity(1);
     setDiscount(0);
+    setReceivedAmount(0);
     setPendingProduct(null);
     setSelectedProductIndex(-1);
     searchInputRef.current?.focus();
@@ -470,6 +482,7 @@ export const QuickCheckout: React.FC = () => {
   const finalizeSale = useCallback((invoiceNumber?: string) => {
     setItems([]);
     setDiscount(0);
+    setReceivedAmount(0);
     setIsProcessing(false);
     searchInputRef.current?.focus();
     if (invoiceNumber) {
@@ -485,7 +498,7 @@ export const QuickCheckout: React.FC = () => {
     
     setIsProcessing(true);
     
-    const invoiceNumber = `QC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const invoiceNumber = generateNextInvoiceNumberSync();
     // Invoice-level discount should be only the final invoice discount (not item-level discounts)
     const invoiceDiscount = Math.round(discountAmount * 100) / 100;
     const invoice: Invoice = {
@@ -498,6 +511,8 @@ export const QuickCheckout: React.FC = () => {
       tax: 0,
       discount: invoiceDiscount,
       total: Math.round(total * 100) / 100,
+      receivedAmount: receivedAmount > 0 ? Math.round(receivedAmount * 100) / 100 : undefined,
+      changeAmount: changeAmount > 0 ? Math.round(changeAmount * 100) / 100 : undefined,
       issueDate: new Date().toISOString().split('T')[0],
       dueDate: new Date().toISOString().split('T')[0],
       status: paymentMethod === 'credit' ? 'pending' : 'paid',
@@ -534,7 +549,7 @@ export const QuickCheckout: React.FC = () => {
         toast.error(t('quickCheckout.printBlocked'));
         finalizeSale(invoice.invoiceNumber);
       });
-  }, [items, subtotal, total, discountAmount, totalItemDiscounts, paymentMethod, playBeep, t, finalizeSale]);
+  }, [items, subtotal, total, discountAmount, totalItemDiscounts, paymentMethod, playBeep, t, finalizeSale, receivedAmount, changeAmount, isSinhala]);
 
   // Quick save without print preview (F9)
   const handleQuickSave = useCallback(() => {
@@ -542,7 +557,7 @@ export const QuickCheckout: React.FC = () => {
     
     setIsProcessing(true);
     
-    const invoiceNumber = `QC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const invoiceNumber = generateNextInvoiceNumberSync();
     // Invoice-level discount should be only the final invoice discount (not item-level discounts)
     const invoiceDiscount = Math.round(discountAmount * 100) / 100;
     const invoice: Invoice = {
@@ -555,6 +570,8 @@ export const QuickCheckout: React.FC = () => {
       tax: 0,
       discount: invoiceDiscount,
       total: Math.round(total * 100) / 100,
+      receivedAmount: receivedAmount > 0 ? Math.round(receivedAmount * 100) / 100 : undefined,
+      changeAmount: changeAmount > 0 ? Math.round(changeAmount * 100) / 100 : undefined,
       issueDate: new Date().toISOString().split('T')[0],
       dueDate: new Date().toISOString().split('T')[0],
       status: paymentMethod === 'credit' ? 'pending' : 'paid',
@@ -574,9 +591,10 @@ export const QuickCheckout: React.FC = () => {
     // Reset cart
     setItems([]);
     setDiscount(0);
+    setReceivedAmount(0);
     setIsProcessing(false);
     searchInputRef.current?.focus();
-  }, [items, subtotal, total, discountAmount, totalItemDiscounts, paymentMethod, playBeep, t, isProcessing]);
+  }, [items, subtotal, total, discountAmount, totalItemDiscounts, paymentMethod, playBeep, t, isProcessing, receivedAmount, changeAmount]);
 
   // Keyboard event handler
   useEffect(() => {
@@ -585,9 +603,10 @@ export const QuickCheckout: React.FC = () => {
       const isInSearchInput = document.activeElement === searchInputRef.current;
       const isInQuantityInput = document.activeElement === quantityInputRef.current;
       const isInDiscountInput = document.activeElement === discountInputRef.current;
+      const isInReceivedInput = document.activeElement === receivedAmountInputRef.current;
       
       // Show shortcut map with ? key
-      if (e.key === '?' && !isInSearchInput && !isInQuantityInput && !isInDiscountInput) {
+      if (e.key === '?' && !isInSearchInput && !isInQuantityInput && !isInDiscountInput && !isInReceivedInput) {
         e.preventDefault();
         setShowShortcutMap(prev => !prev);
         return;
@@ -675,6 +694,19 @@ export const QuickCheckout: React.FC = () => {
           break;
           
         case 'F7':
+          // Focus Received Amount input
+          e.preventDefault();
+          setIsCartFocused(false);
+          setIsPaymentFocused(false);
+          setIsQuantityFocused(false);
+          setPendingProduct(null);
+          setCurrentMode('discount'); // Reuse discount mode for this
+          receivedAmountInputRef.current?.focus();
+          receivedAmountInputRef.current?.select();
+          playBeep('add');
+          break;
+          
+        case 'F8':
           // Quick Add custom item mode
           e.preventDefault();
           setIsCartFocused(false);
@@ -1194,7 +1226,15 @@ export const QuickCheckout: React.FC = () => {
                   setProductSearch(parsed?.code || val);
                   setSelectedProductIndex(-1);
                 }}
-                onFocus={() => setMobileSearchFocused(true)}
+                onFocus={() => {
+                  setMobileSearchFocused(true);
+                  // Unfocus cart when search is focused
+                  setIsCartFocused(false);
+                  setSelectedCartIndex(-1);
+                  setIsPaymentFocused(false);
+                  setPriceEditBuffer('');
+                  setIsPriceEditing(false);
+                }}
                 onBlur={() => setTimeout(() => setMobileSearchFocused(false), 200)}
                 className={`w-full pl-11 pr-10 py-3.5 text-base border-2 rounded-2xl focus:outline-none transition-all ${
                   mobileSearchFocused
@@ -1236,6 +1276,14 @@ export const QuickCheckout: React.FC = () => {
                 step="any"
                 value={quantity}
                 onChange={(e) => setQuantity(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
+                onFocus={() => {
+                  // Unfocus cart when quantity is focused
+                  setIsCartFocused(false);
+                  setSelectedCartIndex(-1);
+                  setIsPaymentFocused(false);
+                  setPriceEditBuffer('');
+                  setIsPriceEditing(false);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && pendingProduct) {
                     e.preventDefault();
@@ -1519,11 +1567,48 @@ export const QuickCheckout: React.FC = () => {
                   {t('common.apply')}
                 </button>
               </div>
+              
+              {/* Received Amount - Mobile (F7) */}
+              <div className={`flex items-center gap-2 px-3 rounded-xl border ${isDark ? 'border-slate-700 bg-green-900/20' : 'border-green-200 bg-green-50'}`}>
+                <Banknote className={`w-4 h-4 flex-shrink-0 ${isDark ? 'text-green-400' : 'text-green-500'}`} />
+                <input
+                  ref={receivedAmountInputRef}
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  value={receivedAmount || ''}
+                  onChange={(e) => setReceivedAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                  placeholder={t('invoice.receivedAmount')}
+                  className={`flex-1 py-2.5 text-sm font-medium bg-transparent focus:outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
+                />
+                {receivedAmount > 0 && (
+                  <span className={`text-sm font-bold ${changeAmount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    Δ {changeAmount.toLocaleString()}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           
           {/* Total & Checkout */}
           <div className="px-4 pb-4">
+            {/* Change Display */}
+            {receivedAmount > 0 && (
+              <div className={`mb-3 p-3 rounded-xl ${
+                changeAmount >= 0
+                  ? isDark ? 'bg-green-900/30 border border-green-700' : 'bg-green-50 border border-green-200'
+                  : isDark ? 'bg-red-900/30 border border-red-700' : 'bg-red-50 border border-red-200'
+              }`}>
+                <div className="flex justify-between items-center">
+                  <span className={`text-sm font-medium ${changeAmount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {t('invoice.changeAmount')}
+                  </span>
+                  <span className={`text-xl font-bold font-mono ${changeAmount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {t('common.currency')} {changeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            )}
             <div className={`flex items-center justify-between py-2 mb-3 ${isDark ? 'border-t border-slate-700/50' : 'border-t border-slate-100'}`}>
               <div>
                 <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -1689,6 +1774,15 @@ export const QuickCheckout: React.FC = () => {
                       type="text"
                       placeholder={t('quickCheckout.searchPlaceholder')}
                       value={productSearch}
+                      onFocus={() => {
+                        // Unfocus cart when search is focused
+                        setIsCartFocused(false);
+                        setSelectedCartIndex(-1);
+                        setIsPaymentFocused(false);
+                        setPriceEditBuffer('');
+                        setIsPriceEditing(false);
+                        setCurrentMode('search');
+                      }}
                       onChange={(e) => {
                         const val = e.target.value;
                         const parsed = parseScanInput(val);
@@ -1760,7 +1854,16 @@ export const QuickCheckout: React.FC = () => {
                       step="any"
                       value={quantity}
                       onChange={(e) => setQuantity(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
-                      onFocus={() => setIsQuantityFocused(true)}
+                      onFocus={() => {
+                        setIsQuantityFocused(true);
+                        // Unfocus cart when quantity is focused
+                        setIsCartFocused(false);
+                        setSelectedCartIndex(-1);
+                        setIsPaymentFocused(false);
+                        setPriceEditBuffer('');
+                        setIsPriceEditing(false);
+                        setCurrentMode('quantity');
+                      }}
                       onBlur={() => setIsQuantityFocused(false)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && pendingProduct) {
@@ -1902,6 +2005,15 @@ export const QuickCheckout: React.FC = () => {
             <div 
               ref={cartListRef}
               tabIndex={-1}
+              onBlur={(e) => {
+                // Only unfocus if the related target is not within the cart
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setIsCartFocused(false);
+                  setSelectedCartIndex(-1);
+                  setPriceEditBuffer('');
+                  setIsPriceEditing(false);
+                }
+              }}
               className={`p-4 rounded-2xl border min-h-[300px] outline-none overflow-x-hidden ${
                 isCartFocused 
                   ? isDark ? 'bg-slate-800/50 border-amber-500/50 ring-2 ring-amber-500/20' : 'bg-white border-amber-400 ring-2 ring-amber-200 shadow-lg'
@@ -1948,7 +2060,15 @@ export const QuickCheckout: React.FC = () => {
                       placeholder={t('quickCheckout.itemName')}
                       value={quickAddName}
                       onChange={(e) => setQuickAddName(e.target.value)}
-                      onFocus={() => setQuickAddFocusField('name')}
+                      onFocus={() => {
+                        setQuickAddFocusField('name');
+                        // Unfocus cart when quick add name is focused
+                        setIsCartFocused(false);
+                        setSelectedCartIndex(-1);
+                        setIsPaymentFocused(false);
+                        setPriceEditBuffer('');
+                        setIsPriceEditing(false);
+                      }}
                       className={`flex-1 px-3 py-2 text-sm border-2 rounded-lg focus:outline-none transition-all ${
                         quickAddFocusField === 'name'
                           ? isDark 
@@ -1968,7 +2088,15 @@ export const QuickCheckout: React.FC = () => {
                         placeholder={t('quickCheckout.price')}
                         value={quickAddPrice || ''}
                         onChange={(e) => setQuickAddPrice(Math.max(0, parseFloat(e.target.value) || 0))}
-                        onFocus={() => setQuickAddFocusField('price')}
+                        onFocus={() => {
+                          setQuickAddFocusField('price');
+                          // Unfocus cart when quick add price is focused
+                          setIsCartFocused(false);
+                          setSelectedCartIndex(-1);
+                          setIsPaymentFocused(false);
+                          setPriceEditBuffer('');
+                          setIsPriceEditing(false);
+                        }}
                         className={`w-full px-3 py-2 text-sm text-right border-2 rounded-lg focus:outline-none transition-all ${
                           quickAddFocusField === 'price'
                             ? isDark 
@@ -1989,7 +2117,15 @@ export const QuickCheckout: React.FC = () => {
                         placeholder={t('quickCheckout.qty')}
                         value={quickAddQty || ''}
                         onChange={(e) => setQuickAddQty(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
-                        onFocus={() => setQuickAddFocusField('qty')}
+                        onFocus={() => {
+                          setQuickAddFocusField('qty');
+                          // Unfocus cart when quick add qty is focused
+                          setIsCartFocused(false);
+                          setSelectedCartIndex(-1);
+                          setIsPaymentFocused(false);
+                          setPriceEditBuffer('');
+                          setIsPriceEditing(false);
+                        }}
                         className={`w-full px-3 py-2 text-sm text-center border-2 rounded-lg focus:outline-none transition-all ${
                           quickAddFocusField === 'qty'
                             ? isDark 
@@ -2033,7 +2169,11 @@ export const QuickCheckout: React.FC = () => {
                         if (el) cartItemRefs.current.set(index, el);
                         else cartItemRefs.current.delete(index);
                       }}
-                      onClick={() => {
+                      tabIndex={0}
+                      onClick={(e) => {
+                        // Prevent any default behavior
+                        e.preventDefault();
+                        // Set focus state
                         setIsCartFocused(true);
                         setSelectedCartIndex(index);
                         setSelectedProductIndex(-1);
@@ -2041,15 +2181,25 @@ export const QuickCheckout: React.FC = () => {
                         setCurrentMode('cart');
                         setPriceEditBuffer('');
                         setIsPriceEditing(false);
-                        (document.activeElement as HTMLElement)?.blur();
+                        // Blur any active input element
+                        if (document.activeElement instanceof HTMLInputElement) {
+                          document.activeElement.blur();
+                        }
+                        // Focus the cart container for keyboard navigation
                         cartListRef.current?.focus();
                         playBeep('add');
                       }}
-                      className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
+                      onFocus={() => {
+                        // Also set focus state when the item itself receives focus
+                        setIsCartFocused(true);
+                        setSelectedCartIndex(index);
+                        setCurrentMode('cart');
+                      }}
+                      className={`flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer outline-none ${
                         isCartFocused && index === selectedCartIndex
                           ? isDark 
-                            ? 'bg-amber-500/20 shadow-md' 
-                            : 'bg-amber-50 shadow-md'
+                            ? 'bg-amber-500/20 shadow-md ring-2 ring-amber-500/50' 
+                            : 'bg-amber-50 shadow-md ring-2 ring-amber-400/50'
                           : isDark ? 'bg-slate-700/50 hover:bg-slate-700' : 'bg-slate-50 hover:bg-slate-100'
                       }`}
                     >
@@ -2175,54 +2325,6 @@ export const QuickCheckout: React.FC = () => {
 
           {/* Right Panel - Checkout Summary */}
           <div className="space-y-4">
-            {/* Payment Method */}
-            <div 
-              ref={paymentRef}
-              tabIndex={-1}
-              className={`p-4 rounded-2xl border outline-none transition-all ${
-                isPaymentFocused
-                  ? isDark ? 'bg-slate-800/50 border-blue-500/50 ring-2 ring-blue-500/20' : 'bg-white border-blue-400 ring-2 ring-blue-200 shadow-lg'
-                  : isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  <CreditCard className="w-4 h-4" />
-                  {t('quickCheckout.paymentMethod')}
-                </h3>
-                <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>F5</kbd>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => { setPaymentMethod('cash'); playBeep('add'); }}
-                  className={`flex items-center justify-center gap-2 p-4 rounded-xl font-medium transition-all ${
-                    paymentMethod === 'cash'
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
-                      : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  <Banknote className="w-5 h-5" />
-                  {t('invoice.cash')}
-                </button>
-                <button
-                  onClick={() => { setPaymentMethod('credit'); playBeep('add'); }}
-                  className={`flex items-center justify-center gap-2 p-4 rounded-xl font-medium transition-all ${
-                    paymentMethod === 'credit'
-                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30'
-                      : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  <CreditCard className="w-5 h-5" />
-                  {t('quickCheckout.credit')}
-                </button>
-              </div>
-              {isPaymentFocused && (
-                <p className={`mt-2 text-xs text-center ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
-                  ← {t('invoice.cash')} • {t('quickCheckout.credit')} →
-                </p>
-              )}
-            </div>
-
             {/* Discount */}
             <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
               <div className="flex items-center justify-between mb-3">
@@ -2243,6 +2345,19 @@ export const QuickCheckout: React.FC = () => {
                   max={subtotal}
                   value={discount || ''}
                   onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
+                  onFocus={() => {
+                    // Unfocus cart when discount is focused
+                    setIsCartFocused(false);
+                    setSelectedCartIndex(-1);
+                    setIsPaymentFocused(false);
+                    setPriceEditBuffer('');
+                    setIsPriceEditing(false);
+                    setCurrentMode('discount');
+                  }}
+                  onBlur={() => {
+                    // Release focus when clicking elsewhere
+                    setCurrentMode('search');
+                  }}
                   placeholder="0"
                   className={`w-full pl-14 pr-4 py-3 text-lg text-right font-bold border-2 rounded-xl focus:outline-none transition-all ${
                     isDark
@@ -2251,42 +2366,131 @@ export const QuickCheckout: React.FC = () => {
                   }`}
                 />
               </div>
+            </div>
+
+            {/* Received Amount - Enhanced Payment Input */}
+            <div className={`p-4 rounded-2xl border relative overflow-hidden ${
+              receivedAmount > 0 && receivedAmount >= total
+                ? isDark ? 'bg-gradient-to-br from-emerald-900/30 to-slate-800/50 border-emerald-500/50' : 'bg-gradient-to-br from-emerald-50 to-white border-emerald-300 shadow-emerald-100/50 shadow-lg'
+                : isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
+            }`}>
+              {/* Decorative corner accent when paid */}
+              {receivedAmount > 0 && receivedAmount >= total && (
+                <div className={`absolute top-0 right-0 w-16 h-16 ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`} style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }}>
+                  <CheckCircle className={`w-5 h-5 absolute top-2 right-2 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                </div>
+              )}
               
-              {/* Apply Discount to All Items */}
-              <div className={`mt-3 pt-3 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                <p className={`text-xs mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {t('invoice.applyDiscountToAll')}
-                </p>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={bulkDiscountPercent || ''}
-                      onChange={(e) => setBulkDiscountPercent(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                      placeholder={t('invoice.enterDiscountPercent')}
-                      className={`w-full px-3 py-2 pr-8 text-sm border rounded-lg focus:outline-none transition-all ${
-                        isDark
-                          ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-pink-500'
-                          : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-pink-500'
-                      }`}
-                    />
-                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>%</span>
-                  </div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <Banknote className={`w-4 h-4 ${receivedAmount > 0 && receivedAmount >= total ? 'text-emerald-500' : ''}`} />
+                  {t('invoice.receivedAmount')}
+                </h3>
+                <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>F7</kbd>
+              </div>
+              
+              {/* Main Input */}
+              <div className="relative">
+                <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {t('common.currency')}
+                </span>
+                <input
+                  ref={receivedAmountInputRef}
+                  type="number"
+                  min="0"
+                  value={receivedAmount || ''}
+                  onChange={(e) => setReceivedAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                  onFocus={() => {
+                    // Unfocus cart when received amount is focused
+                    setIsCartFocused(false);
+                    setSelectedCartIndex(-1);
+                    setIsPaymentFocused(false);
+                    setPriceEditBuffer('');
+                    setIsPriceEditing(false);
+                    setCurrentMode('payment');
+                  }}
+                  onBlur={() => {
+                    // Release focus when clicking elsewhere
+                    setCurrentMode('search');
+                  }}
+                  placeholder="0"
+                  className={`w-full pl-14 pr-4 py-4 text-xl text-right font-bold border-2 rounded-xl focus:outline-none transition-all ${
+                    receivedAmount > 0 && receivedAmount >= total
+                      ? isDark
+                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400 focus:border-emerald-400 ring-2 ring-emerald-500/20'
+                        : 'border-emerald-400 bg-emerald-50 text-emerald-700 focus:border-emerald-500 ring-2 ring-emerald-200'
+                      : isDark
+                        ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-emerald-500'
+                        : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-emerald-500'
+                  }`}
+                />
+              </div>
+              
+              {/* Quick Amount Buttons */}
+              <div className="mt-3 grid grid-cols-4 gap-1.5">
+                {[
+                  { label: 'Exact', value: total, isExact: true },
+                  { label: '+100', value: Math.ceil(total / 100) * 100 },
+                  { label: '+500', value: Math.ceil(total / 500) * 500 },
+                  { label: '+1K', value: Math.ceil(total / 1000) * 1000 },
+                ].map((btn) => (
                   <button
-                    onClick={() => applyDiscountToAll(bulkDiscountPercent)}
-                    disabled={items.length === 0 || bulkDiscountPercent <= 0}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      items.length > 0 && bulkDiscountPercent > 0
-                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:shadow-pink-500/30'
-                        : isDark ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    key={btn.label}
+                    onClick={() => {
+                      setReceivedAmount(btn.value);
+                      playBeep('add');
+                    }}
+                    className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      btn.isExact
+                        ? isDark 
+                          ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30' 
+                          : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-200'
+                        : isDark 
+                          ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' 
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
                     }`}
                   >
-                    {t('common.apply')}
+                    {btn.isExact ? '= ' + btn.value.toLocaleString() : btn.label}
                   </button>
-                </div>
+                ))}
               </div>
+              
+              {/* Change Display - Enhanced */}
+              {receivedAmount > 0 && (
+                <div className={`mt-3 p-3 rounded-xl transition-all ${
+                  changeAmount >= 0 
+                    ? isDark ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'
+                    : isDark ? 'bg-red-500/20 border border-red-500/30' : 'bg-red-50 border border-red-200'
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      {changeAmount >= 0 ? (
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isDark ? 'bg-emerald-500/30' : 'bg-emerald-200'}`}>
+                          <span className="text-sm">💵</span>
+                        </div>
+                      ) : (
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isDark ? 'bg-red-500/30' : 'bg-red-200'}`}>
+                          <span className="text-sm">⚠️</span>
+                        </div>
+                      )}
+                      <span className={`text-sm font-medium ${
+                        changeAmount >= 0 
+                          ? isDark ? 'text-emerald-400' : 'text-emerald-700'
+                          : isDark ? 'text-red-400' : 'text-red-700'
+                      }`}>
+                        {changeAmount >= 0 ? t('invoice.changeAmount') : t('invoice.balanceDue')}
+                      </span>
+                    </div>
+                    <span className={`text-2xl font-bold font-mono ${
+                      changeAmount >= 0 
+                        ? isDark ? 'text-emerald-400' : 'text-emerald-600'
+                        : isDark ? 'text-red-400' : 'text-red-600'
+                    }`}>
+                      {t('common.currency')} {Math.abs(changeAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Summary */}
@@ -2352,120 +2556,109 @@ export const QuickCheckout: React.FC = () => {
               <kbd className="ml-2 px-2 py-1 rounded bg-white/20 text-sm font-mono">F12</kbd>
             </button>
 
-            {/* Keyboard Shortcuts Legend */}
-            <div className={`p-4 rounded-2xl border ${isDark ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/50 border-slate-700' : 'bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-200 shadow-sm'}`}>
+            {/* Payment Method - Moved to Bottom */}
+            <div 
+              ref={paymentRef}
+              tabIndex={-1}
+              onBlur={(e) => {
+                // Only unfocus if the related target is not within the payment section
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setIsPaymentFocused(false);
+                }
+              }}
+              className={`p-4 rounded-2xl border outline-none transition-all ${
+                isPaymentFocused
+                  ? isDark ? 'bg-slate-800/50 border-blue-500/50 ring-2 ring-blue-500/20' : 'bg-white border-blue-400 ring-2 ring-blue-200 shadow-lg'
+                  : isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
+              }`}
+            >
               <div className="flex items-center justify-between mb-3">
-                <p className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-indigo-900'}`}>
+                <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <CreditCard className="w-4 h-4" />
+                  {t('quickCheckout.paymentMethod')}
+                </h3>
+                <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>F5</kbd>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { setPaymentMethod('cash'); playBeep('add'); }}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl font-medium transition-all ${
+                    paymentMethod === 'cash'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
+                      : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <Banknote className="w-5 h-5" />
+                  {t('invoice.cash')}
+                </button>
+                <button
+                  onClick={() => { setPaymentMethod('credit'); playBeep('add'); }}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl font-medium transition-all ${
+                    paymentMethod === 'credit'
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30'
+                      : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <CreditCard className="w-5 h-5" />
+                  {t('quickCheckout.credit')}
+                </button>
+              </div>
+              {isPaymentFocused && (
+                <p className={`mt-2 text-xs text-center ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                  ← {t('invoice.cash')} • {t('quickCheckout.credit')} →
+                </p>
+              )}
+            </div>
+
+            {/* Quick Shortcuts Panel - Moved to Bottom Right */}
+            <div className={`p-4 rounded-2xl border ${isDark ? 'bg-gradient-to-br from-slate-800 via-slate-800/90 to-indigo-900/30 border-slate-700' : 'bg-gradient-to-br from-white via-indigo-50/30 to-blue-50 border-indigo-200 shadow-sm'}`}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-indigo-900'}`}>
                   <Keyboard className="w-4 h-4" />
                   {t('quickCheckout.keyboardShortcuts')}
-                </p>
+                </h3>
                 <button
-                  onClick={() => setShowShortcuts(!showShortcuts)}
-                  className={`text-xs px-2 py-1 rounded-lg transition-colors ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-700'}`}
+                  onClick={() => setShowShortcutMap(true)}
+                  className={`text-xs px-2 py-1 rounded-lg transition-colors flex items-center gap-1 ${isDark ? 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400' : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-700'}`}
                 >
-                  {showShortcuts ? t('common.less') : t('common.more')}
+                  <span>?</span>
+                  {t('common.more')}
                 </button>
               </div>
               
-              {/* Primary Shortcuts - Always visible */}
-              <div className="grid grid-cols-3 gap-2 text-xs mb-3">
-                <div className={`flex flex-col items-center p-2 rounded-lg ${isDark ? 'bg-slate-700/50' : 'bg-white'}`}>
-                  <kbd className={`px-2 py-1 rounded font-mono text-sm font-bold ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>F2</kbd>
-                  <span className={`mt-1 text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{t('quickCheckout.shortcut.search')}</span>
-                </div>
-                <div className={`flex flex-col items-center p-2 rounded-lg ${isDark ? 'bg-slate-700/50' : 'bg-white'}`}>
-                  <kbd className={`px-2 py-1 rounded font-mono text-sm font-bold ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>F3</kbd>
-                  <span className={`mt-1 text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{t('quickCheckout.shortcut.quantity')}</span>
-                </div>
-                <div className={`flex flex-col items-center p-2 rounded-lg ${isDark ? 'bg-slate-700/50' : 'bg-white'}`}>
-                  <kbd className={`px-2 py-1 rounded font-mono text-sm font-bold ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'}`}>F4</kbd>
-                  <span className={`mt-1 text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{t('quickCheckout.shortcut.cart')}</span>
-                </div>
+              {/* Creative Shortcuts Grid */}
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { key: 'F2', label: t('quickCheckout.shortcut.search'), color: 'blue', icon: '🔍' },
+                  { key: 'F3', label: t('quickCheckout.shortcut.quantity'), color: 'emerald', icon: '📊' },
+                  { key: 'F4', label: t('quickCheckout.shortcut.cart'), color: 'purple', icon: '🛒' },
+                  { key: 'F5', label: t('quickCheckout.shortcut.payment'), color: 'cyan', icon: '💳' },
+                  { key: 'F6', label: t('quickCheckout.shortcut.discount'), color: 'pink', icon: '🏷️' },
+                  { key: 'F7', label: t('quickCheckout.shortcut.received'), color: 'amber', icon: '💰' },
+                  { key: 'F9', label: t('quickCheckout.shortcut.quickSave'), color: 'green', icon: '💾' },
+                  { key: 'F12', label: t('quickCheckout.shortcut.checkout'), color: 'orange', icon: '🖨️' },
+                ].map((shortcut) => (
+                  <div 
+                    key={shortcut.key}
+                    className={`flex flex-col items-center p-1.5 rounded-lg transition-all hover:scale-105 cursor-default ${
+                      isDark ? `bg-${shortcut.color}-500/10 hover:bg-${shortcut.color}-500/20` : `bg-${shortcut.color}-50 hover:bg-${shortcut.color}-100`
+                    }`}
+                  >
+                    <span className="text-sm mb-0.5">{shortcut.icon}</span>
+                    <kbd className={`px-1.5 py-0.5 rounded font-mono text-xs font-bold ${
+                      isDark ? `bg-${shortcut.color}-500/20 text-${shortcut.color}-400` : `bg-${shortcut.color}-100 text-${shortcut.color}-700`
+                    }`}>{shortcut.key}</kbd>
+                    <span className={`mt-0.5 text-[9px] text-center leading-tight ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{shortcut.label}</span>
+                  </div>
+                ))}
               </div>
               
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className={`flex flex-col items-center p-2 rounded-lg ${isDark ? 'bg-slate-700/50' : 'bg-white'}`}>
-                  <kbd className={`px-2 py-1 rounded font-mono text-sm font-bold ${isDark ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-100 text-cyan-700'}`}>F5</kbd>
-                  <span className={`mt-1 text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{t('quickCheckout.shortcut.payment')}</span>
-                </div>
-                <div className={`flex flex-col items-center p-2 rounded-lg ${isDark ? 'bg-slate-700/50' : 'bg-white'}`}>
-                  <kbd className={`px-2 py-1 rounded font-mono text-sm font-bold ${isDark ? 'bg-pink-500/20 text-pink-400' : 'bg-pink-100 text-pink-700'}`}>F6</kbd>
-                  <span className={`mt-1 text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{t('quickCheckout.shortcut.discount')}</span>
-                </div>
-                <div className={`flex flex-col items-center p-2 rounded-lg ${isDark ? 'bg-slate-700/50' : 'bg-white'}`}>
-                  <kbd className={`px-2 py-1 rounded font-mono text-sm font-bold ${isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>F12</kbd>
-                  <span className={`mt-1 text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{t('quickCheckout.shortcut.checkout')}</span>
-                </div>
+              {/* Quick Action Hints */}
+              <div className={`mt-2 pt-2 border-t flex justify-between items-center text-[10px] ${isDark ? 'border-slate-700 text-slate-500' : 'border-indigo-100 text-slate-500'}`}>
+                <span>↑↓ {t('quickCheckout.shortcut.navigateItems')}</span>
+                <span>←→ {t('quickCheckout.shortcut.adjustQty')}</span>
+                <span>Enter {t('quickCheckout.shortcut.addItem')}</span>
               </div>
-              
-              {/* Extended Shortcuts - Toggleable */}
-              {showShortcuts && (
-                <div className={`mt-3 pt-3 border-t ${isDark ? 'border-slate-700' : 'border-indigo-200'}`}>
-                  <p className={`text-xs font-semibold mb-2 ${isDark ? 'text-slate-400' : 'text-indigo-700'}`}>
-                    {t('quickCheckout.modeShortcuts')}
-                  </p>
-                  
-                  {/* Quantity Mode */}
-                  <div className={`p-2 rounded-lg mb-2 ${isDark ? 'bg-slate-700/30' : 'bg-white'}`}>
-                    <p className={`text-xs font-medium mb-1 flex items-center gap-1 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                      📊 {t('quickCheckout.quantityMode')}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs">
-                      <kbd className={`px-1.5 py-0.5 rounded font-mono ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>←</kbd>
-                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{t('quickCheckout.shortcut.decreaseQty')}</span>
-                      <kbd className={`px-1.5 py-0.5 rounded font-mono ml-2 ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>→</kbd>
-                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{t('quickCheckout.shortcut.increaseQty')}</span>
-                    </div>
-                  </div>
-                  
-                  {/* Cart Mode */}
-                  <div className={`p-2 rounded-lg mb-2 ${isDark ? 'bg-slate-700/30' : 'bg-white'}`}>
-                    <p className={`text-xs font-medium mb-1 flex items-center gap-1 ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>
-                      🛒 {t('quickCheckout.cartMode')}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <kbd className={`px-1.5 py-0.5 rounded font-mono ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>↑↓</kbd>
-                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{t('quickCheckout.shortcut.navigateItems')}</span>
-                      <kbd className={`px-1.5 py-0.5 rounded font-mono ml-2 ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>←→</kbd>
-                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{t('quickCheckout.shortcut.adjustQty')}</span>
-                    </div>
-                  </div>
-                  
-                  {/* Payment Mode */}
-                  <div className={`p-2 rounded-lg mb-2 ${isDark ? 'bg-slate-700/30' : 'bg-white'}`}>
-                    <p className={`text-xs font-medium mb-1 flex items-center gap-1 ${isDark ? 'text-cyan-400' : 'text-cyan-700'}`}>
-                      💳 {t('quickCheckout.paymentMode')}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs">
-                      <kbd className={`px-1.5 py-0.5 rounded font-mono ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>←</kbd>
-                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{t('invoice.cash')}</span>
-                      <kbd className={`px-1.5 py-0.5 rounded font-mono ml-2 ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>→</kbd>
-                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{t('quickCheckout.credit')}</span>
-                    </div>
-                  </div>
-                  
-                  {/* Actions */}
-                  <div className={`p-2 rounded-lg ${isDark ? 'bg-slate-700/30' : 'bg-white'}`}>
-                    <p className={`text-xs font-medium mb-1 flex items-center gap-1 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-                      ⚡ {t('quickCheckout.actions')}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="flex items-center gap-1">
-                        <kbd className={`px-1.5 py-0.5 rounded font-mono ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>Enter</kbd>
-                        <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{t('quickCheckout.shortcut.addItem')}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <kbd className={`px-1.5 py-0.5 rounded font-mono ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>Del</kbd>
-                        <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{t('quickCheckout.shortcut.removeLastItem')}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <kbd className={`px-1.5 py-0.5 rounded font-mono ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>Esc</kbd>
-                        <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{t('quickCheckout.shortcut.clear')}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

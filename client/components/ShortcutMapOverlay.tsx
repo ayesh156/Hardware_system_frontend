@@ -91,6 +91,7 @@ export const ShortcutMapOverlay: React.FC<ShortcutMapOverlayProps> = ({
           { key: 'F4', label: t('quickCheckout.shortcut.cart') || 'Cart' },
           { key: 'F5', label: t('quickCheckout.shortcut.payment') || 'Payment' },
           { key: 'F6', label: t('quickCheckout.shortcut.discount') || 'Discount' },
+          { key: 'F7', label: t('quickCheckout.shortcut.received') || 'Received Amount' },
           { key: 'F9', label: t('quickCheckout.shortcut.quickSave') || 'Quick Save' },
         ],
       };

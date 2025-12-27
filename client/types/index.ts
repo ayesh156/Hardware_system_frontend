@@ -188,6 +188,8 @@ export interface Invoice {
   taxRate?: number;
   tax: number;
   total: number;
+  receivedAmount?: number; // Amount received from customer
+  changeAmount?: number; // Change to return to customer
   issueDate: string;
   dueDate: string;
   status: 'paid' | 'pending' | 'overdue' | 'cancelled';

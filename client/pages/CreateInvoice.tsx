@@ -8,6 +8,7 @@ import { Customer, Product, Invoice, InvoiceItem, FlattenedProduct } from '../ty
 import { flattenProducts } from '../lib/utils';
 import { printInvoice } from '../components/modals/PrintInvoiceModal';
 import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
+import { generateNextInvoiceNumberSync, initializeFromExistingInvoices } from '../lib/invoiceNumberService';
 import {
   FileText, User, Package, CheckCircle, ChevronLeft, ChevronRight,
   Search, Plus, Trash2, Calendar, ArrowLeft, UserX, CreditCard,
@@ -19,9 +20,12 @@ import { toast } from 'sonner';
 
 // Extended Invoice Item with discount tracking and Sinhala translation
 interface ExtendedInvoiceItem extends InvoiceItem {
-  originalPrice: number;
+  originalPrice: number; // Original retail price (before any discount)
+  productDiscountedPrice?: number; // Price after product discount (before manual discount)
+  productDiscountAmount?: number; // Amount saved from product discount
   discountType?: 'percentage' | 'fixed';
   discountValue?: number;
+  manualDiscountAmount?: number; // Amount saved from manual discount
   isCustomPrice?: boolean;
   isQuickAdd?: boolean;
   productNameSi?: string; // Sinhala product name for printing
@@ -59,6 +63,12 @@ export const CreateInvoice: React.FC = () => {
   const [bulkDiscountPercent, setBulkDiscountPercent] = useState<number>(0);
   const [enableTax, setEnableTax] = useState<boolean>(false);
   const [taxRate, setTaxRate] = useState<number>(15);
+  
+  // Received amount and change calculation
+  const [receivedAmount, setReceivedAmount] = useState<number>(0);
+  
+  // Auto-generated but editable invoice number
+  const [invoiceNumber, setInvoiceNumber] = useState<string>('');
   
   // Enhanced pricing state
   const [priceMode, setPriceMode] = useState<'auto' | 'wholesale' | 'retail' | 'custom'>('auto');
@@ -100,6 +110,8 @@ export const CreateInvoice: React.FC = () => {
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const discountInputRef = useRef<HTMLInputElement>(null);
+  const receivedAmountInputRef = useRef<HTMLInputElement>(null);
+  const invoiceNumberInputRef = useRef<HTMLInputElement>(null);
   const itemDiscountInputRef = useRef<HTMLInputElement>(null);
   const notesInputRef = useRef<HTMLTextAreaElement>(null);
   // Walk-in button ref for quick focus
@@ -163,46 +175,57 @@ export const CreateInvoice: React.FC = () => {
   }, [flattenedProducts, productSearch, selectedProductId]);
 
   // Determine the best price based on customer type (uses FlattenedProduct)
-  const getProductPrice = (flatProduct: FlattenedProduct): { price: number; label: string; originalPrice: number } => {
+  // Returns detailed discount breakdown for cumulative tracking
+  const getProductPrice = (flatProduct: FlattenedProduct): { 
+    price: number; 
+    label: string; 
+    originalPrice: number;
+    hasProductDiscount: boolean;
+    productDiscountAmount: number;
+  } => {
     // For wholesale customers: use wholesale price directly, skip discounted price
     if (isWholesaleCustomer) {
       if (priceMode === 'custom' && customPrice > 0) {
-        return { price: customPrice, label: 'Custom', originalPrice: flatProduct.wholesalePrice };
+        return { price: customPrice, label: 'Custom', originalPrice: flatProduct.wholesalePrice, hasProductDiscount: false, productDiscountAmount: 0 };
       }
       // Default to wholesale price for wholesale customers
-      return { price: flatProduct.wholesalePrice, label: 'Wholesale', originalPrice: flatProduct.wholesalePrice };
+      return { price: flatProduct.wholesalePrice, label: 'Wholesale', originalPrice: flatProduct.wholesalePrice, hasProductDiscount: false, productDiscountAmount: 0 };
     }
     
     // For regular/retail customers:
     const retailPrice = flatProduct.retailPrice;
     
     // Check if product has a discounted price (only for non-wholesale)
-    const hasDiscount = flatProduct.hasDiscount && flatProduct.discountedPrice && flatProduct.discountedPrice < retailPrice;
-    const effectiveRetailPrice = hasDiscount ? flatProduct.discountedPrice! : retailPrice;
+    const hasProductDiscount = flatProduct.hasDiscount && flatProduct.discountedPrice && flatProduct.discountedPrice < retailPrice;
+    const effectiveRetailPrice = hasProductDiscount ? flatProduct.discountedPrice! : retailPrice;
+    const productDiscountAmount = hasProductDiscount ? retailPrice - flatProduct.discountedPrice! : 0;
     
     if (priceMode === 'custom' && customPrice > 0) {
-      return { price: customPrice, label: 'Custom', originalPrice: retailPrice };
+      return { price: customPrice, label: 'Custom', originalPrice: retailPrice, hasProductDiscount: false, productDiscountAmount: 0 };
     }
     if (priceMode === 'wholesale') {
-      return { price: flatProduct.wholesalePrice, label: 'Wholesale', originalPrice: retailPrice };
+      return { price: flatProduct.wholesalePrice, label: 'Wholesale', originalPrice: retailPrice, hasProductDiscount: false, productDiscountAmount: 0 };
     }
-    // Default to retail/discounted price
+    // Default to retail/discounted price - include product discount info
     return { 
       price: effectiveRetailPrice, 
-      label: hasDiscount ? 'Discounted' : 'Retail',
-      originalPrice: retailPrice 
+      label: hasProductDiscount ? 'Discounted' : 'Retail',
+      originalPrice: retailPrice,
+      hasProductDiscount: !!hasProductDiscount,
+      productDiscountAmount
     };
   };
 
-  // Calculate final price after item discount
-  const calculateFinalPrice = (basePrice: number): number => {
+  // Calculate final price after item discount and return discount amount
+  const calculateFinalPrice = (basePrice: number): { finalPrice: number; manualDiscountAmount: number } => {
     if (itemDiscountType === 'percentage' && itemDiscountValue > 0) {
-      return basePrice * (1 - itemDiscountValue / 100);
+      const discountAmount = basePrice * (itemDiscountValue / 100);
+      return { finalPrice: basePrice - discountAmount, manualDiscountAmount: discountAmount };
     }
     if (itemDiscountType === 'fixed' && itemDiscountValue > 0) {
-      return Math.max(0, basePrice - itemDiscountValue);
+      return { finalPrice: Math.max(0, basePrice - itemDiscountValue), manualDiscountAmount: Math.min(itemDiscountValue, basePrice) };
     }
-    return basePrice;
+    return { finalPrice: basePrice, manualDiscountAmount: 0 };
   };
 
   // Reset pricing options when product changes - default to Retail price
@@ -238,11 +261,17 @@ export const CreateInvoice: React.FC = () => {
     const flatProduct = flattenedProducts.find((fp) => fp.flatId === selectedProductId);
     if (!flatProduct) return;
 
-    const { price: basePrice, originalPrice } = getProductPrice(flatProduct);
-    const finalPrice = priceMode === 'custom' ? customPrice : calculateFinalPrice(basePrice);
+    const { price: basePrice, originalPrice, hasProductDiscount, productDiscountAmount } = getProductPrice(flatProduct);
+    
+    // Calculate manual discount on top of product discount
+    const { finalPrice: calculatedFinalPrice, manualDiscountAmount } = calculateFinalPrice(basePrice);
+    const finalPrice = priceMode === 'custom' ? customPrice : calculatedFinalPrice;
     
     // Get Sinhala product name from the product's nameAlt field
     const sinhalaName = flatProduct.product.nameAlt || flatProduct.displayName;
+    
+    // Calculate cumulative discount info
+    const totalDiscount = productDiscountAmount + (priceMode !== 'custom' ? manualDiscountAmount : 0);
     
     const newItem: ExtendedInvoiceItem = {
       id: `item-${Date.now()}`,
@@ -253,10 +282,13 @@ export const CreateInvoice: React.FC = () => {
       size: flatProduct.variant?.size,
       quantity,
       unitPrice: finalPrice,
-      originalPrice: originalPrice, // Store the original retail price for discount calculation
+      originalPrice: originalPrice, // Store the original retail price (before any discount)
+      productDiscountedPrice: hasProductDiscount ? basePrice : undefined, // Price after product discount
+      productDiscountAmount: productDiscountAmount > 0 ? productDiscountAmount : undefined, // Product discount amount
       total: quantity * finalPrice,
       discountType: itemDiscountType !== 'none' ? itemDiscountType : undefined,
       discountValue: itemDiscountValue > 0 ? itemDiscountValue : undefined,
+      manualDiscountAmount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined, // Manual discount amount
       isCustomPrice: priceMode === 'custom',
     };
 
@@ -272,12 +304,16 @@ export const CreateInvoice: React.FC = () => {
     } else {
       setItems([...items, newItem]);
       
-      // Show toast with discount info if applicable
-      if (flatProduct.hasDiscount && priceMode !== 'custom') {
-        const savings = originalPrice - finalPrice;
-        if (savings > 0) {
-          toast.success(`${flatProduct.displayName} - ${t('invoice.perItemDiscount')}: ${t('common.currency')} ${savings.toLocaleString()}`);
+      // Show toast with cumulative discount info if applicable
+      if (totalDiscount > 0 && priceMode !== 'custom') {
+        const discountParts = [];
+        if (productDiscountAmount > 0) {
+          discountParts.push(`${t('invoice.productDiscount')}: ${t('common.currency')} ${productDiscountAmount.toLocaleString()}`);
         }
+        if (manualDiscountAmount > 0) {
+          discountParts.push(`${t('invoice.manualDiscount')}: ${t('common.currency')} ${manualDiscountAmount.toLocaleString()}`);
+        }
+        toast.success(`${flatProduct.displayName} - ${t('invoice.totalSavings')}: ${t('common.currency')} ${totalDiscount.toLocaleString()}`);
       }
     }
 
@@ -330,13 +366,19 @@ export const CreateInvoice: React.FC = () => {
     
     const extItem = item as ExtendedInvoiceItem;
     let finalPrice = newPrice;
+    let manualDiscountAmount = 0;
     
-    // Apply discount if specified
+    // Apply manual discount if specified
     if (discountType === 'percentage' && discountValue > 0) {
-      finalPrice = newPrice * (1 - discountValue / 100);
+      manualDiscountAmount = newPrice * (discountValue / 100);
+      finalPrice = newPrice - manualDiscountAmount;
     } else if (discountType === 'fixed' && discountValue > 0) {
+      manualDiscountAmount = Math.min(discountValue, newPrice);
       finalPrice = Math.max(0, newPrice - discountValue);
     }
+    
+    // Calculate product discount (difference between original price and the base price being edited)
+    const productDiscountAmount = extItem.originalPrice > newPrice ? extItem.originalPrice - newPrice : (extItem.productDiscountAmount || 0);
     
     setItems(items.map(i => 
       i.id === itemId 
@@ -344,8 +386,11 @@ export const CreateInvoice: React.FC = () => {
             ...i, 
             unitPrice: finalPrice,
             total: i.quantity * finalPrice,
+            productDiscountedPrice: newPrice !== extItem.originalPrice ? newPrice : undefined,
+            productDiscountAmount: productDiscountAmount > 0 ? productDiscountAmount : undefined,
             discountType: discountType !== 'none' ? discountType : undefined,
             discountValue: discountValue > 0 ? discountValue : undefined,
+            manualDiscountAmount: manualDiscountAmount > 0 ? manualDiscountAmount : undefined,
           }
         : i
     ));
@@ -399,6 +444,26 @@ export const CreateInvoice: React.FC = () => {
   const tax = enableTax ? taxableAmount * (taxRate / 100) : 0;
   // Total = Subtotal - Final Discounts + Tax
   const total = taxableAmount + tax;
+  
+  // Calculate change amount
+  const changeAmount = receivedAmount > 0 ? Math.max(0, receivedAmount - total) : 0;
+  
+  // Initialize invoice counter from existing data on first render
+  useEffect(() => {
+    initializeFromExistingInvoices(mockInvoices);
+  }, []);
+  
+  // Generate next invoice number using the service
+  const generateNextInvoiceNumber = useCallback(() => {
+    return generateNextInvoiceNumberSync();
+  }, []);
+  
+  // Initialize invoice number on component mount
+  useEffect(() => {
+    if (!invoiceNumber) {
+      setInvoiceNumber(generateNextInvoiceNumber());
+    }
+  }, [invoiceNumber, generateNextInvoiceNumber]);
 
   const handleCreateInvoice = () => {
     if ((!selectedCustomer && !isWalkIn) || items.length === 0) return;
@@ -406,10 +471,11 @@ export const CreateInvoice: React.FC = () => {
     const customerName = isWalkIn ? 'Walk-in Customer' : (currentCustomer?.name || 'Unknown');
     const customerId = isWalkIn ? 'walk-in' : selectedCustomer;
 
-    const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    // Use the editable invoice number or generate a new one
+    const finalInvoiceNumber = invoiceNumber || generateNextInvoiceNumber();
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
-      invoiceNumber,
+      invoiceNumber: finalInvoiceNumber,
       customerId,
       customerName,
       items,
@@ -421,6 +487,8 @@ export const CreateInvoice: React.FC = () => {
       taxRate: enableTax ? taxRate : 0,
       tax: Math.round(tax * 100) / 100,
       total: Math.round(total * 100) / 100,
+      receivedAmount: receivedAmount > 0 ? Math.round(receivedAmount * 100) / 100 : undefined,
+      changeAmount: changeAmount > 0 ? Math.round(changeAmount * 100) / 100 : undefined,
       issueDate,
       dueDate,
       status: paymentMethod === 'credit' ? 'pending' : 'paid',
@@ -461,7 +529,7 @@ export const CreateInvoice: React.FC = () => {
     // Print directly without preview
     printInvoice(invoice, printCustomer, i18n.language as 'en' | 'si')
       .then(() => {
-        toast.success(`${t('invoice.invoiceCreated')}: ${invoiceNumber}`);
+        toast.success(`${t('invoice.invoiceCreated')}: ${finalInvoiceNumber}`);
         navigate('/invoices');
       })
       .catch(() => {
@@ -477,10 +545,10 @@ export const CreateInvoice: React.FC = () => {
     const customerName = isWalkIn ? 'Walk-in Customer' : (currentCustomer?.name || 'Unknown');
     const customerId = isWalkIn ? 'walk-in' : selectedCustomer;
 
-    const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const finalInvoiceNumber = invoiceNumber || generateNextInvoiceNumber();
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
-      invoiceNumber,
+      invoiceNumber: finalInvoiceNumber,
       customerId,
       customerName,
       items,
@@ -488,6 +556,8 @@ export const CreateInvoice: React.FC = () => {
       discount: Math.round(finalDiscount1 * 100) / 100,
       discountType: 'fixed',
       discountValue: totalFinalDiscount,
+      receivedAmount: receivedAmount > 0 ? Math.round(receivedAmount * 100) / 100 : undefined,
+      changeAmount: changeAmount > 0 ? Math.round(changeAmount * 100) / 100 : undefined,
       enableTax,
       taxRate: enableTax ? taxRate : 0,
       tax: Math.round(tax * 100) / 100,
@@ -504,7 +574,7 @@ export const CreateInvoice: React.FC = () => {
 
     // Show success toast
     toast.success(
-      `${t('invoice.invoiceSaved')}: ${invoiceNumber}`,
+      `${t('invoice.invoiceSaved')}: ${finalInvoiceNumber}`,
       { description: `${t('common.currency')} ${invoice.total.toLocaleString()}` }
     );
 
@@ -513,11 +583,13 @@ export const CreateInvoice: React.FC = () => {
     setSelectedCustomer('');
     setIsWalkIn(false);
     setDiscount(0);
+    setReceivedAmount(0);
     setDiscountType('none');
     setNotes('');
+    setInvoiceNumber(''); // Reset to generate new number
     setStep(1);
     navigate('/invoices');
-  }, [selectedCustomer, isWalkIn, items, currentCustomer, subtotal, finalDiscount1, totalFinalDiscount, enableTax, taxRate, tax, total, issueDate, dueDate, paymentMethod, notes, t, navigate]);
+  }, [selectedCustomer, isWalkIn, items, currentCustomer, subtotal, finalDiscount1, totalFinalDiscount, enableTax, taxRate, tax, total, issueDate, dueDate, paymentMethod, notes, t, navigate, invoiceNumber, generateNextInvoiceNumber, receivedAmount, changeAmount]);
 
   const handlePrintClose = () => {
     navigate('/invoices');
@@ -838,8 +910,16 @@ export const CreateInvoice: React.FC = () => {
           return;
         }
         
-        // F7 to focus notes (N shortcut removed)
-        if (e.key === 'F7' && !isInInput) {
+        // F7 to focus Received Amount input
+        if (e.key === 'F7') {
+          e.preventDefault();
+          receivedAmountInputRef.current?.focus();
+          receivedAmountInputRef.current?.select();
+          return;
+        }
+        
+        // F8 to focus notes
+        if (e.key === 'F8' && !isInInput) {
           e.preventDefault();
           notesInputRef.current?.focus();
           notesInputRef.current?.select();
@@ -1811,10 +1891,37 @@ export const CreateInvoice: React.FC = () => {
 
                     {/* Price Calculation Preview */}
                     {(() => {
-                      const { price: basePrice, label } = getProductPrice(currentProduct);
-                      const finalPrice = priceMode === 'custom' ? customPrice : calculateFinalPrice(basePrice);
-                      const hasDiscount = itemDiscountType !== 'none' && itemDiscountValue > 0;
                       const hasProductDiscount = currentProduct.hasDiscount && currentProduct.discountedPrice && currentProduct.discountedPrice < currentProduct.retailPrice;
+                      const hasItemDiscount = itemDiscountType !== 'none' && itemDiscountValue > 0;
+                      
+                      // Determine the base price based on price mode
+                      // For retail mode: use discounted price if available, otherwise retail price
+                      // For wholesale mode: use wholesale price
+                      // For custom mode: use custom price
+                      let basePriceForCalculation: number;
+                      let displayPriceLabel: string;
+                      
+                      if (priceMode === 'custom') {
+                        basePriceForCalculation = customPrice;
+                        displayPriceLabel = t('invoice.customPrice');
+                      } else if (priceMode === 'wholesale') {
+                        basePriceForCalculation = currentProduct.wholesalePrice;
+                        displayPriceLabel = t('invoice.wholesale') + ' ' + t('invoice.price');
+                      } else {
+                        // Retail mode (default) - use discounted price if available
+                        basePriceForCalculation = hasProductDiscount ? currentProduct.discountedPrice! : currentProduct.retailPrice;
+                        displayPriceLabel = t('invoice.retail') + ' ' + t('invoice.price');
+                      }
+                      
+                      // Apply additional item discount if any
+                      let finalUnitPrice = basePriceForCalculation;
+                      if (hasItemDiscount) {
+                        if (itemDiscountType === 'percentage' && itemDiscountValue > 0) {
+                          finalUnitPrice = basePriceForCalculation * (1 - itemDiscountValue / 100);
+                        } else if (itemDiscountType === 'fixed' && itemDiscountValue > 0) {
+                          finalUnitPrice = Math.max(0, basePriceForCalculation - itemDiscountValue);
+                        }
+                      }
                       
                       return (
                         <div className={`p-3 rounded-xl mb-4 ${
@@ -1823,9 +1930,7 @@ export const CreateInvoice: React.FC = () => {
                           {/* Selected Price Mode Display */}
                           <div className="flex items-center justify-between mb-2">
                             <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              {priceMode === 'custom' ? t('invoice.customPrice') : 
-                               priceMode === 'wholesale' ? t('invoice.wholesale') + ' ' + t('invoice.price') : 
-                               t('invoice.retail') + ' ' + t('invoice.price')}
+                              {displayPriceLabel}
                             </span>
                             {priceMode === 'retail' && hasProductDiscount ? (
                               <div className="flex items-center gap-2">
@@ -1833,25 +1938,25 @@ export const CreateInvoice: React.FC = () => {
                                   {t('common.currency')} {currentProduct.retailPrice.toLocaleString()}
                                 </span>
                                 <span className="text-sm font-semibold text-pink-500">
-                                  {t('common.currency')} {currentProduct.discountedPrice.toLocaleString()}
+                                  {t('common.currency')} {currentProduct.discountedPrice!.toLocaleString()}
                                 </span>
                               </div>
                             ) : (
                               <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                                {t('common.currency')} {basePrice.toLocaleString()}
+                                {t('common.currency')} {basePriceForCalculation.toLocaleString()}
                               </span>
                             )}
                           </div>
                           
                           {/* Additional Item Discount */}
-                          {hasDiscount && (
+                          {hasItemDiscount && (
                             <>
                               <div className="flex items-center justify-between mb-1">
                                 <span className={`text-xs text-pink-400`}>
                                   {t('invoice.itemDiscount')} ({itemDiscountType === 'percentage' ? `${itemDiscountValue}%` : `${t('common.currency')} ${itemDiscountValue}`})
                                 </span>
                                 <span className="text-sm text-pink-400">
-                                  - {t('common.currency')} {(basePrice - finalPrice).toLocaleString()}
+                                  - {t('common.currency')} {(basePriceForCalculation - finalUnitPrice).toLocaleString()}
                                 </span>
                               </div>
                               <div className={`border-t pt-1 mt-1 mb-2 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
@@ -1860,21 +1965,21 @@ export const CreateInvoice: React.FC = () => {
                                     {t('invoice.finalUnitPrice')}
                                   </span>
                                   <span className="text-sm font-bold text-emerald-500">
-                                    {t('common.currency')} {finalPrice.toLocaleString()}
+                                    {t('common.currency')} {finalUnitPrice.toLocaleString()}
                                   </span>
                                 </div>
                               </div>
                             </>
                           )}
                           
-                          {/* Invoice Total */}
+                          {/* Line Item Total */}
                           <div className={`flex items-center justify-between mt-2 pt-2 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                             <span className={`text-sm font-medium flex items-center gap-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                               <Calculator className="w-3.5 h-3.5" />
-                              {t('invoice.total')} ({quantity} × {t('common.currency')} {finalPrice.toLocaleString()})
+                              {t('invoice.lineTotal')} ({quantity} × {t('common.currency')} {finalUnitPrice.toLocaleString()})
                             </span>
                             <span className="text-lg font-bold text-emerald-500">
-                              {t('common.currency')} {(quantity * finalPrice).toLocaleString()}
+                              {t('common.currency')} {(quantity * finalUnitPrice).toLocaleString()}
                             </span>
                           </div>
                         </div>
@@ -1996,21 +2101,72 @@ export const CreateInvoice: React.FC = () => {
                                       </span>
                                     )}
                                   </div>
-                                  <div className={`text-xs flex items-center gap-2 flex-wrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    {extItem.originalPrice !== item.unitPrice && (
-                                      <span className="line-through">
+                                  
+                                  {/* Discount Breakdown - Enhanced with Cumulative Tracking */}
+                                  <div className={`text-xs space-y-1 mt-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    {/* Original Price */}
+                                    <div className="flex items-center gap-1">
+                                      <span className="font-medium">{t('invoice.originalPrice')}:</span>
+                                      <span className={extItem.originalPrice !== item.unitPrice ? 'line-through text-slate-500' : ''}>
                                         {t('common.currency')} {extItem.originalPrice.toLocaleString()}
                                       </span>
+                                    </div>
+                                    
+                                    {/* Product Discount (Pre-defined discount from inventory) */}
+                                    {extItem.productDiscountAmount && extItem.productDiscountAmount > 0 && (
+                                      <div className="flex items-center gap-1 pl-3 border-l-2 border-orange-500/30">
+                                        <Tag className="w-3 h-3 text-orange-500" />
+                                        <span className="text-orange-600 dark:text-orange-400 font-medium">
+                                          {t('invoice.productDiscount')}:
+                                        </span>
+                                        <span className="text-orange-500 font-semibold">
+                                          -{t('common.currency')} {extItem.productDiscountAmount.toLocaleString()}
+                                        </span>
+                                        {extItem.productDiscountedPrice && (
+                                          <span className="text-slate-400 ml-1">
+                                            → {t('common.currency')} {extItem.productDiscountedPrice.toLocaleString()}
+                                          </span>
+                                        )}
+                                      </div>
                                     )}
-                                    <span className={extItem.originalPrice !== item.unitPrice ? 'text-emerald-500 font-medium' : ''}>
-                                      {t('common.currency')} {item.unitPrice.toLocaleString()}
-                                    </span>
-                                    <span>× {item.quantity}</span>
-                                    {extItem.discountType && (
-                                      <span className="text-pink-400">
-                                        ({extItem.discountType === 'percentage' ? `${extItem.discountValue}% ${t('invoice.off')}` : `${t('common.currency')} ${extItem.discountValue} ${t('invoice.off')}`})
+                                    
+                                    {/* Manual Discount (Applied at checkout) */}
+                                    {extItem.manualDiscountAmount && extItem.manualDiscountAmount > 0 && (
+                                      <div className="flex items-center gap-1 pl-3 border-l-2 border-pink-500/30">
+                                        <Percent className="w-3 h-3 text-pink-500" />
+                                        <span className="text-pink-600 dark:text-pink-400 font-medium">
+                                          {t('invoice.manualDiscount')}:
+                                        </span>
+                                        <span className="text-pink-500 font-semibold">
+                                          -{t('common.currency')} {extItem.manualDiscountAmount.toLocaleString()}
+                                        </span>
+                                        <span className="text-pink-400 text-xs">
+                                          ({extItem.discountType === 'percentage' ? `${extItem.discountValue}%` : `${t('common.currency')} ${extItem.discountValue}`})
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Total Discount Summary (if both discounts exist) */}
+                                    {(extItem.productDiscountAmount || 0) + (extItem.manualDiscountAmount || 0) > 0 && (
+                                      <div className="flex items-center gap-1 pl-3 border-l-2 border-emerald-500/50 bg-emerald-500/5 rounded-r py-0.5 pr-1">
+                                        <Sparkles className="w-3 h-3 text-emerald-500" />
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                          {t('invoice.totalSavings')}:
+                                        </span>
+                                        <span className="text-emerald-500 font-bold">
+                                          -{t('common.currency')} {((extItem.productDiscountAmount || 0) + (extItem.manualDiscountAmount || 0)).toLocaleString()}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Final Price */}
+                                    <div className="flex items-center gap-1 font-medium pt-0.5 border-t border-dashed border-slate-600/30 mt-1">
+                                      <span>{t('invoice.finalPrice')}:</span>
+                                      <span className="text-emerald-500 font-bold text-sm">
+                                        {t('common.currency')} {item.unitPrice.toLocaleString()}
                                       </span>
-                                    )}
+                                      <span className="text-slate-500">× {item.quantity}</span>
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -2029,7 +2185,7 @@ export const CreateInvoice: React.FC = () => {
                                   <button
                                     onClick={() => {
                                       setEditingItemId(item.id);
-                                      setEditingPrice(extItem.originalPrice || item.unitPrice);
+                                      setEditingPrice(extItem.productDiscountedPrice || extItem.originalPrice || item.unitPrice);
                                       setEditingDiscountType(extItem.discountType || 'none');
                                       setEditingDiscountValue(extItem.discountValue || 0);
                                     }}
@@ -2046,7 +2202,7 @@ export const CreateInvoice: React.FC = () => {
                                   </button>
                                 </div>
                               </div>
-                              <div className="flex justify-end mt-1">
+                              <div className="flex justify-end mt-2">
                                 <span className="text-emerald-500 font-semibold">
                                   {t('common.currency')} {item.total.toLocaleString()}
                                 </span>
@@ -2194,86 +2350,104 @@ export const CreateInvoice: React.FC = () => {
             <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
               {/* Left Panel - Settings */}
               <div className="xl:col-span-2 space-y-4">
-                {/* Customer Info Card */}
+                {/* Final Discounts */}
                 <div className={`p-4 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
-                  <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    <User className="w-4 h-4 text-blue-400" />
-                    {t('invoice.customer')}
+                  <h4 className={`text-base font-semibold mb-3 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <span className="flex items-center gap-2">
+                      <Tag className="w-5 h-5 text-pink-400" />
+                      {t('invoice.finalDiscount')}
+                    </span>
+                    <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F5</kbd>
                   </h4>
-                  {isWalkIn ? (
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        theme === 'dark' ? 'bg-purple-500/20' : 'bg-purple-100'
-                      }`}>
-                        <UserX className="w-5 h-5 text-purple-400" />
-                      </div>
-                      <div>
-                        <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{t('invoice.walkInCustomer')}</p>
-                        <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('invoice.cashQuickSale')}</p>
+                  <div className="space-y-3">
+                    {/* Final Discount 1 */}
+                    <div>
+                      <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {t('invoice.finalDiscount1')}
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex-1">
+                          <span className={`absolute left-3 top-2.5 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('common.currency')}</span>
+                          <input
+                            ref={discountInputRef}
+                            type="number"
+                            min="0"
+                            max={subtotal}
+                            value={discount || ''}
+                            onChange={(e) => setDiscount(Math.min(subtotal, Math.max(0, parseFloat(e.target.value) || 0)))}
+                            placeholder="0"
+                            className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 ${
+                              theme === 'dark'
+                                ? 'border-slate-600 bg-slate-800 text-white placeholder-slate-500'
+                                : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400'
+                            }`}
+                          />
+                        </div>
+                        {discount > 0 && (
+                          <span className="text-pink-400 font-medium whitespace-nowrap">
+                            - {t('common.currency')} {discount.toLocaleString()}
+                          </span>
+                        )}
                       </div>
                     </div>
-                  ) : currentCustomer && (
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold ${
-                        theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
-                      }`}>
-                        {(isSinhala && currentCustomer.nameSi ? currentCustomer.nameSi : currentCustomer.name).charAt(0)}
-                      </div>
-                      <div>
-                        <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{isSinhala && currentCustomer.nameSi ? currentCustomer.nameSi : currentCustomer.name}</p>
-                        <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{currentCustomer.businessName}</p>
-                        <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{currentCustomer.phone}</p>
-                      </div>
-                      {currentCustomer.customerType === 'wholesale' && (
-                        <span className="ml-auto px-2 py-1 text-xs font-medium bg-purple-500/10 text-purple-400 rounded">
-                          {t('invoice.wholesale')}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  </div>
                 </div>
 
-                {/* Dates */}
+                {/* Received Amount - F7 shortcut */}
                 <div className={`p-4 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
-                  <h4 className={`font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    <Calendar className="w-4 h-4 text-cyan-400" />
-                    {t('invoice.invoiceDates')}
+                  <h4 className={`text-base font-semibold mb-3 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <span className="flex items-center gap-2">
+                      <Banknote className="w-5 h-5 text-green-400" />
+                      {t('invoice.receivedAmount')}
+                    </span>
+                    <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F7</kbd>
                   </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {t('invoice.issueDate')}
-                      </label>
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <span className={`absolute left-3 top-2.5 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('common.currency')}</span>
                       <input
-                        type="date"
-                        value={issueDate}
-                        onChange={(e) => setIssueDate(e.target.value)}
-                        className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                        ref={receivedAmountInputRef}
+                        type="number"
+                        min="0"
+                        value={receivedAmount || ''}
+                        onChange={(e) => setReceivedAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                        placeholder={total > 0 ? total.toFixed(2) : '0'}
+                        className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 ${
                           theme === 'dark'
-                            ? 'border-slate-600 bg-slate-800 text-white'
-                            : 'border-slate-200 bg-slate-50 text-slate-900'
+                            ? 'border-slate-600 bg-slate-800 text-white placeholder-slate-500'
+                            : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400'
                         }`}
                       />
                     </div>
-                    <div>
-                      <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {t('invoice.dueDate')}
-                      </label>
-                      <input
-                        type="date"
-                        value={dueDate}
-                        onChange={(e) => setDueDate(e.target.value)}
-                        className={`w-full px-3 py-2 border rounded-lg text-sm ${
-                          theme === 'dark'
-                            ? 'border-slate-600 bg-slate-800 text-white'
-                            : 'border-slate-200 bg-slate-50 text-slate-900'
-                        }`}
-                      />
-                    </div>
+                    {/* Change Display */}
+                    {receivedAmount > 0 && (
+                      <div className={`p-3 rounded-lg ${
+                        changeAmount >= 0
+                          ? theme === 'dark' ? 'bg-green-900/30 border border-green-700' : 'bg-green-50 border border-green-200'
+                          : theme === 'dark' ? 'bg-red-900/30 border border-red-700' : 'bg-red-50 border border-red-200'
+                      }`}>
+                        <div className="flex justify-between items-center">
+                          <span className={`text-sm font-medium ${
+                            changeAmount >= 0
+                              ? theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                              : theme === 'dark' ? 'text-red-400' : 'text-red-600'
+                          }`}>
+                            {t('invoice.changeAmount')}
+                          </span>
+                          <span className={`text-lg font-bold font-mono ${
+                            changeAmount >= 0
+                              ? theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                              : theme === 'dark' ? 'text-red-400' : 'text-red-600'
+                          }`}>
+                            {t('common.currency')} {changeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2281,9 +2455,9 @@ export const CreateInvoice: React.FC = () => {
                 <div className={`p-4 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
-                  <h4 className={`font-semibold mb-3 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <h4 className={`text-base font-semibold mb-3 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <span className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-emerald-400" />
+                      <CreditCard className="w-5 h-5 text-emerald-400" />
                       {t('invoice.paymentMethod')}
                     </span>
                     <span className={`text-xs font-normal flex items-center gap-3 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -2325,94 +2499,13 @@ export const CreateInvoice: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Final Discounts */}
-                <div className={`p-4 rounded-xl border ${
-                  theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
-                }`}>
-                  <h4 className={`font-semibold mb-3 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    <span className="flex items-center gap-2">
-                      <Tag className="w-4 h-4 text-pink-400" />
-                      {t('invoice.finalDiscount')}
-                    </span>
-                    <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F5</kbd>
-                  </h4>
-                  <div className="space-y-3">
-                    {/* Final Discount 1 */}
-                    <div>
-                      <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {t('invoice.finalDiscount1')}
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <div className="relative flex-1">
-                          <span className={`absolute left-3 top-2.5 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('common.currency')}</span>
-                          <input
-                            ref={discountInputRef}
-                            type="number"
-                            min="0"
-                            max={subtotal}
-                            value={discount || ''}
-                            onChange={(e) => setDiscount(Math.min(subtotal, Math.max(0, parseFloat(e.target.value) || 0)))}
-                            placeholder="0"
-                            className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 ${
-                              theme === 'dark'
-                                ? 'border-slate-600 bg-slate-800 text-white placeholder-slate-500'
-                                : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400'
-                            }`}
-                          />
-                        </div>
-                        {discount > 0 && (
-                          <span className="text-pink-400 font-medium whitespace-nowrap">
-                            - {t('common.currency')} {discount.toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Apply Discount to All Items */}
-                    <div className={`pt-3 mt-3 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
-                      <p className={`text-xs mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {t('invoice.applyDiscountToAll')}
-                      </p>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={bulkDiscountPercent || ''}
-                            onChange={(e) => setBulkDiscountPercent(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                            placeholder={t('invoice.enterDiscountPercent')}
-                            className={`w-full px-3 py-2 pr-8 text-sm border rounded-lg focus:outline-none transition-all ${
-                              theme === 'dark'
-                                ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-pink-500'
-                                : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-pink-500'
-                            }`}
-                          />
-                          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>%</span>
-                        </div>
-                        <button
-                          onClick={() => applyDiscountToAll(bulkDiscountPercent)}
-                          disabled={items.length === 0 || bulkDiscountPercent <= 0}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            items.length > 0 && bulkDiscountPercent > 0
-                              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:shadow-pink-500/30'
-                              : theme === 'dark' ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                          }`}
-                        >
-                          {t('common.apply')}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Tax Settings */}
                 <div className={`p-4 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
-                  <h4 className={`font-semibold mb-3 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <h4 className={`text-base font-semibold mb-3 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <span className="flex items-center gap-2">
-                      <Calculator className="w-4 h-4 text-cyan-400" />
+                      <Calculator className="w-5 h-5 text-cyan-400" />
                       {t('invoice.taxSettings')}
                     </span>
                     <div className="flex items-center gap-2">
@@ -2472,13 +2565,13 @@ export const CreateInvoice: React.FC = () => {
                 <div className={`p-4 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
                 }`}>
-                  <label className={`text-sm font-medium mb-2 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <label className={`text-base font-semibold mb-2 flex items-center justify-between ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     <span className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-slate-400" />
+                      <FileText className="w-5 h-5 text-slate-400" />
                       {t('invoice.notes')}
                     </span>
                     <div className="flex items-center gap-2">
-                      <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F7</kbd>
+                      <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>F8</kbd>
                     </div>
                   </label>
                   <textarea
@@ -2498,188 +2591,300 @@ export const CreateInvoice: React.FC = () => {
 
               {/* Right Panel - Invoice Preview */}
               <div className="xl:col-span-3">
-                <div className={`rounded-2xl overflow-hidden shadow-2xl ${
-                  theme === 'dark' ? 'shadow-black/50' : 'shadow-slate-300/50'
+                <div className={`rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[600px] ${
+                  theme === 'dark' ? 'shadow-black/50 bg-slate-900' : 'shadow-slate-300/50 bg-white'
                 }`}>
-                  {/* Invoice Preview Header */}
-                  <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 p-6 text-white">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h2 className="text-2xl font-bold tracking-tight">LIYANAGE HARDWARE</h2>
-                        <p className="text-amber-200 text-xs mt-1 tracking-widest">QUALITY BUILDING MATERIALS</p>
+                  {/* Invoice Preview Header - Compact Paper Bill Style */}
+                  <div className={`px-4 py-3 text-center border-b-2 border-dashed flex-shrink-0 ${
+                    theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-300 bg-gradient-to-b from-slate-50 to-white'
+                  }`}>
+                    {/* Store Logo/Name - Compact */}
+                    <div className="mb-2">
+                      <h2 className={`text-lg font-black tracking-tight ${
+                        theme === 'dark' ? 'text-amber-400' : 'text-amber-700'
+                      }`}>🏪 LIYANAGE HARDWARE</h2>
+                      <p className={`text-[10px] tracking-widest uppercase mt-0.5 ${
+                        theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                      }`}>Quality Building Materials</p>
+                    </div>
+                    
+                    {/* Invoice Number Display - Compact */}
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="text-center">
+                        <p className={`text-[9px] font-bold uppercase tracking-wider mb-0.5 ${
+                          theme === 'dark' ? 'text-slate-400' : 'text-slate-400'
+                        }`}>{t('tableHeaders.invoice')}</p>
+                        <div className={`inline-block px-2.5 py-1 rounded border font-mono ${
+                          theme === 'dark' 
+                            ? 'border-emerald-500/50 bg-emerald-500/5' 
+                            : 'border-emerald-400/60 bg-emerald-50'
+                        }`}>
+                          <p className={`text-sm font-bold tracking-wide ${
+                            theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'
+                          }`}>
+                            {invoiceNumber}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-3xl font-bold tracking-wider">{t('tableHeaders.invoice').toUpperCase()}</p>
-                        <p className="text-blue-200 text-sm mt-1">#{`INV-${new Date().getFullYear()}-XXXXXX`}</p>
+                      <div className={`w-px h-8 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'}`}></div>
+                      <div className="text-center">
+                        <p className={`text-[9px] font-bold uppercase tracking-wider mb-0.5 ${
+                          theme === 'dark' ? 'text-slate-400' : 'text-slate-400'
+                        }`}>{t('invoice.issueDate')}</p>
+                        <p className={`text-xs font-semibold font-mono ${
+                          theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'
+                        }`}>
+                          {new Date(issueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Invoice Body */}
-                  <div className={`p-6 ${theme === 'dark' ? 'bg-slate-900' : 'bg-white'}`}>
-                    {/* Customer & Date Row */}
-                    <div className="flex justify-between mb-6 pb-4 border-b border-dashed border-slate-300 dark:border-slate-700">
-                      <div>
-                        <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>{t('invoice.billTo')}</p>
-                        <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {/* Invoice Body - Scrollable */}
+                  <div className={`p-4 overflow-y-auto flex-1 ${theme === 'dark' ? 'bg-slate-900' : 'bg-white'}`}>
+                    {/* Customer & Date Info - Compact Row */}
+                    <div className={`flex justify-between items-start mb-3 pb-2 border-b ${
+                      theme === 'dark' ? 'border-slate-800' : 'border-slate-100'
+                    }`}>
+                      <div className="flex-1">
+                        <p className={`text-[9px] font-bold uppercase tracking-wider mb-0.5 ${
+                          theme === 'dark' ? 'text-slate-500' : 'text-slate-400'
+                        }`}>{t('invoice.billTo')}</p>
+                        <p className={`text-xs font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                           {isWalkIn ? t('invoice.walkInCustomer') : (isSinhala && currentCustomer?.nameSi ? currentCustomer.nameSi : currentCustomer?.name)}
                         </p>
                         {!isWalkIn && currentCustomer && (
-                          <>
-                            <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{currentCustomer.businessName}</p>
-                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{currentCustomer.phone}</p>
-                          </>
+                          <p className={`text-[10px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{currentCustomer.phone}</p>
                         )}
                       </div>
                       <div className="text-right">
-                        <div className="mb-2">
-                          <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('invoice.issueDate')}</p>
-                          <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                            {new Date(issueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                          </p>
-                        </div>
-                        <div>
-                          <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{t('invoice.dueDate')}</p>
-                          <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                            {new Date(dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                          </p>
-                        </div>
+                        <p className={`text-[9px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{t('invoice.issueDate')}</p>
+                        <p className={`text-[10px] font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                          {new Date(issueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
                       </div>
                     </div>
 
-                    {/* Items Table */}
-                    <div className="mb-6">
-                      <table className="w-full">
-                        <thead>
-                          <tr className={`text-xs uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                            <th className="text-left py-2 font-semibold">#</th>
-                            <th className="text-left py-2 font-semibold">{t('tableHeaders.item')}</th>
-                            <th className="text-center py-2 font-semibold">{t('tableHeaders.qty')}</th>
-                            <th className="text-right py-2 font-semibold">{t('tableHeaders.price')}</th>
-                            <th className="text-right py-2 font-semibold">{t('tableHeaders.total')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                          {items.slice(0, 5).map((item, index) => {
-                            const extItem = item as ExtendedInvoiceItem;
-                            return (
-                              <tr key={item.id} className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                                <td className={`py-2 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{index + 1}</td>
-                                <td className="py-2">
-                                  <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{isSinhala ? (item.productNameSi || item.productName) : item.productName}</span>
-                                  {extItem.discountType && (
-                                    <span className="ml-2 text-xs text-pink-400">
-                                      ({extItem.discountType === 'percentage' ? `${extItem.discountValue}% ${t('invoice.off')}` : `${t('common.currency')} ${extItem.discountValue} ${t('invoice.off')}`})
-                                    </span>
-                                  )}
-                                  {extItem.isQuickAdd && (
-                                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-500/10 text-amber-400 rounded">{t('invoice.quickBadge')}</span>
-                                  )}
-                                </td>
-                                <td className="py-2 text-center">{item.quantity}</td>
-                                <td className={`py-2 text-right font-mono ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  {extItem.originalPrice !== item.unitPrice && (
-                                    <span className="line-through text-xs mr-2 opacity-60">
-                                      {t('common.currency')} {extItem.originalPrice.toLocaleString()}
-                                    </span>
-                                  )}
-                                  <span className={extItem.originalPrice !== item.unitPrice ? 'text-emerald-500 font-medium' : ''}>
-                                    {t('common.currency')} {item.unitPrice.toLocaleString()}
+                    {/* Items Table - Bill Style - Compact */}
+                    <div className="mb-3">
+                      {/* Table Header */}
+                      <div className={`grid grid-cols-12 gap-0.5 py-1.5 text-[9px] font-bold uppercase tracking-wider border-b-2 ${
+                        theme === 'dark' ? 'text-slate-400 border-slate-700' : 'text-slate-500 border-slate-200'
+                      }`}>
+                        <div className="col-span-5">{t('tableHeaders.item')}</div>
+                        <div className="col-span-2 text-center">{t('tableHeaders.qty')}</div>
+                        <div className="col-span-2 text-right">{t('tableHeaders.price')}</div>
+                        <div className="col-span-3 text-right">{t('tableHeaders.total')}</div>
+                      </div>
+                      
+                      {/* Table Body */}
+                      <div className={`divide-y ${theme === 'dark' ? 'divide-slate-800/30' : 'divide-slate-100'}`}>
+                        {items.slice(0, 6).map((item) => {
+                          const extItem = item as ExtendedInvoiceItem;
+                          const hasDiscount = extItem.originalPrice > item.unitPrice;
+                          const totalDiscountPerUnit = (extItem.productDiscountAmount || 0) + (extItem.manualDiscountAmount || 0);
+                          const totalSavings = totalDiscountPerUnit * item.quantity;
+                          
+                          return (
+                            <div key={item.id}>
+                              {/* Main item row */}
+                              <div className="grid grid-cols-12 gap-0.5 py-1 text-[10px]">
+                                <div className="col-span-5">
+                                  <span className={`font-medium block ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                    {isSinhala ? (item.productNameSi || item.productName) : item.productName}
                                   </span>
-                                </td>
-                                <td className={`py-2 text-right font-mono font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                                  {t('common.currency')} {item.total.toLocaleString()}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                          {items.length > 5 && (
-                            <tr>
-                              <td colSpan={5} className={`py-2 text-center text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                                {t('invoice.andMoreItems').replace('{count}', (items.length - 5).toString())}
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
+                                  {/* Show original price if there's any discount */}
+                                  {hasDiscount && (
+                                    <span className={`text-[8px] flex items-center gap-1 mt-0.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                      {t('invoice.originalPrice')}: {t('common.currency')} {extItem.originalPrice.toLocaleString()}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className={`col-span-2 text-center ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  {item.quantity}
+                                </div>
+                                <div className={`col-span-2 text-right font-mono ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  {/* Show discounted unit price if discount exists */}
+                                  {hasDiscount ? (
+                                    <div className="flex flex-col items-end">
+                                      <span className="line-through text-[8px] opacity-60">{extItem.originalPrice.toLocaleString()}</span>
+                                      <span className="text-emerald-400 font-semibold">{item.unitPrice.toLocaleString()}</span>
+                                    </div>
+                                  ) : (
+                                    item.unitPrice.toLocaleString()
+                                  )}
+                                </div>
+                                <div className={`col-span-3 text-right font-mono font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                  {item.total.toLocaleString()}
+                                </div>
+                              </div>
+                              
+                              {/* Cumulative Discount Breakdown if applicable */}
+                              {hasDiscount && (
+                                <div className={`text-[8px] pl-1 pb-1 space-y-0.5 ${
+                                  theme === 'dark' ? 'text-slate-500' : 'text-slate-400'
+                                }`}>
+                                  {/* Product Discount */}
+                                  {extItem.productDiscountAmount && extItem.productDiscountAmount > 0 && (
+                                    <div className={`flex items-center gap-1 pl-1 border-l-2 ${
+                                      theme === 'dark' ? 'border-orange-500/30 text-orange-400' : 'border-orange-300 text-orange-600'
+                                    }`}>
+                                      <Tag className="w-2 h-2" />
+                                      <span>{t('invoice.productDiscount')}: -{t('common.currency')} {extItem.productDiscountAmount.toLocaleString()}</span>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Manual Discount */}
+                                  {extItem.manualDiscountAmount && extItem.manualDiscountAmount > 0 && (
+                                    <div className={`flex items-center gap-1 pl-1 border-l-2 ${
+                                      theme === 'dark' ? 'border-pink-500/30 text-pink-400' : 'border-pink-300 text-pink-600'
+                                    }`}>
+                                      <Percent className="w-2 h-2" />
+                                      <span>
+                                        {t('invoice.manualDiscount')}: -{t('common.currency')} {extItem.manualDiscountAmount.toLocaleString()}
+                                        {extItem.discountType && (
+                                          <span className="opacity-70 ml-1">
+                                            ({extItem.discountType === 'percentage' ? `${extItem.discountValue}%` : `${t('common.currency')} ${extItem.discountValue}`})
+                                          </span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Total Savings */}
+                                  {totalSavings > 0 && (
+                                    <div className={`flex items-center justify-between gap-1 pl-1 border-l-2 ${
+                                      theme === 'dark' ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/5' : 'border-emerald-300 text-emerald-600 bg-emerald-50'
+                                    } rounded-r py-0.5 pr-1`}>
+                                      <span className="flex items-center gap-1">
+                                        <Sparkles className="w-2 h-2" />
+                                        {t('invoice.totalSavings')}
+                                      </span>
+                                      <span className="font-bold">-{t('common.currency')} {totalSavings.toLocaleString()}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {items.length > 6 && (
+                          <div className={`py-1 text-center text-[9px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                            +{items.length - 6} {t('invoice.moreItems')}...
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Totals */}
-                    <div className="flex justify-end">
-                      <div className="w-64">
-                        {/* Subtotal (includes item discounts already) */}
-                        <div className={`flex justify-between py-2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                          <span>{t('invoice.subtotal')}</span>
-                          <span className="font-mono">{t('common.currency')} {subtotal.toLocaleString()}</span>
+                    {/* Totals Section - Receipt Style - Compact */}
+                    <div className={`border-t-2 border-dashed pt-2 ${
+                      theme === 'dark' ? 'border-slate-700' : 'border-slate-300'
+                    }`}>
+                      {/* Subtotal */}
+                      <div className={`flex justify-between py-0.5 text-[9px] ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <span>{t('invoice.subtotal')}</span>
+                        <span className="font-mono">{t('common.currency')} {subtotal.toLocaleString()}</span>
+                      </div>
+                      
+                      {/* Item Discounts */}
+                      {totalItemDiscounts > 0 && (
+                        <div className="flex justify-between py-0.5 text-[9px] text-pink-400">
+                          <span className="flex items-center gap-0.5">
+                            <Sparkles className="w-2.5 h-2.5" />
+                            {t('invoice.itemDiscounts')}
+                          </span>
+                          <span className="font-mono">-{t('common.currency')} {totalItemDiscounts.toLocaleString()}</span>
                         </div>
-                        {/* Item discounts info (if any) */}
-                        {totalItemDiscounts > 0 && (
-                          <div className="flex justify-between py-1 text-xs text-pink-400 items-center">
-                            <span className="flex items-center gap-1">
-                              <Sparkles className="w-3 h-3" />
-                              {t('invoice.itemDiscounts')}
-                            </span>
-                            <span className="font-mono">({t('common.currency')} {totalItemDiscounts.toLocaleString()})</span>
-                          </div>
-                        )}
-                        {/* Final Discount 1 */}
-                        {finalDiscount1 > 0 && (
-                          <div className="flex justify-between py-2 text-sm text-pink-400 items-center">
-                            <span className="flex items-center gap-1.5">
-                              <Tag className="w-3.5 h-3.5" />
-                              {t('invoice.finalDiscount1')}
-                            </span>
-                            <span className="font-mono">- {t('common.currency')} {finalDiscount1.toLocaleString()}</span>
-                          </div>
-                        )}
-                        {enableTax && (
-                          <div className={`flex justify-between py-2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <span>{t('invoice.tax')} ({taxRate}%)</span>
-                            <span className="font-mono">{t('common.currency')} {tax.toFixed(2)}</span>
-                          </div>
-                        )}
-                        <div className={`flex justify-between py-3 mt-2 border-t-2 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
-                          <span className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{t('invoice.totalAmount')}</span>
-                          <span className="text-xl font-bold text-emerald-500">{t('common.currency')} {total.toLocaleString()}</span>
+                      )}
+                      
+                      {/* Final Discount */}
+                      {finalDiscount1 > 0 && (
+                        <div className="flex justify-between py-0.5 text-[9px] text-pink-400">
+                          <span className="flex items-center gap-0.5">
+                            <Tag className="w-2.5 h-2.5" />
+                            {t('invoice.finalDiscount1')}
+                          </span>
+                          <span className="font-mono">-{t('common.currency')} {finalDiscount1.toLocaleString()}</span>
                         </div>
+                      )}
+                      
+                      {/* Tax */}
+                      {enableTax && (
+                        <div className={`flex justify-between py-0.5 text-[9px] ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                          <span>{t('invoice.tax')} ({taxRate}%)</span>
+                          <span className="font-mono">+{t('common.currency')} {tax.toFixed(2)}</span>
+                        </div>
+                      )}
+                      
+                      {/* Grand Total */}
+                      <div className={`flex justify-between items-center py-2 mt-1.5 border-t-2 border-double ${
+                        theme === 'dark' ? 'border-slate-600' : 'border-slate-300'
+                      }`}>
+                        <span className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                          {t('invoice.totalAmount')}
+                        </span>
+                        <span className={`text-base font-black font-mono ${
+                          theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'
+                        }`}>
+                          {t('common.currency')} {total.toLocaleString()}
+                        </span>
+                      </div>
+                      
+                      {/* Payment Info Row - Compact */}
+                      <div className={`flex justify-between items-center py-1.5 mt-1 rounded px-2 text-[9px] ${
+                        theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
+                      }`}>
+                        <div className="flex items-center gap-1">
+                          <span className={`${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {t('invoice.paymentMethod')}:
+                          </span>
+                          <span className={`font-semibold px-1.5 py-0.5 rounded text-[8px] ${
+                            paymentMethod === 'cash' ? 'bg-emerald-500/20 text-emerald-400' :
+                            paymentMethod === 'card' ? 'bg-blue-500/20 text-blue-400' :
+                            paymentMethod === 'bank_transfer' ? 'bg-purple-500/20 text-purple-400' :
+                            'bg-amber-500/20 text-amber-400'
+                          }`}>
+                            {paymentMethod === 'cash' ? `${t('invoice.cash')}` :
+                             paymentMethod === 'card' ? `${t('invoice.card')}` :
+                             paymentMethod === 'bank_transfer' ? `${t('invoice.bankTransfer')}` :
+                             `${t('invoice.credit')}`}
+                          </span>
+                        </div>
+                        <span className={`font-bold px-1.5 py-0.5 rounded text-[8px] ${
+                          paymentMethod === 'credit' 
+                            ? 'bg-amber-500/20 text-amber-400' 
+                            : 'bg-emerald-500/20 text-emerald-400'
+                        }`}>
+                          {paymentMethod === 'credit' ? `${t('invoice.pending')}` : `${t('invoice.paid')}`}
+                        </span>
                       </div>
                     </div>
 
-                    {/* Payment Badge */}
-                    <div className="mt-4 flex justify-between items-center">
-                      <div className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
-                        paymentMethod === 'cash' ? 'bg-emerald-500/10 text-emerald-400' :
-                        paymentMethod === 'card' ? 'bg-blue-500/10 text-blue-400' :
-                        paymentMethod === 'bank_transfer' ? 'bg-purple-500/10 text-purple-400' :
-                        'bg-amber-500/10 text-amber-400'
-                      }`}>
-                        {paymentMethod === 'cash' ? <>💵 {t('invoice.cashPayment')}</> :
-                         paymentMethod === 'card' ? <>💳 {t('invoice.cardPayment')}</> :
-                         paymentMethod === 'bank_transfer' ? <>🏦 {t('invoice.bankTransferPayment')}</> :
-                         <>📝 {t('invoice.creditDue')}</>}
-                      </div>
-                      <div className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
-                        paymentMethod === 'credit' ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'
-                      }`}>
-                        {paymentMethod === 'credit' ? t('invoice.pending') : t('invoice.paid')}
-                      </div>
-                    </div>
-
+                    {/* Notes - Compact */}
                     {notes && (
-                      <div className={`mt-4 p-3 rounded-lg ${theme === 'dark' ? 'bg-amber-500/5 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
-                        <p className={`text-xs font-semibold mb-1 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-700'}`}>{t('invoice.notes')}:</p>
-                        <p className={`text-sm ${theme === 'dark' ? 'text-amber-200/70' : 'text-amber-800'}`}>{notes}</p>
+                      <div className={`mt-2 p-1.5 rounded border-l-2 text-[8px] ${
+                        theme === 'dark' ? 'bg-amber-500/5 border-amber-500' : 'bg-amber-50 border-amber-400'
+                      }`}>
+                        <p className={`font-bold uppercase ${theme === 'dark' ? 'text-amber-400' : 'text-amber-700'}`}>
+                          {t('invoice.notes')}
+                        </p>
+                        <p className={`mt-0.5 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>{notes}</p>
                       </div>
                     )}
                   </div>
 
-                  {/* Invoice Footer */}
-                  <div className={`px-6 py-4 ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'} border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
-                    <p className={`text-center text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                      {t('invoice.thankYouMessage')} • Liyanage Hardware • 📞 0773751805 / 0412268217
+                  {/* Invoice Footer - Receipt Style - Compact */}
+                  <div className={`px-3 py-2 text-center border-t-2 border-dashed flex-shrink-0 ${
+                    theme === 'dark' ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'
+                  }`}>
+                    <p className={`text-[8px] font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {t('invoice.thankYouMessage')}
                     </p>
-                    <p className={`text-center text-[10px] mt-1 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
-                      © 2025 Powered by Nebulainfinite
+                    <p className={`text-[7px] mt-0.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                      📞 0773751805 / 0412268217
+                    </p>
+                    <p className={`text-[7px] ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
+                      © 2025 Nebulainfinite
                     </p>
                   </div>
                 </div>
@@ -2688,9 +2893,9 @@ export const CreateInvoice: React.FC = () => {
                 <button
                   onClick={handleCreateInvoice}
                   disabled={items.length === 0}
-                  className="w-full mt-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl shadow-emerald-500/30"
+                  className="w-full mt-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-500/30"
                 >
-                  <CheckCircle className="w-6 h-6" />
+                  <CheckCircle className="w-5 h-5" />
                   {t('invoice.completeAndPrint')}
                 </button>
               </div>
