@@ -13,11 +13,11 @@ export interface Customer {
   photo?: string;
   registrationDate: string;
   totalSpent: number;
-  
+
   // Customer classification
   customerType: CustomerType;
   isActive: boolean;
-  
+
   // Credit/Loan tracking
   loanBalance: number;
   loanDueDate?: string;
@@ -105,27 +105,27 @@ export interface Product {
   sku: string;
   barcode?: string;
   description: string;
-  
+
   // Categorization
   categoryId?: string;
   category: 'building_materials' | 'steel_metal' | 'electrical' | 'plumbing' | 'tools' | 'paint' | 'hardware' | 'wood_timber' | 'safety' | 'other';
   subcategory?: string;
   brandId?: string;
   brand?: string;
-  
+
   // Pricing (base prices - variants may override)
   price?: number;         // Legacy field for backward compatibility
   costPrice?: number;     // Purchase/cost price
   wholesalePrice?: number; // Bulk/dealer price
   retailPrice?: number;   // Selling price to customers (normal price)
   discountedPrice?: number; // Special discounted price (lower than retail)
-  
+
   // Stock Management
   stock: number;
   minStock?: number;      // Reorder level alert
   maxStock?: number;
   unit?: 'piece' | 'kg' | 'g' | 'meter' | 'feet' | 'liter' | 'bag' | 'box' | 'pack' | 'roll' | 'sheet' | 'pair' | 'set' | 'sqft' | 'sqm' | 'bundle' | 'cube';
-  
+
   // Product Attributes
   sizes?: string[];       // Available sizes
   colors?: string[];      // Available colors
@@ -136,11 +136,11 @@ export interface Product {
     height?: number;
     unit: 'mm' | 'cm' | 'm' | 'inch' | 'feet';
   };
-  
+
   // Variants
   hasVariants?: boolean;
   variants?: ProductVariant[];
-  
+
   // Additional Info
   warranty?: string;
   manufacturer?: string;
@@ -148,16 +148,33 @@ export interface Product {
   specifications?: Record<string, string>;
   tags?: string[];
   images?: string[];
-  
+
   // Supplier relationship
   supplierId?: string;
   supplierName?: string;
-  
+
   // Status
   isActive?: boolean;
   isFeatured?: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+// ── NEW: InventoryProduct — the flat schema used by the inventory/warehouse grid ──
+export interface InventoryProduct {
+  id: string;
+  searchKey: string; // SKU / Code
+  name: string;
+  productCategory: string;
+  cost: number;          // Cost[0]
+  lastPrice: number;     // Last Price[1]
+  salesPrice: number;    // Sales Price[3]
+  displayPrice: number;  // Display Price[4]
+  storeQty: number;
+  salesType: 'Full' | 'Half' | 'Quarter' | 'Piece' | 'Kg' | 'Box' | 'Set' | string;
+  unitQty: number;
+  oneUnitPrice: number;  // 1 Unit Price
+  status: 'Available' | 'Out of Stock' | 'Low Stock' | 'Discontinued';
 }
 
 export interface InvoiceItem {
@@ -234,4 +251,3 @@ export interface Supplier {
   // Delivery records
   deliveries?: SupplierDelivery[];
 }
-

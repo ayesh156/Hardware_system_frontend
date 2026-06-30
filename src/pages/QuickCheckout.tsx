@@ -1,19 +1,22 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
-import { mockProducts, mockInvoices } from '../data/mockData';
+import { useDropdownPosition } from '../hooks/use-dropdown-position';
+import { mockProducts, mockInvoices, mockCustomers } from '../data/mockData';
 import { Product, Invoice, InvoiceItem, FlattenedProduct, Customer } from '../types/index';
 import { flattenProducts } from '../lib/utils';
 import { printInvoice } from '../components/modals/PrintInvoiceModal';
 import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
+import { CategoryGrid } from '../components/CategoryGrid';
+import { PosItem, PosCategory } from '../data/posCategories';
 import {
   Zap, Search, Plus, Trash2, ArrowLeft, Printer, ShoppingCart,
   Keyboard, X, Package, Calculator, Barcode, Volume2, VolumeX,
   ChevronUp, ChevronDown, RotateCcw, CreditCard, Banknote, Percent,
   ArrowRight, ArrowUp, ArrowDown, ArrowLeftIcon, CheckCircle,
-  Minus, ScanLine, ChevronRight, Receipt, Sparkles
+  Minus, ScanLine, ChevronRight, Receipt, Sparkles, User, Building2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -66,13 +69,68 @@ export const QuickCheckout: React.FC = () => {
   const { theme } = useTheme();
   const isSinhala = i18n.language === 'si';
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
   
   const [products] = useState<Product[]>(mockProducts);
   
   // Flatten products so each variant appears as a distinct line item
   const flattenedProducts = useMemo(() => flattenProducts(products), [products]);
-  
+
+  // ── In-place Edit mode via query param ──
+  const editInvoiceId = searchParams.get('edit');
+  const editingInvoice = useMemo(() => {
+    if (!editInvoiceId) return null;
+    return mockInvoices.find(inv => inv.id === editInvoiceId) || null;
+  }, [editInvoiceId]);
+
+  // ── Hydrate state when editing an existing invoice ──
+  useEffect(() => {
+    if (!editingInvoice) return;
+
+    // Map invoice items to QuickInvoiceItem format
+    const hydratedItems: QuickInvoiceItem[] = editingInvoice.items.map(item => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.productName,
+      productNameSi: (item as any).productNameSi,
+      variantId: item.variantId,
+      size: item.size,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      originalPrice: (item as any).originalPrice || item.unitPrice,
+      total: item.total,
+    }));
+    setItems(hydratedItems);
+
+    // Populate customer
+    if (editingInvoice.customerId && editingInvoice.customerId !== 'walk-in') {
+      setSelectedCustomerId(editingInvoice.customerId);
+      const cust = mockCustomers.find(c => c.id === editingInvoice.customerId);
+      if (cust) {
+        setCustomerSearch(cust.name);
+      }
+    } else {
+      setSelectedCustomerId('walk-in');
+      setCustomerSearch('');
+    }
+
+    // Populate financial fields
+    const invoiceDiscount = editingInvoice.discountValue || editingInvoice.discount || 0;
+    setDiscount(invoiceDiscount);
+    setReceivedAmount(editingInvoice.receivedAmount || 0);
+
+    // Map payment method (cash/credit are the two options in QuickCheckout)
+    if (editingInvoice.paymentMethod === 'cash' || editingInvoice.paymentMethod === 'credit') {
+      setPaymentMethod(editingInvoice.paymentMethod);
+    }
+
+    // Toast notification
+    toast.info(`Editing invoice ${editingInvoice.invoiceNumber}`, {
+      description: `${hydratedItems.length} items loaded`,
+    });
+  }, [editingInvoice]);
+
   const [items, setItems] = useState<QuickInvoiceItem[]>([]);
   const [productSearch, setProductSearch] = useState('');
   const [quantity, setQuantity] = useState<number>(1);
@@ -129,8 +187,14 @@ export const QuickCheckout: React.FC = () => {
   const [isPriceEditing, setIsPriceEditing] = useState(false);
   const priceEditTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Customer selection state
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('walk-in');
+  const filteredCustomers = useMemo(() => mockCustomers.filter(c =>
+    c.name.toLowerCase().includes(customerSearch.toLowerCase())), [customerSearch]);
+
   // Helper functions for decimal-preserving quantity adjustments
-  // When adjusting, only the integer part changes while decimal fraction is preserved
   const incrementQuantity = useCallback((currentQty: number): number => {
     const intPart = Math.floor(currentQty);
     const decimalPart = currentQty - intPart;
@@ -142,7 +206,6 @@ export const QuickCheckout: React.FC = () => {
     const decimalPart = currentQty - intPart;
     const newIntPart = Math.max(0, intPart - 1);
     const newQty = newIntPart + decimalPart;
-    // Ensure we don't go below minimum (0.01 for decimals, or the decimal part if > 0)
     return Math.max(minValue, newQty > 0 ? newQty : decimalPart > 0 ? decimalPart : minValue);
   }, []);
 
@@ -176,13 +239,12 @@ export const QuickCheckout: React.FC = () => {
     }
   }, [soundEnabled]);
 
-  // Filter products by search (SKU, barcode, name) - uses flattened products for variant display
+  // Filter products by search (SKU, barcode, name)
   const filteredProducts = useMemo((): FlattenedProduct[] => {
     if (!productSearch.trim()) return [];
     
     const searchLower = productSearch.toLowerCase().trim();
     
-    // Check for exact barcode/SKU match first (for barcode scanner)
     const exactMatch = flattenedProducts.find(
       (fp) => fp.displayBarcode === productSearch || fp.displaySku.toLowerCase() === searchLower
     );
@@ -203,40 +265,34 @@ export const QuickCheckout: React.FC = () => {
             (fp.variantLabel && fp.variantLabel.toLowerCase().includes(searchLower))
           )
       )
-      .slice(0, 12); // Increased limit since variants expand the list
+      .slice(0, 12);
   }, [flattenedProducts, productSearch]);
 
-  // Parse common barcode scan formats and extract quantity if provided
+  // Parse common barcode scan formats
   const parseScanInput = (input: string): { code?: string; qty?: number } | null => {
     if (!input) return null;
     const trimmed = input.trim();
     if (!trimmed) return null;
 
-    // qty * code  (e.g. 3*012345) or qtyxcode or qty|code or qty-code
     const prefix = trimmed.match(/^\s*(\d+)\s*[\*xX\|\-]\s*(.+)$/);
     if (prefix) return { qty: Number(prefix[1]), code: prefix[2].trim() };
 
-    // code * qty (e.g. 012345*3)
     const suffix = trimmed.match(/^\s*(.+?)\s*[\*xX\|\-]\s*(\d+)\s*$/);
     if (suffix) return { code: suffix[1].trim(), qty: Number(suffix[2]) };
 
-    // Plain code
     return { code: trimmed };
   };
 
-  // Auto-detect barcode scan - set pending product for quantity input
+  // Auto-detect barcode scan
   useEffect(() => {
     if (filteredProducts.length === 1 && productSearch.length >= 3) {
       const flatProduct = filteredProducts[0];
-      // Check if it's an exact match (barcode scanner typically sends full code)
       if (flatProduct.displayBarcode === productSearch || flatProduct.displaySku.toLowerCase() === productSearch.toLowerCase()) {
-        // Set as pending product and focus quantity input
         setPendingProduct(flatProduct);
         setProductSearch('');
         setSelectedProductIndex(-1);
         setQuantity(1);
         setIsQuantityFocused(true);
-        // Focus quantity input after a brief delay for barcode scanner
         setTimeout(() => {
           quantityInputRef.current?.focus();
           quantityInputRef.current?.select();
@@ -247,19 +303,16 @@ export const QuickCheckout: React.FC = () => {
     }
   }, [filteredProducts, productSearch, playBeep, t]);
 
-  // Add product to cart (accepts FlattenedProduct for variant support)
+  // Add product to cart
   const addProductToCart = useCallback((flatProduct: FlattenedProduct, overrideQty?: number) => {
-    // Use discounted price if available, otherwise use retail price
     const normalPrice = flatProduct.retailPrice;
     const effectivePrice = flatProduct.hasDiscount && flatProduct.discountedPrice 
       ? flatProduct.discountedPrice 
       : normalPrice;
     const addQty = Math.max(1, overrideQty ?? quantity);
     
-    // Use flatId as the unique identifier (includes variant info)
     const existingItem = items.find((i) => i.productId === flatProduct.flatId);
     if (existingItem) {
-      // Check stock
       if (existingItem.quantity + addQty > flatProduct.stock) {
         playBeep('error');
         toast.error(`${t('quickCheckout.insufficientStock')}: ${flatProduct.stock} ${t('invoice.available')}`);
@@ -289,12 +342,11 @@ export const QuickCheckout: React.FC = () => {
         size: flatProduct.variant?.size,
         quantity: addQty,
         unitPrice: effectivePrice,
-        originalPrice: normalPrice, // Always store normal price for discount calculation
+        originalPrice: normalPrice,
         total: addQty * effectivePrice,
       };
       setItems([...items, newItem]);
       
-      // Show toast with discount info if applicable
       if (flatProduct.hasDiscount) {
         const savings = normalPrice - effectivePrice;
         toast.success(`${flatProduct.displayName} - ${t('invoice.perItemDiscount')}: ${t('common.currency')} ${savings.toLocaleString()}`);
@@ -307,7 +359,6 @@ export const QuickCheckout: React.FC = () => {
     setSelectedProductIndex(-1);
     searchInputRef.current?.focus();
     
-    // Auto-scroll cart to bottom to show newly added item
     setTimeout(() => {
       if (cartItemsContainerRef.current) {
         cartItemsContainerRef.current.scrollTop = cartItemsContainerRef.current.scrollHeight;
@@ -355,7 +406,6 @@ export const QuickCheckout: React.FC = () => {
     
     const item = items.find((i) => i.id === itemId);
     if (item) {
-      // Find the flattened product by the item's productId (which is flatId)
       const flatProduct = flattenedProducts.find((fp) => fp.flatId === item.productId);
       if (flatProduct && newQuantity > flatProduct.stock) {
         playBeep('error');
@@ -371,7 +421,7 @@ export const QuickCheckout: React.FC = () => {
     ));
   }, [items, flattenedProducts, removeItem, playBeep, t]);
 
-  // Mobile swipe handlers for cart items
+  // Mobile swipe handlers
   const handleTouchStart = useCallback((e: React.TouchEvent, itemId: string) => {
     setTouchStartX(e.touches[0].clientX);
     setSwipedItemId(itemId);
@@ -388,11 +438,9 @@ export const QuickCheckout: React.FC = () => {
       const item = items.find(i => i.id === swipedItemId);
       if (item) {
         if (touchDeltaX < -60) {
-          // Swipe left - remove item
           removeItem(item.id);
           toast.success(t('quickCheckout.itemRemoved'));
         } else if (touchDeltaX > 60) {
-          // Swipe right - increase quantity
           updateItemQuantity(item.id, item.quantity + 1);
         }
       }
@@ -401,7 +449,7 @@ export const QuickCheckout: React.FC = () => {
     setSwipedItemId(null);
   }, [touchDeltaX, swipedItemId, items, removeItem, updateItemQuantity, t]);
 
-  // Quick add with haptic-style feedback
+  // Quick add
   const quickAddProduct = useCallback((flatProduct: FlattenedProduct) => {
     addProductToCart(flatProduct, 1);
     if (isMobile) {
@@ -409,7 +457,7 @@ export const QuickCheckout: React.FC = () => {
     }
   }, [addProductToCart, isMobile, t]);
 
-  // Add custom item from Quick Add row
+  // Add custom item
   const addQuickAddItem = useCallback(() => {
     if (!quickAddName.trim() || quickAddPrice <= 0 || quickAddQty <= 0) {
       playBeep('error');
@@ -431,7 +479,6 @@ export const QuickCheckout: React.FC = () => {
     playBeep('add');
     toast.success(`${quickAddName} ${t('quickCheckout.addedToCart')}`);
     
-    // Reset Quick Add fields
     setQuickAddName('');
     setQuickAddPrice(0);
     setQuickAddQty(1);
@@ -439,7 +486,6 @@ export const QuickCheckout: React.FC = () => {
     setQuickAddFocusField('name');
     searchInputRef.current?.focus();
     
-    // Auto-scroll cart to bottom
     setTimeout(() => {
       if (cartItemsContainerRef.current) {
         cartItemsContainerRef.current.scrollTop = cartItemsContainerRef.current.scrollHeight;
@@ -448,20 +494,15 @@ export const QuickCheckout: React.FC = () => {
   }, [quickAddName, quickAddPrice, quickAddQty, playBeep, t]);
 
   // Calculate totals
-  // Original subtotal (before any item-level discounts) for display
   const originalSubtotal = items.reduce((sum, item) => sum + (item.originalPrice * item.quantity), 0);
-  // Current subtotal (after item-level discounts applied)
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  // Calculate total item-level discounts for display (difference between original price and current unit price)
   const totalItemDiscounts = items.reduce((sum, item) => {
     const itemDiscount = (item.originalPrice - item.unitPrice) * item.quantity;
     return sum + (itemDiscount > 0 ? itemDiscount : 0);
   }, 0);
-  const discountAmount = Math.min(discount, subtotal); // Can't discount more than subtotal
-  // Total is subtotal minus invoice-level discount (item discounts already reflected in subtotal)
+  const discountAmount = Math.min(discount, subtotal);
   const total = subtotal - discountAmount;
   
-  // Received amount and change calculation
   const [receivedAmount, setReceivedAmount] = useState<number>(0);
   const receivedAmountInputRef = useRef<HTMLInputElement>(null);
   const changeAmount = receivedAmount > 0 ? Math.max(0, receivedAmount - total) : 0;
@@ -478,7 +519,7 @@ export const QuickCheckout: React.FC = () => {
     searchInputRef.current?.focus();
   }, []);
 
-  // Finalize sale helper
+  // Finalize sale
   const finalizeSale = useCallback((invoiceNumber?: string) => {
     setItems([]);
     setDiscount(0);
@@ -499,66 +540,6 @@ export const QuickCheckout: React.FC = () => {
     setIsProcessing(true);
     
     const invoiceNumber = generateNextInvoiceNumberSync();
-    // Invoice-level discount should be only the final invoice discount (not item-level discounts)
-    const invoiceDiscount = Math.round(discountAmount * 100) / 100;
-    const invoice: Invoice = {
-      id: `inv-${Date.now()}`,
-      invoiceNumber,
-      customerId: 'walk-in',
-      customerName: t('invoice.walkInCustomer'),
-      items,
-      subtotal: Math.round(subtotal * 100) / 100,
-      tax: 0,
-      discount: invoiceDiscount,
-      total: Math.round(total * 100) / 100,
-      receivedAmount: receivedAmount > 0 ? Math.round(receivedAmount * 100) / 100 : undefined,
-      changeAmount: changeAmount > 0 ? Math.round(changeAmount * 100) / 100 : undefined,
-      issueDate: new Date().toISOString().split('T')[0],
-      dueDate: new Date().toISOString().split('T')[0],
-      status: paymentMethod === 'credit' ? 'pending' : 'paid',
-      paymentMethod: paymentMethod, // 'cash' or 'credit' (credit prints as credit payment)
-      notes: invoiceDiscount > 0 
-        ? `${t('quickCheckout.quickSaleNote')} - ${t('quickCheckout.discount')}: ${t('common.currency')} ${invoiceDiscount.toLocaleString()}`
-        : t('quickCheckout.quickSaleNote'),
-    };
-
-    playBeep('success');
-
-    // Prepare a walk-in customer object for printing
-    const walkInCustomer: Customer = {
-      id: 'walk-in',
-      name: t('invoice.walkInCustomer'),
-      businessName: t('invoice.walkInCustomer'),
-      email: '',
-      phone: '',
-      address: '',
-      registrationDate: new Date().toISOString(),
-      totalSpent: 0,
-      customerType: 'regular',
-      isActive: true,
-      loanBalance: 0
-    };
-
-    // Print directly in the browser without showing a preview modal
-    printInvoice(invoice, walkInCustomer, isSinhala ? 'si' : 'en')
-      .then(() => {
-        finalizeSale(invoice.invoiceNumber);
-      })
-      .catch(() => {
-        // Fallback: still finalize the sale but inform about the print issue
-        toast.error(t('quickCheckout.printBlocked'));
-        finalizeSale(invoice.invoiceNumber);
-      });
-  }, [items, subtotal, total, discountAmount, totalItemDiscounts, paymentMethod, playBeep, t, finalizeSale, receivedAmount, changeAmount, isSinhala]);
-
-  // Quick save without print preview (F9)
-  const handleQuickSave = useCallback(() => {
-    if (items.length === 0 || isProcessing) return;
-    
-    setIsProcessing(true);
-    
-    const invoiceNumber = generateNextInvoiceNumberSync();
-    // Invoice-level discount should be only the final invoice discount (not item-level discounts)
     const invoiceDiscount = Math.round(discountAmount * 100) / 100;
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
@@ -581,14 +562,67 @@ export const QuickCheckout: React.FC = () => {
         : t('quickCheckout.quickSaleNote'),
     };
 
-    // Save directly without showing print modal
+    playBeep('success');
+
+    const walkInCustomer: Customer = {
+      id: 'walk-in',
+      name: t('invoice.walkInCustomer'),
+      businessName: t('invoice.walkInCustomer'),
+      email: '',
+      phone: '',
+      address: '',
+      registrationDate: new Date().toISOString(),
+      totalSpent: 0,
+      customerType: 'regular',
+      isActive: true,
+      loanBalance: 0
+    };
+
+    printInvoice(invoice, walkInCustomer, isSinhala ? 'si' : 'en')
+      .then(() => {
+        finalizeSale(invoice.invoiceNumber);
+      })
+      .catch(() => {
+        toast.error(t('quickCheckout.printBlocked'));
+        finalizeSale(invoice.invoiceNumber);
+      });
+  }, [items, subtotal, total, discountAmount, totalItemDiscounts, paymentMethod, playBeep, t, finalizeSale, receivedAmount, changeAmount, isSinhala]);
+
+  // Quick save
+  const handleQuickSave = useCallback(() => {
+    if (items.length === 0 || isProcessing) return;
+    
+    setIsProcessing(true);
+    
+    const invoiceNumber = generateNextInvoiceNumberSync();
+    const invoiceDiscount = Math.round(discountAmount * 100) / 100;
+    const invoice: Invoice = {
+      id: `inv-${Date.now()}`,
+      invoiceNumber,
+      customerId: 'walk-in',
+      customerName: t('invoice.walkInCustomer'),
+      items,
+      subtotal: Math.round(subtotal * 100) / 100,
+      tax: 0,
+      discount: invoiceDiscount,
+      total: Math.round(total * 100) / 100,
+      receivedAmount: receivedAmount > 0 ? Math.round(receivedAmount * 100) / 100 : undefined,
+      changeAmount: changeAmount > 0 ? Math.round(changeAmount * 100) / 100 : undefined,
+      issueDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date().toISOString().split('T')[0],
+      status: paymentMethod === 'credit' ? 'pending' : 'paid',
+      paymentMethod: paymentMethod,
+      notes: invoiceDiscount > 0 
+        ? `${t('quickCheckout.quickSaleNote')} - ${t('quickCheckout.discount')}: ${t('common.currency')} ${invoiceDiscount.toLocaleString()}`
+        : t('quickCheckout.quickSaleNote'),
+    };
+
     playBeep('success');
     toast.success(
       `${t('quickCheckout.invoiceSaved')}: ${invoiceNumber}`, 
       { description: `${t('common.currency')} ${invoice.total.toLocaleString()}` }
     );
     
-    // Reset cart
     setItems([]);
     setDiscount(0);
     setReceivedAmount(0);
@@ -596,23 +630,20 @@ export const QuickCheckout: React.FC = () => {
     searchInputRef.current?.focus();
   }, [items, subtotal, total, discountAmount, totalItemDiscounts, paymentMethod, playBeep, t, isProcessing, receivedAmount, changeAmount]);
 
-  // Keyboard event handler
+  // Keyboard event handler (full, preserved as-is)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check if we're in cart focus mode
       const isInSearchInput = document.activeElement === searchInputRef.current;
       const isInQuantityInput = document.activeElement === quantityInputRef.current;
       const isInDiscountInput = document.activeElement === discountInputRef.current;
       const isInReceivedInput = document.activeElement === receivedAmountInputRef.current;
       
-      // Show shortcut map with ? key
       if (e.key === '?' && !isInSearchInput && !isInQuantityInput && !isInDiscountInput && !isInReceivedInput) {
         e.preventDefault();
         setShowShortcutMap(prev => !prev);
         return;
       }
       
-      // Step navigation with Ctrl+Arrow or PageUp/PageDown
       if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowLeft') {
         e.preventDefault();
         if (currentStep === 'review') {
@@ -659,11 +690,10 @@ export const QuickCheckout: React.FC = () => {
             setIsCartFocused(true);
             setIsPaymentFocused(false);
             setIsQuantityFocused(false);
-            setSelectedCartIndex(items.length - 1); // Select last added item
+            setSelectedCartIndex(items.length - 1);
             setSelectedProductIndex(-1);
             setPendingProduct(null);
             setCurrentMode('cart');
-            // Blur any input to enable arrow key navigation
             (document.activeElement as HTMLElement)?.blur();
             cartListRef.current?.focus?.({ preventScroll: true } as FocusOptions) ?? cartListRef.current?.focus();
             playBeep('add');
@@ -694,20 +724,18 @@ export const QuickCheckout: React.FC = () => {
           break;
           
         case 'F7':
-          // Focus Received Amount input
           e.preventDefault();
           setIsCartFocused(false);
           setIsPaymentFocused(false);
           setIsQuantityFocused(false);
           setPendingProduct(null);
-          setCurrentMode('discount'); // Reuse discount mode for this
+          setCurrentMode('discount');
           receivedAmountInputRef.current?.focus();
           receivedAmountInputRef.current?.select();
           playBeep('add');
           break;
           
         case 'F8':
-          // Quick Add custom item mode
           e.preventDefault();
           setIsCartFocused(false);
           setIsPaymentFocused(false);
@@ -724,7 +752,6 @@ export const QuickCheckout: React.FC = () => {
           break;
           
         case 'F9':
-          // Quick save - save invoice directly without print preview
           e.preventDefault();
           if (items.length > 0) handleQuickSave();
           break;
@@ -739,7 +766,6 @@ export const QuickCheckout: React.FC = () => {
           if (showShortcutMap) {
             setShowShortcutMap(false);
           } else if (isQuickAddMode) {
-            // Exit Quick Add mode
             setIsQuickAddMode(false);
             setQuickAddName('');
             setQuickAddPrice(0);
@@ -768,14 +794,12 @@ export const QuickCheckout: React.FC = () => {
           break;
           
         case 'Delete':
-          // Delete removes last item from any context
           if (items.length > 0 && !isInDiscountInput) {
             e.preventDefault();
             const itemToRemove = isCartFocused && selectedCartIndex >= 0 
               ? items[selectedCartIndex] 
               : items[items.length - 1];
             removeItem(itemToRemove.id);
-            // Adjust cart selection after removal
             if (isCartFocused) {
               if (items.length <= 1) {
                 setIsCartFocused(false);
@@ -789,11 +813,9 @@ export const QuickCheckout: React.FC = () => {
           break;
           
         case 'ArrowDown':
-          // In cart mode: navigate to next item
           if (isCartFocused && items.length > 0) {
             e.preventDefault();
             setSelectedCartIndex((prev) => prev < items.length - 1 ? prev + 1 : prev);
-            // Reset price editing when changing selection
             setPriceEditBuffer('');
             setIsPriceEditing(false);
             if (priceEditTimeoutRef.current) {
@@ -801,7 +823,6 @@ export const QuickCheckout: React.FC = () => {
             }
           } else if (filteredProducts.length > 0 && isInSearchInput) {
             e.preventDefault();
-            // In search mode: navigate products
             setSelectedProductIndex((prev) => 
               prev < filteredProducts.length - 1 ? prev + 1 : prev
             );
@@ -809,11 +830,9 @@ export const QuickCheckout: React.FC = () => {
           break;
           
         case 'ArrowUp':
-          // In cart mode: navigate to previous item
           if (isCartFocused && items.length > 0) {
             e.preventDefault();
             setSelectedCartIndex((prev) => prev > 0 ? prev - 1 : 0);
-            // Reset price editing when changing selection
             setPriceEditBuffer('');
             setIsPriceEditing(false);
             if (priceEditTimeoutRef.current) {
@@ -821,7 +840,6 @@ export const QuickCheckout: React.FC = () => {
             }
           } else if (filteredProducts.length > 0 && isInSearchInput) {
             e.preventDefault();
-            // In search mode: navigate products
             setSelectedProductIndex((prev) => prev > 0 ? prev - 1 : 0);
           }
           break;
@@ -829,16 +847,13 @@ export const QuickCheckout: React.FC = () => {
         case 'ArrowLeft':
           e.preventDefault();
           if (isCartFocused && items.length > 0 && selectedCartIndex >= 0) {
-            // In cart mode: decrease quantity (preserving decimal fraction)
             const item = items[selectedCartIndex];
             if (item) {
               updateItemQuantity(item.id, decrementQuantity(item.quantity, 0.01));
             }
           } else if (isInQuantityInput) {
-            // In quantity input: decrease quantity (preserving decimal fraction)
             setQuantity(q => decrementQuantity(q, 0.01));
           } else if (isPaymentFocused) {
-            // In payment mode: switch to cash
             setPaymentMethod('cash');
             playBeep('add');
           }
@@ -847,34 +862,28 @@ export const QuickCheckout: React.FC = () => {
         case 'ArrowRight':
           e.preventDefault();
           if (isCartFocused && items.length > 0 && selectedCartIndex >= 0) {
-            // In cart mode: increase quantity (preserving decimal fraction)
             const item = items[selectedCartIndex];
             if (item) {
               updateItemQuantity(item.id, incrementQuantity(item.quantity));
             }
           } else if (isInQuantityInput) {
-            // In quantity input: increase quantity (preserving decimal fraction)
             setQuantity(q => incrementQuantity(q));
           } else if (isPaymentFocused) {
-            // In payment mode: switch to credit
             setPaymentMethod('credit');
             playBeep('add');
           }
           break;
           
-        // Handle numeric keys for direct price modification in cart mode
         case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
           if (isCartFocused && items.length > 0 && selectedCartIndex >= 0 && !isInSearchInput && !isInQuantityInput && !isInDiscountInput) {
             e.preventDefault();
             const digit = e.key;
             
-            // Clear any existing timeout
             if (priceEditTimeoutRef.current) {
               clearTimeout(priceEditTimeoutRef.current);
             }
             
-            // Build up the price buffer
             const newBuffer = priceEditBuffer + digit;
             setPriceEditBuffer(newBuffer);
             setIsPriceEditing(true);
@@ -883,7 +892,6 @@ export const QuickCheckout: React.FC = () => {
             let newPrice: number;
             let isRelativeDeduction = false;
             
-            // Check if this is a relative deduction (buffer starts with '-')
             if (newBuffer.startsWith('-')) {
               const deductionAmount = parseFloat(newBuffer.slice(1)) || 0;
               newPrice = Math.max(0, (item?.originalPrice || 0) - deductionAmount);
@@ -892,7 +900,6 @@ export const QuickCheckout: React.FC = () => {
               newPrice = parseFloat(newBuffer) || 0;
             }
             
-            // Update the price immediately
             if (item && newPrice >= 0) {
               setItems(prevItems => prevItems.map(i => 
                 i.id === item.id 
@@ -901,7 +908,6 @@ export const QuickCheckout: React.FC = () => {
               ));
             }
             
-            // Set timeout to clear buffer after 1.5 seconds of inactivity
             priceEditTimeoutRef.current = setTimeout(() => {
               setPriceEditBuffer('');
               setIsPriceEditing(false);
@@ -922,16 +928,13 @@ export const QuickCheckout: React.FC = () => {
           if (isCartFocused && isPriceEditing && priceEditBuffer.length > 0 && !isInSearchInput && !isInQuantityInput && !isInDiscountInput) {
             e.preventDefault();
             
-            // Clear any existing timeout
             if (priceEditTimeoutRef.current) {
               clearTimeout(priceEditTimeoutRef.current);
             }
             
-            // Remove last digit from buffer
             const newBuffer = priceEditBuffer.slice(0, -1);
             setPriceEditBuffer(newBuffer);
             
-            // Update the price
             const newPrice = parseFloat(newBuffer) || 0;
             const item = items[selectedCartIndex];
             if (item) {
@@ -942,11 +945,9 @@ export const QuickCheckout: React.FC = () => {
               ));
             }
             
-            // If buffer is empty, revert to original price
             if (newBuffer === '') {
               setIsPriceEditing(false);
             } else {
-              // Reset timeout
               priceEditTimeoutRef.current = setTimeout(() => {
                 setPriceEditBuffer('');
                 setIsPriceEditing(false);
@@ -959,7 +960,6 @@ export const QuickCheckout: React.FC = () => {
           if (isCartFocused && isPriceEditing && !priceEditBuffer.includes('.') && !isInSearchInput && !isInQuantityInput && !isInDiscountInput) {
             e.preventDefault();
             
-            // Clear any existing timeout
             if (priceEditTimeoutRef.current) {
               clearTimeout(priceEditTimeoutRef.current);
             }
@@ -967,7 +967,6 @@ export const QuickCheckout: React.FC = () => {
             const newBuffer = priceEditBuffer + '.';
             setPriceEditBuffer(newBuffer);
             
-            // Reset timeout
             priceEditTimeoutRef.current = setTimeout(() => {
               setPriceEditBuffer('');
               setIsPriceEditing(false);
@@ -976,13 +975,10 @@ export const QuickCheckout: React.FC = () => {
           break;
           
         case '-':
-          // Minus key for relative price deduction (e.g., -50 means subtract 50 from original price)
           if (isCartFocused && items.length > 0 && selectedCartIndex >= 0 && !isInSearchInput && !isInQuantityInput && !isInDiscountInput) {
-            // Only allow minus at the beginning of the buffer
             if (priceEditBuffer === '') {
               e.preventDefault();
               
-              // Clear any existing timeout
               if (priceEditTimeoutRef.current) {
                 clearTimeout(priceEditTimeoutRef.current);
               }
@@ -990,7 +986,6 @@ export const QuickCheckout: React.FC = () => {
               setPriceEditBuffer('-');
               setIsPriceEditing(true);
               
-              // Reset timeout
               priceEditTimeoutRef.current = setTimeout(() => {
                 setPriceEditBuffer('');
                 setIsPriceEditing(false);
@@ -1000,19 +995,16 @@ export const QuickCheckout: React.FC = () => {
           break;
           
         case 'Enter':
-          // Quick Add mode - commit the custom item
           if (isQuickAddMode) {
             e.preventDefault();
             addQuickAddItem();
           } else if (pendingProduct && isInQuantityInput) {
-            // Second Enter: Confirm pending product with quantity and add to cart
             e.preventDefault();
             addProductToCart(pendingProduct);
             setPendingProduct(null);
             setCurrentMode('search');
             searchInputRef.current?.focus();
           } else if (isInSearchInput && filteredProducts.length > 0) {
-            // First Enter: Set pending product and focus quantity input
             e.preventDefault();
             const productToSelect = selectedProductIndex >= 0 
               ? filteredProducts[selectedProductIndex] 
@@ -1035,11 +1027,9 @@ export const QuickCheckout: React.FC = () => {
           break;
           
         case 'Tab':
-          // Handle Tab navigation in Quick Add mode
           if (isQuickAddMode) {
             e.preventDefault();
             if (e.shiftKey) {
-              // Shift+Tab - go backwards
               if (quickAddFocusField === 'qty') {
                 setQuickAddFocusField('price');
                 quickAddPriceRef.current?.focus();
@@ -1051,7 +1041,6 @@ export const QuickCheckout: React.FC = () => {
                 quickAddQtyRef.current?.focus();
               }
             } else {
-              // Tab - go forwards
               if (quickAddFocusField === 'name') {
                 setQuickAddFocusField('price');
                 quickAddPriceRef.current?.focus();
@@ -1078,7 +1067,6 @@ export const QuickCheckout: React.FC = () => {
       searchInputRef.current?.focus();
     }
     
-    // Cleanup timeout on unmount
     return () => {
       if (priceEditTimeoutRef.current) {
         clearTimeout(priceEditTimeoutRef.current);
@@ -1086,7 +1074,7 @@ export const QuickCheckout: React.FC = () => {
     };
   }, [isMobile]);
 
-  // Active-scroll synchronization: Keep selected cart item in viewport
+  // Active-scroll synchronization
   useEffect(() => {
     if (isCartFocused && selectedCartIndex >= 0) {
       const itemElement = cartItemRefs.current.get(selectedCartIndex);
@@ -1099,7 +1087,6 @@ export const QuickCheckout: React.FC = () => {
     }
   }, [selectedCartIndex, isCartFocused]);
 
-  // Active-scroll synchronization: Keep selected product in viewport
   useEffect(() => {
     if (selectedProductIndex >= 0) {
       const itemElement = productItemRefs.current.get(selectedProductIndex);
@@ -1114,7 +1101,6 @@ export const QuickCheckout: React.FC = () => {
 
   const isDark = theme === 'dark';
 
-  // Step indicator for Quick Checkout (Product Selection → Review)
   const stepIndex = currentStep === 'products' ? 1 : 2;
   const canProceedToReview = items.length > 0;
 
@@ -1122,7 +1108,6 @@ export const QuickCheckout: React.FC = () => {
   if (isMobile) {
     return (
       <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-slate-50'} pb-40`}>
-        {/* Shortcut Map Overlay */}
         <ShortcutMapOverlay
           isOpen={showShortcutMap}
           onClose={() => setShowShortcutMap(false)}
@@ -1133,7 +1118,6 @@ export const QuickCheckout: React.FC = () => {
           totalSteps={1}
         />
 
-        {/* Mobile Header - Compact */}
         <div className={`sticky top-0 z-50 px-3 py-2.5 ${isDark ? 'bg-slate-800/98 backdrop-blur-lg border-b border-slate-700/50' : 'bg-white/98 backdrop-blur-lg border-b border-slate-200 shadow-sm'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1171,36 +1155,33 @@ export const QuickCheckout: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Search Section - Full Width, Touch Optimized */}
-        <div className={`sticky top-[52px] z-40 px-3 py-3 ${isDark ? 'bg-slate-900/98 backdrop-blur-lg' : 'bg-slate-50/98 backdrop-blur-lg'}`}>
-          {/* Pending Product Banner */}
+        <div className={`sticky top-[52px] z-40 px-3 py-2 ${isDark ? 'bg-slate-900/98 backdrop-blur-lg' : 'bg-slate-50/98 backdrop-blur-lg'}`}>
           {pendingProduct && (
-            <div className={`mb-3 p-3 rounded-2xl flex items-center justify-between animate-pulse ${isDark ? 'bg-amber-500/20 border border-amber-500/40' : 'bg-amber-50 border-2 border-amber-300'}`}>
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-amber-500/30' : 'bg-amber-200'}`}>
-                  <Package className={`w-5 h-5 ${isDark ? 'text-amber-400' : 'text-amber-700'}`} />
+            <div className={`mb-2 p-2 rounded-xl flex items-center justify-between animate-pulse ${isDark ? 'bg-amber-500/20 border border-amber-500/40' : 'bg-amber-50 border-2 border-amber-300'}`}>
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDark ? 'bg-amber-500/30' : 'bg-amber-200'}`}>
+                  <Package className={`w-4 h-4 ${isDark ? 'text-amber-400' : 'text-amber-700'}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`font-semibold truncate ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{isSinhala ? (pendingProduct.product.nameAlt || pendingProduct.displayName) : pendingProduct.displayName}</p>
-                  <p className={`text-xs ${isDark ? 'text-amber-400/70' : 'text-amber-600'}`}>
+                  <p className={`font-semibold text-xs truncate ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{isSinhala ? (pendingProduct.product.nameAlt || pendingProduct.displayName) : pendingProduct.displayName}</p>
+                  <p className={`text-[10px] ${isDark ? 'text-amber-400/70' : 'text-amber-600'}`}>
                     {t('common.currency')} {pendingProduct.retailPrice.toLocaleString()}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => { setPendingProduct(null); }}
-                className={`p-2 rounded-xl ${isDark ? 'active:bg-amber-500/30 text-amber-400' : 'active:bg-amber-200 text-amber-700'}`}
+                className={`p-1 rounded-xl ${isDark ? 'active:bg-amber-500/30 text-amber-400' : 'active:bg-amber-200 text-amber-700'}`}
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
           )}
           
-          {/* Search + Quantity Row */}
           <div className="flex gap-2">
             <div className="flex-1 relative">
-              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                <ScanLine className={`w-5 h-5 ${mobileSearchFocused ? 'text-amber-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <ScanLine className={`w-4 h-4 ${mobileSearchFocused ? 'text-amber-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
               </div>
               <input
                 ref={searchInputRef}
@@ -1228,7 +1209,6 @@ export const QuickCheckout: React.FC = () => {
                 }}
                 onFocus={() => {
                   setMobileSearchFocused(true);
-                  // Unfocus cart when search is focused
                   setIsCartFocused(false);
                   setSelectedCartIndex(-1);
                   setIsPaymentFocused(false);
@@ -1236,11 +1216,11 @@ export const QuickCheckout: React.FC = () => {
                   setIsPriceEditing(false);
                 }}
                 onBlur={() => setTimeout(() => setMobileSearchFocused(false), 200)}
-                className={`w-full pl-11 pr-10 py-3.5 text-base border-2 rounded-2xl focus:outline-none transition-all ${
+                className={`w-full pl-9 pr-9 py-2 text-sm border-2 rounded-xl focus:outline-none transition-all ${
                   mobileSearchFocused
                     ? isDark
-                      ? 'border-amber-500 bg-slate-800 text-white ring-4 ring-amber-500/20'
-                      : 'border-amber-500 bg-white text-slate-900 ring-4 ring-amber-100'
+                      ? 'border-amber-500 bg-slate-800 text-white ring-2 ring-amber-500/20'
+                      : 'border-amber-500 bg-white text-slate-900 ring-2 ring-amber-100'
                     : isDark
                       ? 'border-slate-700 bg-slate-800/80 text-white placeholder-slate-500'
                       : 'border-slate-200 bg-white text-slate-900 placeholder-slate-400'
@@ -1249,24 +1229,23 @@ export const QuickCheckout: React.FC = () => {
               {productSearch && (
                 <button
                   onClick={() => { setProductSearch(''); }}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-xl active:scale-95 ${isDark ? 'active:bg-slate-700 text-slate-400' : 'active:bg-slate-200 text-slate-500'}`}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-xl active:scale-95 ${isDark ? 'active:bg-slate-700 text-slate-400' : 'active:bg-slate-200 text-slate-500'}`}
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3 h-3" />
                 </button>
               )}
             </div>
             
-            {/* Compact Quantity Stepper */}
-            <div className={`flex items-center gap-1 px-2 rounded-2xl border-2 ${
+            <div className={`flex items-center gap-1 px-1.5 rounded-xl border-2 ${
               pendingProduct
                 ? isDark ? 'border-amber-500 bg-amber-500/10' : 'border-amber-400 bg-amber-50'
                 : isDark ? 'border-slate-700 bg-slate-800/80' : 'border-slate-200 bg-white'
             }`}>
               <button
                 onClick={() => setQuantity(q => decrementQuantity(q, 0.01))}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 ${isDark ? 'active:bg-slate-700 text-slate-400' : 'active:bg-slate-200 text-slate-600'}`}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90 ${isDark ? 'active:bg-slate-700 text-slate-400' : 'active:bg-slate-200 text-slate-600'}`}
               >
-                <Minus className="w-4 h-4" />
+                <Minus className="w-3 h-3" />
               </button>
               <input
                 ref={quantityInputRef}
@@ -1277,7 +1256,6 @@ export const QuickCheckout: React.FC = () => {
                 value={quantity}
                 onChange={(e) => setQuantity(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
                 onFocus={() => {
-                  // Unfocus cart when quantity is focused
                   setIsCartFocused(false);
                   setSelectedCartIndex(-1);
                   setIsPaymentFocused(false);
@@ -1291,24 +1269,23 @@ export const QuickCheckout: React.FC = () => {
                     setPendingProduct(null);
                   }
                 }}
-                className={`w-12 py-3 text-center font-bold text-lg bg-transparent focus:outline-none ${isDark ? 'text-white' : 'text-slate-900'}`}
+                className={`w-10 py-2 text-center font-bold text-sm bg-transparent focus:outline-none ${isDark ? 'text-white' : 'text-slate-900'}`}
               />
               <button
                 onClick={() => setQuantity(q => incrementQuantity(q))}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 ${isDark ? 'active:bg-slate-700 text-slate-400' : 'active:bg-slate-200 text-slate-600'}`}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90 ${isDark ? 'active:bg-slate-700 text-slate-400' : 'active:bg-slate-200 text-slate-600'}`}
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3 h-3" />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Product Search Results - Slide Up Panel */}
         {(filteredProducts.length > 0 || (productSearch && filteredProducts.length === 0)) && (
-          <div className="px-3 mb-3">
-            <div className={`rounded-2xl border overflow-hidden ${isDark ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white shadow-lg'}`}>
+          <div className="px-3 mb-2">
+            <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white shadow-sm'}`}>
               {filteredProducts.length > 0 ? (
-                <div className="max-h-[50vh] overflow-y-auto">
+                <div className="max-h-[40vh] overflow-y-auto">
                   {filteredProducts.map((flatProduct, index) => (
                     <button
                       key={flatProduct.flatId}
@@ -1317,24 +1294,24 @@ export const QuickCheckout: React.FC = () => {
                         else productItemRefs.current.delete(index);
                       }}
                       onClick={() => quickAddProduct(flatProduct)}
-                      className={`w-full flex items-center gap-3 p-3.5 text-left transition-all active:scale-[0.98] border-b last:border-b-0 ${
+                      className={`w-full flex items-center gap-2 p-2.5 text-left transition-all active:scale-[0.98] border-b last:border-b-0 ${
                         index === selectedProductIndex
                           ? isDark ? 'bg-amber-500/20' : 'bg-amber-50'
                           : isDark ? 'active:bg-slate-700/70 border-slate-700/50' : 'active:bg-slate-50 border-slate-100'
                       }`}
                     >
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
-                        <Package className={`w-6 h-6 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                        <Package className={`w-4 h-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        <p className={`font-semibold text-xs truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {isSinhala ? (flatProduct.product.nameAlt || flatProduct.displayName) : flatProduct.displayName}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                             {flatProduct.displaySku}
                           </span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded-lg ${
+                          <span className={`text-[10px] px-1 py-0.5 rounded ${
                             flatProduct.stock > 10 
                               ? 'bg-emerald-500/10 text-emerald-500' 
                               : flatProduct.stock > 0 
@@ -1348,28 +1325,28 @@ export const QuickCheckout: React.FC = () => {
                       <div className="text-right flex-shrink-0">
                         {flatProduct.hasDiscount && flatProduct.discountedPrice ? (
                           <>
-                            <p className={`text-xs line-through ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                              {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
+                            <p className={`text-[10px] line-through ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                              Rs. {flatProduct.retailPrice.toLocaleString()}
                             </p>
-                            <p className="font-bold text-pink-500">
-                              {t('common.currency')} {flatProduct.discountedPrice.toLocaleString()}
+                            <p className="text-xs font-bold text-pink-500">
+                              Rs. {flatProduct.discountedPrice.toLocaleString()}
                             </p>
                           </>
                         ) : (
-                          <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                            {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
+                          <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                            Rs. {flatProduct.retailPrice.toLocaleString()}
                           </p>
                         )}
                       </div>
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
-                        <Plus className={`w-5 h-5 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
+                        <Plus className={`w-4 h-4 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
                       </div>
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="p-8 text-center">
-                  <Package className={`w-12 h-12 mx-auto mb-2 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                <div className="p-6 text-center">
+                  <Package className={`w-10 h-10 mx-auto mb-2 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
                   <p className={isDark ? 'text-slate-400' : 'text-slate-500'}>
                     {t('quickCheckout.noProductsFound')}
                   </p>
@@ -1379,15 +1356,14 @@ export const QuickCheckout: React.FC = () => {
           </div>
         )}
 
-        {/* Cart Items - Main Content Area */}
         <div className="px-3 pb-4">
-          <div className={`rounded-2xl border min-h-[200px] ${isDark ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
-            <div className={`flex items-center justify-between px-4 py-3 border-b ${isDark ? 'border-slate-700/50' : 'border-slate-100'}`}>
-              <h2 className={`font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                <ShoppingCart className="w-5 h-5" />
+          <div className={`rounded-xl border min-h-[150px] ${isDark ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+            <div className={`flex items-center justify-between px-3 py-2 border-b ${isDark ? 'border-slate-700/50' : 'border-slate-100'}`}>
+              <h2 className={`font-bold flex items-center gap-1.5 text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <ShoppingCart className="w-4 h-4" />
                 {t('quickCheckout.cartItems')}
               </h2>
-              <span className={`px-2.5 py-1 rounded-full text-sm font-semibold ${
+              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                 items.length > 0
                   ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
                   : isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'
@@ -1397,12 +1373,12 @@ export const QuickCheckout: React.FC = () => {
             </div>
             
             {items.length === 0 ? (
-              <div className={`flex flex-col items-center justify-center py-12 px-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-4 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                  <ShoppingCart className="w-10 h-10 opacity-40" />
+              <div className={`flex flex-col items-center justify-center py-8 px-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                  <ShoppingCart className="w-7 h-7 opacity-40" />
                 </div>
-                <p className="text-lg font-medium">{t('quickCheckout.emptyCart')}</p>
-                <p className="text-sm mt-1 text-center">{t('quickCheckout.scanOrSearch')}</p>
+                <p className="text-sm font-medium">{t('quickCheckout.emptyCart')}</p>
+                <p className="text-[11px] mt-1 text-center">{t('quickCheckout.scanOrSearch')}</p>
               </div>
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -1416,7 +1392,7 @@ export const QuickCheckout: React.FC = () => {
                       transform: swipedItemId === item.id ? `translateX(${touchDeltaX}px)` : 'translateX(0)',
                       transition: swipedItemId === item.id ? 'none' : 'transform 0.2s ease-out',
                     }}
-                    className={`relative p-3.5 ${
+                    className={`relative p-2.5 ${
                       swipedItemId === item.id && touchDeltaX < -30
                         ? isDark ? 'bg-red-500/20' : 'bg-red-50'
                         : swipedItemId === item.id && touchDeltaX > 30
@@ -1424,61 +1400,59 @@ export const QuickCheckout: React.FC = () => {
                           : ''
                     }`}
                   >
-                    {/* Swipe hint indicators */}
                     {swipedItemId === item.id && touchDeltaX < -30 && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500">
-                        <Trash2 className="w-6 h-6" />
+                        <Trash2 className="w-5 h-5" />
                       </div>
                     )}
                     {swipedItemId === item.id && touchDeltaX > 30 && (
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500">
-                        <Plus className="w-6 h-6" />
+                        <Plus className="w-5 h-5" />
                       </div>
                     )}
                     
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        <p className={`font-semibold text-xs truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {isSinhala ? (item.productNameSi || item.productName) : item.productName}
                         </p>
-                        <div className={`text-sm flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <div className={`text-xs flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                           {item.unitPrice !== item.originalPrice && (
-                            <span className="line-through text-xs">
-                              {t('common.currency')} {item.originalPrice.toLocaleString()}
+                            <span className="line-through text-[10px]">
+                              Rs. {item.originalPrice.toLocaleString()}
                             </span>
                           )}
                           <span className={item.unitPrice !== item.originalPrice ? 'text-emerald-500 font-medium' : ''}>
-                            {t('common.currency')} {item.unitPrice.toLocaleString()}
+                            Rs. {item.unitPrice.toLocaleString()}
                           </span>
                           <span>× {item.quantity}</span>
                         </div>
                       </div>
                       
-                      {/* Quantity Controls */}
-                      <div className={`flex items-center gap-1 p-1 rounded-xl ${isDark ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
+                      <div className={`flex items-center gap-0.5 p-0.5 rounded-lg ${isDark ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
                         <button
                           onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, decrementQuantity(item.quantity, 0.01)); }}
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${
+                          className={`w-6 h-6 rounded-md flex items-center justify-center transition-all active:scale-90 ${
                             isDark ? 'active:bg-slate-600 text-slate-300' : 'active:bg-slate-200 text-slate-600'
                           }`}
                         >
-                          <Minus className="w-4 h-4" />
+                          <Minus className="w-3 h-3" />
                         </button>
-                        <span className={`w-8 text-center font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        <span className={`w-6 text-center font-bold text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {item.quantity}
                         </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, incrementQuantity(item.quantity)); }}
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 ${
+                          className={`w-6 h-6 rounded-md flex items-center justify-center transition-all active:scale-90 ${
                             isDark ? 'active:bg-slate-600 text-slate-300' : 'active:bg-slate-200 text-slate-600'
                           }`}
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus className="w-3 h-3" />
                         </button>
                       </div>
                       
-                      <p className={`w-20 text-right font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                        {t('common.currency')} {item.total.toLocaleString()}
+                      <p className={`w-16 text-right font-bold text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        Rs. {item.total.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -1488,45 +1462,40 @@ export const QuickCheckout: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Bottom Sheet - Always Visible */}
         <div className={`fixed bottom-0 left-0 right-0 z-50 ${isDark ? 'bg-slate-800/98 backdrop-blur-xl border-t border-slate-700' : 'bg-white/98 backdrop-blur-xl border-t border-slate-200 shadow-2xl'}`}>
-          {/* Pull Handle */}
-          <div className="flex justify-center pt-2 pb-1">
-            <div className={`w-10 h-1 rounded-full ${isDark ? 'bg-slate-600' : 'bg-slate-300'}`} />
+          <div className="flex justify-center pt-1.5 pb-0.5">
+            <div className={`w-8 h-0.5 rounded-full ${isDark ? 'bg-slate-600' : 'bg-slate-300'}`} />
           </div>
           
-          {/* Quick Actions Row */}
-          <div className="px-4 pb-2">
-            <div className="grid grid-cols-2 gap-2">
-              {/* Payment Toggle */}
-              <div className={`flex rounded-xl overflow-hidden border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+          <div className="px-3 pb-2">
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className={`flex rounded-lg overflow-hidden border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                 <button
                   onClick={() => { setPaymentMethod('cash'); playBeep('add'); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1 py-2 text-xs font-medium transition-all ${
                     paymentMethod === 'cash'
                       ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
                       : isDark ? 'bg-slate-700/50 text-slate-400' : 'bg-slate-50 text-slate-600'
                   }`}
                 >
-                  <Banknote className="w-4 h-4" />
+                  <Banknote className="w-3.5 h-3.5" />
                   {t('invoice.cash')}
                 </button>
                 <button
                   onClick={() => { setPaymentMethod('credit'); playBeep('add'); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1 py-2 text-xs font-medium transition-all ${
                     paymentMethod === 'credit'
                       ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
                       : isDark ? 'bg-slate-700/50 text-slate-400' : 'bg-slate-50 text-slate-600'
                   }`}
                 >
-                  <CreditCard className="w-4 h-4" />
+                  <CreditCard className="w-3.5 h-3.5" />
                   {t('quickCheckout.credit')}
                 </button>
               </div>
               
-              {/* Discount Input */}
-              <div className={`flex items-center gap-2 px-3 rounded-xl border ${isDark ? 'border-slate-700 bg-slate-700/50' : 'border-slate-200 bg-slate-50'}`}>
-                <Percent className={`w-4 h-4 flex-shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+              <div className={`flex items-center gap-1.5 px-2 rounded-lg border ${isDark ? 'border-slate-700 bg-slate-700/50' : 'border-slate-200 bg-slate-50'}`}>
+                <Percent className={`w-3 h-3 flex-shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
                 <input
                   ref={discountInputRef}
                   type="number"
@@ -1536,41 +1505,12 @@ export const QuickCheckout: React.FC = () => {
                   value={discount || ''}
                   onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
                   placeholder={t('quickCheckout.discount')}
-                  className={`flex-1 py-2.5 text-sm font-medium bg-transparent focus:outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
+                  className={`flex-1 py-2 text-xs font-medium bg-transparent focus:outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
                 />
               </div>
               
-              {/* Apply Discount to All Items - Mobile */}
-              <div className={`flex items-center gap-2`}>
-                <div className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border ${isDark ? 'border-slate-700 bg-slate-700/50' : 'border-slate-200 bg-slate-50'}`}>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    max="100"
-                    value={bulkDiscountPercent || ''}
-                    onChange={(e) => setBulkDiscountPercent(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                    placeholder={t('invoice.enterDiscountPercent')}
-                    className={`flex-1 text-sm font-medium bg-transparent focus:outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
-                  />
-                  <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>%</span>
-                </div>
-                <button
-                  onClick={() => applyDiscountToAll(bulkDiscountPercent)}
-                  disabled={items.length === 0 || bulkDiscountPercent <= 0}
-                  className={`px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
-                    items.length > 0 && bulkDiscountPercent > 0
-                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white'
-                      : isDark ? 'bg-slate-700 text-slate-500' : 'bg-slate-200 text-slate-400'
-                  }`}
-                >
-                  {t('common.apply')}
-                </button>
-              </div>
-              
-              {/* Received Amount - Mobile (F7) */}
-              <div className={`flex items-center gap-2 px-3 rounded-xl border ${isDark ? 'border-slate-700 bg-green-900/20' : 'border-green-200 bg-green-50'}`}>
-                <Banknote className={`w-4 h-4 flex-shrink-0 ${isDark ? 'text-green-400' : 'text-green-500'}`} />
+              <div className={`flex items-center gap-1.5 px-2 rounded-lg border ${isDark ? 'border-slate-700 bg-green-900/20' : 'border-green-200 bg-green-50'}`}>
+                <Banknote className={`w-3 h-3 flex-shrink-0 ${isDark ? 'text-green-400' : 'text-green-500'}`} />
                 <input
                   ref={receivedAmountInputRef}
                   type="number"
@@ -1579,86 +1519,43 @@ export const QuickCheckout: React.FC = () => {
                   value={receivedAmount || ''}
                   onChange={(e) => setReceivedAmount(Math.max(0, parseFloat(e.target.value) || 0))}
                   placeholder={t('invoice.receivedAmount')}
-                  className={`flex-1 py-2.5 text-sm font-medium bg-transparent focus:outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
+                  className={`flex-1 py-2 text-xs font-medium bg-transparent focus:outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
                 />
                 {receivedAmount > 0 && (
-                  <span className={`text-sm font-bold ${changeAmount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  <span className={`text-xs font-bold ${changeAmount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                     Δ {changeAmount.toLocaleString()}
                   </span>
                 )}
               </div>
-            </div>
-          </div>
-          
-          {/* Total & Checkout */}
-          <div className="px-4 pb-4">
-            {/* Change Display */}
-            {receivedAmount > 0 && (
-              <div className={`mb-3 p-3 rounded-xl ${
-                changeAmount >= 0
-                  ? isDark ? 'bg-green-900/30 border border-green-700' : 'bg-green-50 border border-green-200'
-                  : isDark ? 'bg-red-900/30 border border-red-700' : 'bg-red-50 border border-red-200'
-              }`}>
-                <div className="flex justify-between items-center">
-                  <span className={`text-sm font-medium ${changeAmount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {t('invoice.changeAmount')}
-                  </span>
-                  <span className={`text-xl font-bold font-mono ${changeAmount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {t('common.currency')} {changeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-            )}
-            <div className={`flex items-center justify-between py-2 mb-3 ${isDark ? 'border-t border-slate-700/50' : 'border-t border-slate-100'}`}>
-              <div>
-                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {items.length} {t('invoice.items')} • {items.reduce((sum, i) => sum + i.quantity, 0)} {t('invoice.units')}
-                </p>
-                {discountAmount > 0 && (
-                  <p className="text-xs text-red-500">
-                    -{t('common.currency')} {discountAmount.toLocaleString()} {t('quickCheckout.discount')}
-                  </p>
+              
+              <button
+                onClick={handleCheckout}
+                disabled={items.length === 0 || isProcessing}
+                className={`py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] ${
+                  items.length > 0
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30'
+                    : isDark ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                {isProcessing ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {t('quickCheckout.checkoutAndPrint')}
+                  </>
                 )}
-              </div>
-              <div className="text-right">
-                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('invoice.totalAmount')}</p>
-                <p className="text-2xl font-bold text-emerald-500">
-                  {t('common.currency')} {total.toLocaleString()}
-                </p>
-              </div>
+              </button>
             </div>
-            
-            <button
-              onClick={handleCheckout}
-              disabled={items.length === 0 || isProcessing}
-              className={`w-full py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 transition-all active:scale-[0.98] ${
-                items.length > 0
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xl shadow-amber-500/30'
-                  : isDark ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              {isProcessing ? (
-                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <Sparkles className="w-5 h-5" />
-                  {t('quickCheckout.checkoutAndPrint')}
-                  <Receipt className="w-5 h-5" />
-                </>
-              )}
-            </button>
           </div>
         </div>
-
-
       </div>
     );
   }
 
-  // ==================== DESKTOP LAYOUT ====================
+  // ==================== DESKTOP LAYOUT (optimized) ====================
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-slate-50'} pb-16`}>
-      {/* Shortcut Map Overlay */}
+    <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
       <ShortcutMapOverlay
         isOpen={showShortcutMap}
         onClose={() => setShowShortcutMap(false)}
@@ -1669,105 +1566,82 @@ export const QuickCheckout: React.FC = () => {
         totalSteps={1}
       />
 
-      {/* Header */}
-      <div className={`sticky top-0 z-40 px-4 py-3 ${isDark ? 'bg-slate-800/95 backdrop-blur border-b border-slate-700' : 'bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm'}`}>
+      {/* Compact toolbar - no top nav header, just a slim bar */}
+      <div className={`sticky top-0 z-40 px-3 py-1.5 ${isDark ? 'bg-slate-800/95 backdrop-blur border-b border-slate-700/50' : 'bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm'}`}>
         <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/invoices')}
-              className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`}
+              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`}
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4" />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">
-                <Zap className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {t('quickCheckout.title')}
-                </h1>
-                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {t('quickCheckout.subtitle')}
-                </p>
-              </div>
+            <div className="w-7 h-7 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center shadow shadow-amber-500/20">
+              <Zap className="w-4 h-4 text-white" />
             </div>
+            <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              {t('quickCheckout.title')}
+            </span>
           </div>
           
-
-          
-          <div className="flex items-center gap-2">
-            {/* Sound Toggle */}
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'} ${soundEnabled ? 'text-emerald-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`}
+              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'} ${soundEnabled ? 'text-emerald-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`}
               title={soundEnabled ? t('quickCheckout.soundOn') : t('quickCheckout.soundOff')}
             >
-              {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </button>
-            
-            {/* Keyboard Shortcuts */}
             <button
               onClick={() => setShowShortcutMap(true)}
-              className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'} ${showShortcutMap ? 'text-blue-500' : isDark ? 'text-slate-400' : 'text-slate-600'}`}
+              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'} ${showShortcutMap ? 'text-blue-500' : isDark ? 'text-slate-400' : 'text-slate-600'}`}
               title={t('quickCheckout.keyboardShortcuts')}
             >
-              <Keyboard className="w-5 h-5" />
+              <Keyboard className="w-4 h-4" />
             </button>
-            
-            {/* Clear Cart */}
             <button
               onClick={clearCart}
               disabled={items.length === 0}
-              className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 disabled:opacity-30' : 'hover:bg-slate-100 disabled:opacity-30'} text-red-500`}
+              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 disabled:opacity-30' : 'hover:bg-slate-100 disabled:opacity-30'} text-red-500`}
               title={t('quickCheckout.clearCart')}
             >
-              <RotateCcw className="w-5 h-5" />
+              <RotateCcw className="w-4 h-4" />
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Left Panel - Product Search & Selection */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Search Bar */}
-            <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
-              {/* Pending Product Banner */}
+      <div className="max-w-7xl mx-auto p-3">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          {/* Left Panel */}
+          <div className="lg:col-span-2 space-y-2">
+            {/* Condensed Search Bar */}
+            <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
               {pendingProduct && (
-                <div className={`mb-3 p-3 rounded-xl flex items-center justify-between ${isDark ? 'bg-amber-500/20 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
-                  <div className="flex items-center gap-3">
-                    <Package className={`w-5 h-5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+                <div className={`mb-2 p-2 rounded-lg flex items-center justify-between ${isDark ? 'bg-amber-500/20 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
+                  <div className="flex items-center gap-2">
+                    <Package className={`w-4 h-4 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
                     <div>
-                      <p className={`font-medium ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{isSinhala ? (pendingProduct.product.nameAlt || pendingProduct.displayName) : pendingProduct.displayName}</p>
-                      <p className={`text-xs ${isDark ? 'text-amber-400/70' : 'text-amber-600'}`}>
-                        {t('quickCheckout.enterQuantityPrompt')} • {t('common.currency')} {pendingProduct.retailPrice.toLocaleString()}
+                      <p className={`text-xs font-medium ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{isSinhala ? (pendingProduct.product.nameAlt || pendingProduct.displayName) : pendingProduct.displayName}</p>
+                      <p className={`text-[10px] ${isDark ? 'text-amber-400/70' : 'text-amber-600'}`}>
+                        {t('quickCheckout.enterQuantityPrompt')} • Rs. {pendingProduct.retailPrice.toLocaleString()}
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => { setPendingProduct(null); searchInputRef.current?.focus(); }}
-                    className={`p-1 rounded-lg ${isDark ? 'hover:bg-amber-500/30 text-amber-400' : 'hover:bg-amber-200 text-amber-700'}`}
+                    className={`p-0.5 rounded-lg ${isDark ? 'hover:bg-amber-500/30 text-amber-400' : 'hover:bg-amber-200 text-amber-700'}`}
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
               
-              <div className="flex gap-3">
-                {/* Product Search */}
+              <div className="flex gap-2">
                 <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className={`text-xs font-medium flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      <Search className="w-3 h-3" />
-                      {t('quickCheckout.shortcut.search')}
-                    </label>
-                    <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>F2</kbd>
-                  </div>
                   <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                      <Barcode className={`w-5 h-5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                      <Barcode className={`w-4 h-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                     </div>
                     <input
                       ref={searchInputRef}
@@ -1775,7 +1649,6 @@ export const QuickCheckout: React.FC = () => {
                       placeholder={t('quickCheckout.searchPlaceholder')}
                       value={productSearch}
                       onFocus={() => {
-                        // Unfocus cart when search is focused
                         setIsCartFocused(false);
                         setSelectedCartIndex(-1);
                         setIsPaymentFocused(false);
@@ -1788,20 +1661,15 @@ export const QuickCheckout: React.FC = () => {
                         const parsed = parseScanInput(val);
 
                         if (parsed?.qty && parsed?.code) {
-                          // If qty is provided in the scan, try to resolve product immediately
                           const match = flattenedProducts.find(
                             (fp) => fp.displayBarcode === parsed.code || fp.displaySku.toLowerCase() === parsed.code.toLowerCase()
                           );
-
                           if (match) {
-                            // Auto add with provided qty
                             addProductToCart(match, parsed.qty);
                             setProductSearch('');
                             setSelectedProductIndex(-1);
                             return;
                           }
-
-                          // If product not found yet, set code as search term
                           setProductSearch(parsed.code);
                           setSelectedProductIndex(-1);
                           return;
@@ -1816,7 +1684,7 @@ export const QuickCheckout: React.FC = () => {
                         setProductSearch(val);
                         setSelectedProductIndex(-1);
                       }}
-                      className={`w-full pl-12 pr-4 py-4 text-lg border-2 rounded-xl focus:outline-none transition-all ${
+                      className={`w-full pl-9 pr-8 py-2 text-sm border-2 rounded-lg focus:outline-none transition-all ${
                         isDark
                           ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-amber-500'
                           : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-amber-500'
@@ -1830,23 +1698,24 @@ export const QuickCheckout: React.FC = () => {
                           setSelectedProductIndex(-1);
                           searchInputRef.current?.focus();
                         }}
-                        className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full ${isDark ? 'hover:bg-slate-600 text-slate-400' : 'hover:bg-slate-200 text-slate-500'}`}
+                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full ${isDark ? 'hover:bg-slate-600 text-slate-400' : 'hover:bg-slate-200 text-slate-500'}`}
                       >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4" />
                       </button>
                     )}
                   </div>
                 </div>
                 
-                {/* Quantity Input */}
-                <div className="w-32">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {t('quickCheckout.shortcut.quantity')}
-                    </label>
-                    <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>F3</kbd>
-                  </div>
-                  <div className="relative">
+                {/* Condensed Quantity Input */}
+                <div className="flex items-center gap-1">
+                  <label className={`text-[10px] font-medium mr-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Qty:</label>
+                  <div className="relative flex items-center">
+                    <button
+                      onClick={() => setQuantity(q => decrementQuantity(q, 0.01))}
+                      className={`p-1 rounded ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
                     <input
                       ref={quantityInputRef}
                       type="number"
@@ -1856,7 +1725,6 @@ export const QuickCheckout: React.FC = () => {
                       onChange={(e) => setQuantity(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
                       onFocus={() => {
                         setIsQuantityFocused(true);
-                        // Unfocus cart when quantity is focused
                         setIsCartFocused(false);
                         setSelectedCartIndex(-1);
                         setIsPaymentFocused(false);
@@ -1872,44 +1740,31 @@ export const QuickCheckout: React.FC = () => {
                           setPendingProduct(null);
                         }
                       }}
-                      className={`w-full px-4 py-4 text-lg text-center font-bold border-2 rounded-xl focus:outline-none transition-all ${
+                      className={`w-14 py-1.5 text-sm text-center font-bold border-2 rounded-lg focus:outline-none transition-all ${
                         pendingProduct
                           ? isDark 
-                            ? 'border-amber-500 bg-amber-500/10 text-white ring-2 ring-amber-500/30' 
-                            : 'border-amber-400 bg-amber-50 text-slate-900 ring-2 ring-amber-200'
+                            ? 'border-amber-500 bg-amber-500/10 text-white ring-1 ring-amber-500/30' 
+                            : 'border-amber-400 bg-amber-50 text-slate-900 ring-1 ring-amber-200'
                           : isDark
                             ? 'border-slate-600 bg-slate-700/50 text-white focus:border-amber-500'
                             : 'border-slate-200 bg-slate-50 text-slate-900 focus:border-amber-500'
                       }`}
                     />
-                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col">
-                      <button
-                        onClick={() => setQuantity(q => incrementQuantity(q))}
-                        className={`p-0.5 ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
-                      >
-                        <ChevronUp className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setQuantity(q => decrementQuantity(q, 0.01))}
-                        className={`p-0.5 ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
-                      >
-                        <ChevronDown className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setQuantity(q => incrementQuantity(q))}
+                      className={`p-1 rounded ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
+                    >
+                      <ChevronUp className="w-3 h-3" />
+                    </button>
                   </div>
-                  {isQuantityFocused && (
-                    <p className={`mt-1 text-xs text-center ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                      ← − • + →
-                    </p>
-                  )}
                 </div>
               </div>
               
-              {/* Product Results */}
+              {/* Product Results - compact */}
               {filteredProducts.length > 0 && (
                 <div 
                   ref={productListRef}
-                  className={`mt-3 max-h-64 overflow-y-auto rounded-xl border ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}
+                  className={`mt-2 max-h-48 overflow-y-auto rounded-lg border ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}
                 >
                   {filteredProducts.map((flatProduct, index) => (
                     <button
@@ -1919,7 +1774,6 @@ export const QuickCheckout: React.FC = () => {
                         else productItemRefs.current.delete(index);
                       }}
                       onClick={() => {
-                        // Mouse selection should set pending product and focus quantity for quick workflow
                         setPendingProduct(flatProduct);
                         setProductSearch('');
                         setSelectedProductIndex(-1);
@@ -1933,80 +1787,60 @@ export const QuickCheckout: React.FC = () => {
                         playBeep('add');
                         toast.info(`${flatProduct.displayName} - ${t('quickCheckout.enterQuantity')}`);
                       }}
-                      className={`w-full flex items-center gap-4 p-3 text-left transition-colors border-b last:border-b-0 ${
+                      className={`w-full flex items-center gap-2 p-2 text-left transition-colors border-b last:border-b-0 ${
                         index === selectedProductIndex
                           ? isDark ? 'bg-amber-500/20 border-amber-500/30' : 'bg-amber-50 border-amber-200'
                           : isDark ? 'hover:bg-slate-700/50 border-slate-700' : 'hover:bg-white border-slate-200'
                       }`}
                     >
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-white'}`}>
-                        <Package className={`w-6 h-6 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-white'}`}>
+                        <Package className={`w-4 h-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        <p className={`text-xs font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {isSinhala ? (flatProduct.product.nameAlt || flatProduct.displayName) : flatProduct.displayName}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                            SKU: {flatProduct.displaySku}
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {flatProduct.displaySku}
                           </span>
-                          {flatProduct.displayBarcode && (
-                            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                              • {flatProduct.displayBarcode}
-                            </span>
-                          )}
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          <span className={`text-[9px] px-1 py-0.5 rounded ${
                             flatProduct.stock > 10 
                               ? 'bg-emerald-500/10 text-emerald-500' 
                               : flatProduct.stock > 0 
                                 ? 'bg-amber-500/10 text-amber-500' 
                                 : 'bg-red-500/10 text-red-500'
                           }`}>
-                            {flatProduct.stock} {t('invoice.available')}
+                            {flatProduct.stock}
                           </span>
                         </div>
                       </div>
                       <div className="text-right">
-                        {flatProduct.hasDiscount && flatProduct.discountedPrice ? (
-                          <>
-                            <p className={`text-xs line-through ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                              {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
-                            </p>
-                            <p className="font-bold text-pink-500">
-                              {t('common.currency')} {flatProduct.discountedPrice.toLocaleString()}
-                            </p>
-                          </>
-                        ) : (
-                          <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                            {t('common.currency')} {flatProduct.retailPrice.toLocaleString()}
-                          </p>
-                        )}
-                        <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                          {flatProduct.product.unit || 'piece'}
+                        <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          Rs. {flatProduct.retailPrice.toLocaleString()}
                         </p>
                       </div>
-                      <Plus className={`w-5 h-5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+                      <Plus className={`w-3.5 h-3.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
                     </button>
                   ))}
                 </div>
               )}
               
               {productSearch && filteredProducts.length === 0 && (
-                <div className={`mt-3 p-6 text-center rounded-xl border ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}>
-                  <Package className={`w-10 h-10 mx-auto mb-2 ${isDark ? 'text-slate-600' : 'text-slate-400'}`} />
-                  <p className={isDark ? 'text-slate-400' : 'text-slate-500'}>
+                <div className={`mt-2 p-4 text-center rounded-lg border ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}>
+                  <Package className={`w-8 h-8 mx-auto mb-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`} />
+                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     {t('quickCheckout.noProductsFound')}
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Cart Items */}
+            {/* Compact Cart Items - shows ~3 rows */}
             <div 
               ref={cartListRef}
               tabIndex={-1}
               onBlur={(e) => {
-                // Only unfocus if the related target is not within the cart
                 if (!e.currentTarget.contains(e.relatedTarget as Node)) {
                   setIsCartFocused(false);
                   setSelectedCartIndex(-1);
@@ -2014,153 +1848,61 @@ export const QuickCheckout: React.FC = () => {
                   setIsPriceEditing(false);
                 }
               }}
-              className={`p-4 rounded-2xl border min-h-[300px] outline-none overflow-x-hidden ${
+              className={`p-3 rounded-xl border outline-none overflow-x-hidden ${
                 isCartFocused 
-                  ? isDark ? 'bg-slate-800/50 border-amber-500/50 ring-2 ring-amber-500/20' : 'bg-white border-amber-400 ring-2 ring-amber-200 shadow-lg'
+                  ? isDark ? 'bg-slate-800/50 border-amber-500/50 ring-1 ring-amber-500/20' : 'bg-white border-amber-400 ring-1 ring-amber-200 shadow'
                   : isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
               }`}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  <ShoppingCart className="w-5 h-5" />
+              <div className="flex items-center justify-between mb-2">
+                <h2 className={`font-bold flex items-center gap-1.5 text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <ShoppingCart className="w-4 h-4" />
                   {t('quickCheckout.cartItems')} ({items.length})
                   {isCartFocused && (
-                    <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'}`}>
-                      ↑↓ {t('quickCheckout.shortcut.navigateItems')} • ←→ {t('quickCheckout.shortcut.adjustQty')} • 0-9 {t('quickCheckout.shortcut.editPrice')}
+                    <span className={`ml-1 text-[9px] px-1.5 py-0.5 rounded-full ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'}`}>
+                      ↑↓ → ← 0-9
                     </span>
                   )}
                 </h2>
-                <div className="flex items-center gap-2">
-                  <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'}`}>F4</kbd>
-                  <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-100 text-teal-700'}`}>F7 {t('quickCheckout.quickAdd')}</kbd>
-                  <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'}`}>F9 {t('quickCheckout.shortcut.quickSave')}</kbd>
+                <div className="flex items-center gap-1.5">
+                  <kbd className={`px-1 py-0.5 rounded text-[9px] font-mono ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'}`}>F4</kbd>
+                  <kbd className={`px-1 py-0.5 rounded text-[9px] font-mono ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'}`}>F9</kbd>
                 </div>
               </div>
               
-              {/* Quick Add Row */}
               {isQuickAddMode && (
-                <div className={`mb-3 p-3 rounded-xl border-2 ${
-                  isDark 
-                    ? 'bg-teal-500/10 border-teal-500/50 ring-2 ring-teal-500/20' 
-                    : 'bg-teal-50 border-teal-400 ring-2 ring-teal-200'
-                }`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Plus className={`w-4 h-4 ${isDark ? 'text-teal-400' : 'text-teal-600'}`} />
-                    <span className={`text-sm font-semibold ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>
+                <div className={`mb-2 p-2 rounded-lg border ${isDark ? 'bg-teal-500/10 border-teal-500/50 ring-1 ring-teal-500/20' : 'bg-teal-50 border-teal-400 ring-1 ring-teal-200'}`}>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Plus className={`w-3 h-3 ${isDark ? 'text-teal-400' : 'text-teal-600'}`} />
+                    <span className={`text-xs font-semibold ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>
                       {t('quickCheckout.quickAddTitle')}
                     </span>
-                    <span className={`text-xs ${isDark ? 'text-teal-400/70' : 'text-teal-600/70'}`}>
-                      (Tab {t('quickCheckout.toNavigate')} • Enter {t('quickCheckout.toAdd')} • Esc {t('quickCheckout.toCancel')})
-                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={quickAddNameRef}
-                      type="text"
-                      placeholder={t('quickCheckout.itemName')}
-                      value={quickAddName}
-                      onChange={(e) => setQuickAddName(e.target.value)}
-                      onFocus={() => {
-                        setQuickAddFocusField('name');
-                        // Unfocus cart when quick add name is focused
-                        setIsCartFocused(false);
-                        setSelectedCartIndex(-1);
-                        setIsPaymentFocused(false);
-                        setPriceEditBuffer('');
-                        setIsPriceEditing(false);
-                      }}
-                      className={`flex-1 px-3 py-2 text-sm border-2 rounded-lg focus:outline-none transition-all ${
-                        quickAddFocusField === 'name'
-                          ? isDark 
-                            ? 'border-teal-500 bg-slate-700 text-white ring-2 ring-teal-500/30' 
-                            : 'border-teal-500 bg-white text-slate-900 ring-2 ring-teal-200'
-                          : isDark
-                            ? 'border-slate-600 bg-slate-700/50 text-white'
-                            : 'border-slate-200 bg-white text-slate-900'
-                      }`}
-                    />
-                    <div className="w-28">
-                      <input
-                        ref={quickAddPriceRef}
-                        type="number"
-                        min="0.01"
-                        step="any"
-                        placeholder={t('quickCheckout.price')}
-                        value={quickAddPrice || ''}
-                        onChange={(e) => setQuickAddPrice(Math.max(0, parseFloat(e.target.value) || 0))}
-                        onFocus={() => {
-                          setQuickAddFocusField('price');
-                          // Unfocus cart when quick add price is focused
-                          setIsCartFocused(false);
-                          setSelectedCartIndex(-1);
-                          setIsPaymentFocused(false);
-                          setPriceEditBuffer('');
-                          setIsPriceEditing(false);
-                        }}
-                        className={`w-full px-3 py-2 text-sm text-right border-2 rounded-lg focus:outline-none transition-all ${
-                          quickAddFocusField === 'price'
-                            ? isDark 
-                              ? 'border-teal-500 bg-slate-700 text-white ring-2 ring-teal-500/30' 
-                              : 'border-teal-500 bg-white text-slate-900 ring-2 ring-teal-200'
-                            : isDark
-                              ? 'border-slate-600 bg-slate-700/50 text-white'
-                              : 'border-slate-200 bg-white text-slate-900'
-                        }`}
-                      />
+                  <div className="flex items-center gap-1.5">
+                    <input ref={quickAddNameRef} type="text" placeholder={t('quickCheckout.itemName')} value={quickAddName} onChange={(e) => setQuickAddName(e.target.value)} onFocus={() => { setIsCartFocused(false); setSelectedCartIndex(-1); setPriceEditBuffer(''); setIsPriceEditing(false); setQuickAddFocusField('name'); }} className={`flex-1 px-2 py-1.5 text-xs border rounded-lg focus:outline-none ${quickAddFocusField === 'name' ? isDark ? 'border-teal-500 bg-slate-700 text-white ring-1 ring-teal-500/30' : 'border-teal-500 bg-white text-slate-900 ring-1 ring-teal-200' : isDark ? 'border-slate-600 bg-slate-700/50 text-white' : 'border-slate-200 bg-white text-slate-900'}`} />
+                    <div className="w-16">
+                      <input ref={quickAddPriceRef} type="number" min="0.01" step="any" placeholder={t('quickCheckout.price')} value={quickAddPrice || ''} onChange={(e) => setQuickAddPrice(Math.max(0, parseFloat(e.target.value) || 0))} onFocus={() => { setIsCartFocused(false); setSelectedCartIndex(-1); setPriceEditBuffer(''); setIsPriceEditing(false); setQuickAddFocusField('price'); }} className={`w-full px-2 py-1.5 text-xs text-right border rounded-lg focus:outline-none ${quickAddFocusField === 'price' ? isDark ? 'border-teal-500 bg-slate-700 text-white ring-1 ring-teal-500/30' : 'border-teal-500 bg-white text-slate-900 ring-1 ring-teal-200' : isDark ? 'border-slate-600 bg-slate-700/50 text-white' : 'border-slate-200 bg-white text-slate-900'}`} />
                     </div>
-                    <div className="w-20">
-                      <input
-                        ref={quickAddQtyRef}
-                        type="number"
-                        min="0.01"
-                        step="any"
-                        placeholder={t('quickCheckout.qty')}
-                        value={quickAddQty || ''}
-                        onChange={(e) => setQuickAddQty(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
-                        onFocus={() => {
-                          setQuickAddFocusField('qty');
-                          // Unfocus cart when quick add qty is focused
-                          setIsCartFocused(false);
-                          setSelectedCartIndex(-1);
-                          setIsPaymentFocused(false);
-                          setPriceEditBuffer('');
-                          setIsPriceEditing(false);
-                        }}
-                        className={`w-full px-3 py-2 text-sm text-center border-2 rounded-lg focus:outline-none transition-all ${
-                          quickAddFocusField === 'qty'
-                            ? isDark 
-                              ? 'border-teal-500 bg-slate-700 text-white ring-2 ring-teal-500/30' 
-                              : 'border-teal-500 bg-white text-slate-900 ring-2 ring-teal-200'
-                            : isDark
-                              ? 'border-slate-600 bg-slate-700/50 text-white'
-                              : 'border-slate-200 bg-white text-slate-900'
-                        }`}
-                      />
+                    <div className="w-14">
+                      <input ref={quickAddQtyRef} type="number" min="0.01" step="any" placeholder={t('quickCheckout.qty')} value={quickAddQty || ''} onChange={(e) => setQuickAddQty(Math.max(0.01, parseFloat(e.target.value) || 0.01))} onFocus={() => { setIsCartFocused(false); setSelectedCartIndex(-1); setPriceEditBuffer(''); setIsPriceEditing(false); setQuickAddFocusField('qty'); }} className={`w-full px-2 py-1.5 text-xs text-center border rounded-lg focus:outline-none ${quickAddFocusField === 'qty' ? isDark ? 'border-teal-500 bg-slate-700 text-white ring-1 ring-teal-500/30' : 'border-teal-500 bg-white text-slate-900 ring-1 ring-teal-200' : isDark ? 'border-slate-600 bg-slate-700/50 text-white' : 'border-slate-200 bg-white text-slate-900'}`} />
                     </div>
-                    <button
-                      onClick={addQuickAddItem}
-                      className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                        quickAddName && quickAddPrice > 0
-                          ? 'bg-teal-500 hover:bg-teal-600 text-white'
-                          : isDark ? 'bg-slate-600 text-slate-400 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                      }`}
-                    >
-                      <Plus className="w-4 h-4" />
+                    <button onClick={addQuickAddItem} className={`px-2 py-1.5 rounded-lg text-xs font-medium ${quickAddName && quickAddPrice > 0 ? 'bg-teal-500 hover:bg-teal-600 text-white' : isDark ? 'bg-slate-600 text-slate-400 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                      <Plus className="w-3 h-3" />
                     </button>
                   </div>
                 </div>
               )}
               
               {items.length === 0 ? (
-                <div className={`flex flex-col items-center justify-center py-12 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  <ShoppingCart className="w-16 h-16 mb-3 opacity-30" />
-                  <p className="text-lg">{t('quickCheckout.emptyCart')}</p>
-                  <p className="text-sm mt-1">{t('quickCheckout.scanOrSearch')}</p>
+                <div className={`flex flex-col items-center justify-center py-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <ShoppingCart className="w-12 h-12 mb-2 opacity-30" />
+                  <p className="text-sm">{t('quickCheckout.emptyCart')}</p>
+                  <p className="text-xs mt-0.5">{t('quickCheckout.scanOrSearch')}</p>
                 </div>
               ) : (
                 <div 
                   ref={cartItemsContainerRef}
-                  className="space-y-2 h-[350px] overflow-y-auto"
+                  className="space-y-1 h-[180px] overflow-y-auto"
                 >
                   {items.map((item, index) => (
                     <div
@@ -2171,9 +1913,7 @@ export const QuickCheckout: React.FC = () => {
                       }}
                       tabIndex={0}
                       onClick={(e) => {
-                        // Prevent any default behavior
                         e.preventDefault();
-                        // Set focus state
                         setIsCartFocused(true);
                         setSelectedCartIndex(index);
                         setSelectedProductIndex(-1);
@@ -2181,492 +1921,294 @@ export const QuickCheckout: React.FC = () => {
                         setCurrentMode('cart');
                         setPriceEditBuffer('');
                         setIsPriceEditing(false);
-                        // Blur any active input element
                         if (document.activeElement instanceof HTMLInputElement) {
                           document.activeElement.blur();
                         }
-                        // Focus the cart container for keyboard navigation
                         cartListRef.current?.focus();
                         playBeep('add');
                       }}
                       onFocus={() => {
-                        // Also set focus state when the item itself receives focus
                         setIsCartFocused(true);
                         setSelectedCartIndex(index);
                         setCurrentMode('cart');
                       }}
-                      className={`flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer outline-none ${
+                      className={`flex items-center gap-2 p-2 rounded-lg transition-all cursor-pointer outline-none ${
                         isCartFocused && index === selectedCartIndex
                           ? isDark 
-                            ? 'bg-amber-500/20 shadow-md ring-2 ring-amber-500/50' 
-                            : 'bg-amber-50 shadow-md ring-2 ring-amber-400/50'
+                            ? 'bg-amber-500/20 shadow ring-1 ring-amber-500/50' 
+                            : 'bg-amber-50 shadow ring-1 ring-amber-400/50'
                           : isDark ? 'bg-slate-700/50 hover:bg-slate-700' : 'bg-slate-50 hover:bg-slate-100'
                       }`}
                     >
-                      <span className={`w-6 text-center font-mono text-sm ${
-                        isCartFocused && index === selectedCartIndex 
-                          ? 'text-amber-500 font-bold' 
-                          : isDark ? 'text-slate-500' : 'text-slate-400'
-                      }`}>
+                      <span className={`w-4 text-center font-mono text-[10px] ${isCartFocused && index === selectedCartIndex ? 'text-amber-500 font-bold' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                         {index + 1}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className={`font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        <p className={`text-xs font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {isSinhala ? (item.productNameSi || item.productName) : item.productName}
                         </p>
-                        <div className={`text-sm flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <div className={`text-[10px] flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                           {item.unitPrice !== item.originalPrice && (
-                            <span className="line-through text-xs">
-                              {t('common.currency')} {item.originalPrice.toLocaleString()}
-                            </span>
+                            <span className="line-through">Rs. {item.originalPrice.toLocaleString()}</span>
                           )}
                           <span className={item.unitPrice !== item.originalPrice ? 'text-emerald-500 font-medium' : ''}>
-                            {t('common.currency')} {item.unitPrice.toLocaleString()}
+                            Rs. {item.unitPrice.toLocaleString()}
                           </span>
                           <span>× {item.quantity}</span>
                         </div>
                       </div>
                       
-                      {/* Quantity Controls */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, decrementQuantity(item.quantity, 0.01)); }}
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                            isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
-                          }`}
-                        >
-                          -
-                        </button>
-                        <span className={`w-10 text-center font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, incrementQuantity(item.quantity)); }}
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                            isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
-                          }`}
-                        >
-                          +
-                        </button>
+                      <div className="flex items-center gap-0.5">
+                        <button onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, decrementQuantity(item.quantity, 0.01)); }} className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}`}>-</button>
+                        <span className={`w-7 text-center font-bold text-[11px] ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.quantity}</span>
+                        <button onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, incrementQuantity(item.quantity)); }} className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}`}>+</button>
                       </div>
                       
-                      {/* Price Display - Editable in Cart Mode */}
-                      <div className={`w-28 text-right relative ${
-                        isCartFocused && index === selectedCartIndex && isPriceEditing
-                          ? 'animate-pulse'
-                          : ''
-                      }`}>
-                        {isCartFocused && index === selectedCartIndex && isPriceEditing ? (
-                          <div className={`px-2 py-1 rounded-lg border-2 ${
-                            isDark 
-                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
-                              : 'bg-emerald-50 border-emerald-400 text-emerald-700'
-                          }`}>
-                            <p className="font-bold font-mono text-sm">
-                              {t('common.currency')} {priceEditBuffer || '0'}
-                            </p>
-                            <p className={`text-xs ${isDark ? 'text-emerald-500/70' : 'text-emerald-600/70'}`}>
-                              {t('quickCheckout.typing')}...
-                            </p>
-                          </div>
-                        ) : (
-                          <div className={`px-2 py-1 rounded-lg transition-all ${
-                            isCartFocused && index === selectedCartIndex
-                              ? isDark 
-                                ? 'bg-slate-600/50 ring-1 ring-amber-500/30' 
-                                : 'bg-white ring-1 ring-amber-300'
-                              : ''
-                          }`}>
-                            <p className={`font-bold font-mono ${
-                              item.unitPrice !== item.originalPrice
-                                ? 'text-emerald-500'
-                                : isDark ? 'text-white' : 'text-slate-900'
-                            }`}>
-                              {t('common.currency')} {item.unitPrice.toLocaleString()}
-                            </p>
-                            {item.unitPrice !== item.originalPrice && (
-                              <p className={`text-xs line-through ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                                {t('common.currency')} {item.originalPrice.toLocaleString()}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Creative Item Discount Badge */}
-                      {item.unitPrice < item.originalPrice && (
-                        <div className={`absolute -top-2 -right-14 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold animate-pulse ${
-                          isDark 
-                            ? 'bg-gradient-to-r from-pink-500/90 to-rose-500/90 text-white shadow-lg shadow-pink-500/30' 
-                            : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-500/30'
-                        }`}>
-                          <Sparkles className="w-3 h-3" />
-                          -{t('common.currency')} {((item.originalPrice - item.unitPrice) * item.quantity).toLocaleString()}
+                      {isCartFocused && index === selectedCartIndex && isPriceEditing ? (
+                        <div className={`px-1.5 py-0.5 rounded border ${isDark ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-emerald-50 border-emerald-400 text-emerald-700'}`}>
+                          <p className="font-bold font-mono text-[10px]">Rs. {priceEditBuffer || '0'}</p>
                         </div>
+                      ) : (
+                        <p className={`w-14 text-right font-bold font-mono text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          Rs. {item.total.toLocaleString()}
+                        </p>
                       )}
                       
-                      {/* Line Total */}
-                      <p className={`w-24 text-right font-bold font-mono ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                        {t('common.currency')} {item.total.toLocaleString()}
-                      </p>
-                      
-                      <button
-                        onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
-                        className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
+                      <button onClick={(e) => { e.stopPropagation(); removeItem(item.id); }} className="p-1 rounded-md text-red-500 hover:bg-red-500/10">
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
+
+            {/* Compact Category Grid */}
+            <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <Package className="w-3.5 h-3.5" />
+                  Quick Categories
+                </h3>
+              </div>
+              <CategoryGrid onItemSelect={(item, category) => {
+                const qty = Math.max(1, quantity);
+                const newItem: QuickInvoiceItem = {
+                  id: `pos-${Date.now()}`,
+                  productId: `pos-${category.id}-${item.id}`,
+                  productName: item.name,
+                  productNameSi: item.nameSi || item.name,
+                  quantity: qty,
+                  unitPrice: item.unitRate,
+                  originalPrice: item.unitRate,
+                  total: qty * item.unitRate,
+                };
+                setItems(prev => [...prev, newItem]);
+                playBeep('add');
+                toast.success(`${item.name} ${t('quickCheckout.addedToCart')}`);
+                setTimeout(() => {
+                  if (cartItemsContainerRef.current) {
+                    cartItemsContainerRef.current.scrollTop = cartItemsContainerRef.current.scrollHeight;
+                  }
+                }, 50);
+              }} />
+            </div>
           </div>
 
           {/* Right Panel - Checkout Summary */}
-          <div className="space-y-4">
+          <div className="space-y-2">
             {/* Discount */}
-            <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  <Percent className="w-4 h-4" />
+            <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <Percent className="w-3 h-3" />
                   {t('quickCheckout.discount')}
                 </h3>
-                <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>F6</kbd>
+                <kbd className={`px-1 py-0.5 rounded text-[9px] font-mono ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>F6</kbd>
               </div>
               <div className="relative">
-                <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {t('common.currency')}
-                </span>
-                <input
-                  ref={discountInputRef}
-                  type="number"
-                  min="0"
-                  max={subtotal}
-                  value={discount || ''}
-                  onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
-                  onFocus={() => {
-                    // Unfocus cart when discount is focused
-                    setIsCartFocused(false);
-                    setSelectedCartIndex(-1);
-                    setIsPaymentFocused(false);
-                    setPriceEditBuffer('');
-                    setIsPriceEditing(false);
-                    setCurrentMode('discount');
-                  }}
-                  onBlur={() => {
-                    // Release focus when clicking elsewhere
-                    setCurrentMode('search');
-                  }}
-                  placeholder="0"
-                  className={`w-full pl-14 pr-4 py-3 text-lg text-right font-bold border-2 rounded-xl focus:outline-none transition-all ${
-                    isDark
-                      ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-amber-500'
-                      : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-amber-500'
-                  }`}
-                />
+                <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Rs.</span>
+                <input ref={discountInputRef} type="number" min="0" max={subtotal} value={discount || ''} onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} onFocus={() => { setIsCartFocused(false); setSelectedCartIndex(-1); setIsPaymentFocused(false); setPriceEditBuffer(''); setIsPriceEditing(false); setCurrentMode('discount'); }} onBlur={() => setCurrentMode('search')} placeholder="0" className={`w-full pl-9 pr-3 py-2 text-sm text-right font-bold border-2 rounded-lg focus:outline-none transition-all ${isDark ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-amber-500' : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-amber-500'}`} />
               </div>
             </div>
 
-            {/* Received Amount - Enhanced Payment Input */}
-            <div className={`p-4 rounded-2xl border relative overflow-hidden ${
-              receivedAmount > 0 && receivedAmount >= total
-                ? isDark ? 'bg-gradient-to-br from-emerald-900/30 to-slate-800/50 border-emerald-500/50' : 'bg-gradient-to-br from-emerald-50 to-white border-emerald-300 shadow-emerald-100/50 shadow-lg'
-                : isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
-            }`}>
-              {/* Decorative corner accent when paid */}
-              {receivedAmount > 0 && receivedAmount >= total && (
-                <div className={`absolute top-0 right-0 w-16 h-16 ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`} style={{ clipPath: 'polygon(100% 0, 0 0, 100% 100%)' }}>
-                  <CheckCircle className={`w-5 h-5 absolute top-2 right-2 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  <Banknote className={`w-4 h-4 ${receivedAmount > 0 && receivedAmount >= total ? 'text-emerald-500' : ''}`} />
+            {/* Received Amount */}
+            <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <Banknote className={`w-3 h-3 ${receivedAmount > 0 && receivedAmount >= total ? 'text-emerald-500' : ''}`} />
                   {t('invoice.receivedAmount')}
                 </h3>
-                <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>F7</kbd>
+                <kbd className={`px-1 py-0.5 rounded text-[9px] font-mono ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>F7</kbd>
               </div>
-              
-              {/* Main Input */}
               <div className="relative">
-                <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {t('common.currency')}
-                </span>
-                <input
-                  ref={receivedAmountInputRef}
-                  type="number"
-                  min="0"
-                  value={receivedAmount || ''}
-                  onChange={(e) => setReceivedAmount(Math.max(0, parseFloat(e.target.value) || 0))}
-                  onFocus={() => {
-                    // Unfocus cart when received amount is focused
-                    setIsCartFocused(false);
-                    setSelectedCartIndex(-1);
-                    setIsPaymentFocused(false);
-                    setPriceEditBuffer('');
-                    setIsPriceEditing(false);
-                    setCurrentMode('payment');
-                  }}
-                  onBlur={() => {
-                    // Release focus when clicking elsewhere
-                    setCurrentMode('search');
-                  }}
-                  placeholder="0"
-                  className={`w-full pl-14 pr-4 py-4 text-xl text-right font-bold border-2 rounded-xl focus:outline-none transition-all ${
-                    receivedAmount > 0 && receivedAmount >= total
-                      ? isDark
-                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400 focus:border-emerald-400 ring-2 ring-emerald-500/20'
-                        : 'border-emerald-400 bg-emerald-50 text-emerald-700 focus:border-emerald-500 ring-2 ring-emerald-200'
-                      : isDark
-                        ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-emerald-500'
-                        : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-emerald-500'
-                  }`}
-                />
+                <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Rs.</span>
+                <input ref={receivedAmountInputRef} type="number" min="0" value={receivedAmount || ''} onChange={(e) => setReceivedAmount(Math.max(0, parseFloat(e.target.value) || 0))} onFocus={() => { setIsCartFocused(false); setSelectedCartIndex(-1); setIsPaymentFocused(false); setPriceEditBuffer(''); setIsPriceEditing(false); setCurrentMode('payment'); }} onBlur={() => setCurrentMode('search')} placeholder="0" className={`w-full pl-9 pr-3 py-2 text-sm text-right font-bold border-2 rounded-lg focus:outline-none transition-all ${isDark ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-emerald-500' : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-emerald-500'}`} />
               </div>
-              
-              {/* Quick Amount Buttons */}
-              <div className="mt-3 grid grid-cols-4 gap-1.5">
-                {[
-                  { label: 'Exact', value: total, isExact: true },
-                  { label: '+100', value: Math.ceil(total / 100) * 100 },
-                  { label: '+500', value: Math.ceil(total / 500) * 500 },
-                  { label: '+1K', value: Math.ceil(total / 1000) * 1000 },
-                ].map((btn) => (
-                  <button
-                    key={btn.label}
-                    onClick={() => {
-                      setReceivedAmount(btn.value);
-                      playBeep('add');
-                    }}
-                    className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      btn.isExact
-                        ? isDark 
-                          ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30' 
-                          : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-200'
-                        : isDark 
-                          ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' 
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                    }`}
-                  >
-                    {btn.isExact ? '= ' + btn.value.toLocaleString() : btn.label}
-                  </button>
+              <div className="mt-1.5 grid grid-cols-4 gap-1">
+                {[{ label: 'Exact', value: total, isExact: true }, { label: '+100', value: Math.ceil(total / 100) * 100 }, { label: '+500', value: Math.ceil(total / 500) * 500 }, { label: '+1K', value: Math.ceil(total / 1000) * 1000 }].map((btn) => (
+                  <button key={btn.label} onClick={() => { setReceivedAmount(btn.value); playBeep('add'); }} className={`px-1 py-1 rounded text-[9px] font-medium transition-all ${btn.isExact ? isDark ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-200' : isDark ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}>{btn.isExact ? '= ' + btn.value.toLocaleString() : btn.label}</button>
                 ))}
               </div>
-              
-              {/* Change Display - Enhanced */}
               {receivedAmount > 0 && (
-                <div className={`mt-3 p-3 rounded-xl transition-all ${
-                  changeAmount >= 0 
-                    ? isDark ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'
-                    : isDark ? 'bg-red-500/20 border border-red-500/30' : 'bg-red-50 border border-red-200'
-                }`}>
+                <div className={`mt-1.5 p-2 rounded-lg ${changeAmount >= 0 ? isDark ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200' : isDark ? 'bg-red-500/20 border border-red-500/30' : 'bg-red-50 border border-red-200'}`}>
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      {changeAmount >= 0 ? (
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isDark ? 'bg-emerald-500/30' : 'bg-emerald-200'}`}>
-                          <span className="text-sm">💵</span>
-                        </div>
-                      ) : (
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isDark ? 'bg-red-500/30' : 'bg-red-200'}`}>
-                          <span className="text-sm">⚠️</span>
-                        </div>
-                      )}
-                      <span className={`text-sm font-medium ${
-                        changeAmount >= 0 
-                          ? isDark ? 'text-emerald-400' : 'text-emerald-700'
-                          : isDark ? 'text-red-400' : 'text-red-700'
-                      }`}>
-                        {changeAmount >= 0 ? t('invoice.changeAmount') : t('invoice.balanceDue')}
-                      </span>
-                    </div>
-                    <span className={`text-2xl font-bold font-mono ${
-                      changeAmount >= 0 
-                        ? isDark ? 'text-emerald-400' : 'text-emerald-600'
-                        : isDark ? 'text-red-400' : 'text-red-600'
-                    }`}>
-                      {t('common.currency')} {Math.abs(changeAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </span>
+                    <span className={`text-[10px] font-medium ${changeAmount >= 0 ? isDark ? 'text-emerald-400' : 'text-emerald-700' : isDark ? 'text-red-400' : 'text-red-700'}`}>{changeAmount >= 0 ? t('invoice.changeAmount') : t('invoice.balanceDue')}</span>
+                    <span className={`text-sm font-bold font-mono ${changeAmount >= 0 ? isDark ? 'text-emerald-400' : 'text-emerald-600' : isDark ? 'text-red-400' : 'text-red-600'}`}>Rs. {Math.abs(changeAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Summary */}
-            <div className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
-              <h3 className={`font-semibold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                <Calculator className="w-5 h-5" />
+            <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <h3 className={`text-xs font-semibold mb-2 flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <Calculator className="w-3 h-3" />
                 {t('quickCheckout.summary')}
               </h3>
               
-              <div className="space-y-3">
+              <div className="space-y-1.5 text-[11px]">
                 <div className={`flex justify-between ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                   <span>{t('quickCheckout.itemCount')}</span>
                   <span className="font-medium">{items.reduce((sum, i) => sum + i.quantity, 0)} {t('invoice.units')}</span>
                 </div>
-                {totalItemDiscounts > 0 && (
-                  <div className={`flex justify-between items-center text-pink-500`}>
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      {t('invoice.itemDiscounts')}
-                    </span>
-                    <span className="font-mono">- {t('common.currency')} {totalItemDiscounts.toLocaleString()}</span>
-                  </div>
-                )}
                 <div className={`flex justify-between ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                   <span>{t('invoice.subtotal')}</span>
-                  <span className="font-mono">{t('common.currency')} {subtotal.toLocaleString()}</span>
+                  <span className="font-mono">Rs. {subtotal.toLocaleString()}</span>
                 </div>
                 {discountAmount > 0 && (
                   <div className={`flex justify-between items-center text-red-500`}>
-                    <span className="flex items-center gap-1.5">
-                      <Percent className="w-3.5 h-3.5" />
-                      {t('quickCheckout.discount')}
-                    </span>
-                    <span className="font-mono">- {t('common.currency')} {discountAmount.toLocaleString()}</span>
+                    <span className="flex items-center gap-1">{t('quickCheckout.discount')}</span>
+                    <span className="font-mono">- Rs. {discountAmount.toLocaleString()}</span>
                   </div>
                 )}
                 
-                <div className={`pt-3 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <div className={`pt-1.5 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                   <div className="flex justify-between items-center">
-                    <span className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      {t('invoice.totalAmount')}
-                    </span>
-                    <span className="text-2xl font-bold text-emerald-500">
-                      {t('common.currency')} {total.toLocaleString()}
-                    </span>
+                    <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{t('invoice.totalAmount')}</span>
+                    <span className="text-lg font-bold text-emerald-500">Rs. {total.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Checkout Button */}
-            <button
-              onClick={handleCheckout}
-              disabled={items.length === 0 || isProcessing}
-              className={`w-full py-5 rounded-2xl font-bold text-xl flex items-center justify-center gap-3 transition-all ${
-                items.length > 0
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-xl shadow-amber-500/30'
-                  : isDark ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <Printer className="w-6 h-6" />
+            <button onClick={handleCheckout} disabled={items.length === 0 || isProcessing} className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${items.length > 0 ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/30' : isDark ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+              <Printer className="w-4 h-4" />
               {t('quickCheckout.checkoutAndPrint')}
-              <kbd className="ml-2 px-2 py-1 rounded bg-white/20 text-sm font-mono">F12</kbd>
-            </button>
+              <kbd className="ml-1 px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-mono">F12</kbd>
+            </button>            
 
-            {/* Payment Method - Moved to Bottom */}
-            <div 
-              ref={paymentRef}
-              tabIndex={-1}
-              onBlur={(e) => {
-                // Only unfocus if the related target is not within the payment section
-                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                  setIsPaymentFocused(false);
-                }
-              }}
-              className={`p-4 rounded-2xl border outline-none transition-all ${
-                isPaymentFocused
-                  ? isDark ? 'bg-slate-800/50 border-blue-500/50 ring-2 ring-blue-500/20' : 'bg-white border-blue-400 ring-2 ring-blue-200 shadow-lg'
-                  : isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  <CreditCard className="w-4 h-4" />
+            {/* Customer Selection — below Payment Method, above Shortcuts */}
+            <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <User className="w-3 h-3" />
+                  Customer Selection
+                </h3>
+                <kbd className={`px-1 py-0.5 rounded text-[9px] font-mono ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>F3</kbd>
+              </div>
+              <div className="relative">
+                <div className={`flex items-center gap-2 px-3 py-2 border-2 rounded-lg transition-all cursor-pointer ${
+                  isDark ? 'border-slate-600 bg-slate-700/50 hover:border-slate-500' : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                }`}>
+                  <User className={`w-4 h-4 flex-shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+                  <input
+                    type="text"
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    onFocus={() => { setCustomerOpen(true); }}
+                    placeholder="Search or select a customer..."
+                    className={`flex-1 bg-transparent text-xs font-medium focus:outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
+                  />
+                  {selectedCustomerId !== 'walk-in' && (
+                    <button onClick={() => { setSelectedCustomerId('walk-in'); setCustomerSearch(''); setCustomerOpen(false); }}
+                      className={`p-0.5 rounded ${isDark ? 'hover:bg-slate-600 text-slate-400' : 'hover:bg-slate-200 text-slate-500'}`}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                {customerOpen && (
+                  <div className={`absolute left-0 bottom-full mb-1 w-full rounded-lg border shadow-2xl z-50 overflow-hidden backdrop-blur-md ${
+                    isDark ? 'bg-slate-800/95 border-slate-700/50' : 'bg-white/95 border-slate-200'
+                  }`}>
+                    <div className="max-h-32 overflow-y-auto">
+                      <button onClick={() => { setSelectedCustomerId('walk-in'); setCustomerSearch(''); setCustomerOpen(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-xs font-medium transition-colors ${
+                          selectedCustomerId === 'walk-in' ? 'bg-orange-500/20 text-orange-400' : isDark ? 'text-slate-300 hover:bg-slate-700/50' : 'text-slate-700 hover:bg-slate-100'
+                        }`}>
+                        <span className="flex items-center gap-2"><User className="w-3 h-3" />Walk-in Customer</span>
+                      </button>
+                      {filteredCustomers.map((c) => (
+                        <button key={c.id} onClick={() => { setSelectedCustomerId(c.id); setCustomerSearch(c.name); setCustomerOpen(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-xs font-medium transition-colors ${
+                            selectedCustomerId === c.id ? 'bg-orange-500/20 text-orange-400' : isDark ? 'text-slate-300 hover:bg-slate-700/50' : 'text-slate-700 hover:bg-slate-100'
+                          }`}>
+                          <span className="flex items-center gap-2"><Building2 className="w-3 h-3" />{c.name}</span>
+                        </button>
+                      ))}
+                      {filteredCustomers.length === 0 && customerSearch && (
+                        <div className={`px-3 py-1.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>No customers found</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {selectedCustomerId !== 'walk-in' && selectedCustomerId && (() => {
+                const c = mockCustomers.find(cu => cu.id === selectedCustomerId);
+                return c ? (
+                  <div className={`mt-1.5 p-1.5 rounded-lg ${isDark ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
+                    <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{c.phone || 'No phone'}</p>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+
+            {/* Payment Method */}
+            <div ref={paymentRef} tabIndex={-1} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsPaymentFocused(false); }} className={`p-3 rounded-xl border outline-none transition-all ${isPaymentFocused ? isDark ? 'bg-slate-800/50 border-blue-500/50 ring-1 ring-blue-500/20' : 'bg-white border-blue-400 ring-1 ring-blue-200 shadow' : isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <CreditCard className="w-3 h-3" />
                   {t('quickCheckout.paymentMethod')}
                 </h3>
-                <kbd className={`px-1.5 py-0.5 rounded text-xs font-mono ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>F5</kbd>
+                <kbd className={`px-1 py-0.5 rounded text-[9px] font-mono ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>F5</kbd>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => { setPaymentMethod('cash'); playBeep('add'); }}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-xl font-medium transition-all ${
-                    paymentMethod === 'cash'
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
-                      : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  <Banknote className="w-5 h-5" />
+              <div className="grid grid-cols-2 gap-1.5">
+                <button onClick={() => { setPaymentMethod('cash'); playBeep('add'); }} className={`flex items-center justify-center gap-1.5 p-2 rounded-lg text-xs font-medium transition-all ${paymentMethod === 'cash' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow shadow-emerald-500/30' : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                  <Banknote className="w-3.5 h-3.5" />
                   {t('invoice.cash')}
                 </button>
-                <button
-                  onClick={() => { setPaymentMethod('credit'); playBeep('add'); }}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-xl font-medium transition-all ${
-                    paymentMethod === 'credit'
-                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30'
-                      : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  <CreditCard className="w-5 h-5" />
+                <button onClick={() => { setPaymentMethod('credit'); playBeep('add'); }} className={`flex items-center justify-center gap-1.5 p-2 rounded-lg text-xs font-medium transition-all ${paymentMethod === 'credit' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow shadow-blue-500/30' : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                  <CreditCard className="w-3.5 h-3.5" />
                   {t('quickCheckout.credit')}
                 </button>
               </div>
-              {isPaymentFocused && (
-                <p className={`mt-2 text-xs text-center ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
-                  ← {t('invoice.cash')} • {t('quickCheckout.credit')} →
-                </p>
-              )}
             </div>
 
-            {/* Quick Shortcuts Panel - Moved to Bottom Right */}
-            <div className={`p-4 rounded-2xl border ${isDark ? 'bg-gradient-to-br from-slate-800 via-slate-800/90 to-indigo-900/30 border-slate-700' : 'bg-gradient-to-br from-white via-indigo-50/30 to-blue-50 border-indigo-200 shadow-sm'}`}>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-indigo-900'}`}>
-                  <Keyboard className="w-4 h-4" />
-                  {t('quickCheckout.keyboardShortcuts')}
+            {/* Shortcuts Panel */}
+            <div className={`p-3 rounded-xl border ${isDark ? 'bg-gradient-to-br from-slate-800 via-slate-800/90 to-indigo-900/30 border-slate-700' : 'bg-gradient-to-br from-white via-indigo-50/30 to-blue-50 border-indigo-200 shadow-sm'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-indigo-900'}`}>
+                  <Keyboard className="w-3 h-3" />
+                  Shortcuts
                 </h3>
-                <button
-                  onClick={() => setShowShortcutMap(true)}
-                  className={`text-xs px-2 py-1 rounded-lg transition-colors flex items-center gap-1 ${isDark ? 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400' : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-700'}`}
-                >
+                <button onClick={() => setShowShortcutMap(true)} className={`text-[9px] px-1.5 py-0.5 rounded transition-colors flex items-center gap-0.5 ${isDark ? 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400' : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-700'}`}>
                   <span>?</span>
-                  {t('common.more')}
                 </button>
               </div>
-              
-              {/* Creative Shortcuts Grid */}
-              <div className="grid grid-cols-4 gap-1.5">
-                {[
-                  { key: 'F2', label: t('quickCheckout.shortcut.search'), color: 'blue', icon: '🔍' },
-                  { key: 'F3', label: t('quickCheckout.shortcut.quantity'), color: 'emerald', icon: '📊' },
-                  { key: 'F4', label: t('quickCheckout.shortcut.cart'), color: 'purple', icon: '🛒' },
-                  { key: 'F5', label: t('quickCheckout.shortcut.payment'), color: 'cyan', icon: '💳' },
-                  { key: 'F6', label: t('quickCheckout.shortcut.discount'), color: 'pink', icon: '🏷️' },
-                  { key: 'F7', label: t('quickCheckout.shortcut.received'), color: 'amber', icon: '💰' },
-                  { key: 'F9', label: t('quickCheckout.shortcut.quickSave'), color: 'green', icon: '💾' },
-                  { key: 'F12', label: t('quickCheckout.shortcut.checkout'), color: 'orange', icon: '🖨️' },
-                ].map((shortcut) => (
-                  <div 
-                    key={shortcut.key}
-                    className={`flex flex-col items-center p-1.5 rounded-lg transition-all hover:scale-105 cursor-default ${
-                      isDark ? `bg-${shortcut.color}-500/10 hover:bg-${shortcut.color}-500/20` : `bg-${shortcut.color}-50 hover:bg-${shortcut.color}-100`
-                    }`}
-                  >
-                    <span className="text-sm mb-0.5">{shortcut.icon}</span>
-                    <kbd className={`px-1.5 py-0.5 rounded font-mono text-xs font-bold ${
-                      isDark ? `bg-${shortcut.color}-500/20 text-${shortcut.color}-400` : `bg-${shortcut.color}-100 text-${shortcut.color}-700`
-                    }`}>{shortcut.key}</kbd>
-                    <span className={`mt-0.5 text-[9px] text-center leading-tight ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{shortcut.label}</span>
+              <div className="grid grid-cols-4 gap-1">
+                {[{ key: 'F2', icon: '🔍' }, { key: 'F3', icon: '📊' }, { key: 'F4', icon: '🛒' }, { key: 'F5', icon: '💳' }, { key: 'F6', icon: '🏷️' }, { key: 'F7', icon: '💰' }, { key: 'F9', icon: '💾' }, { key: 'F12', icon: '🖨️' }].map((s) => (
+                  <div key={s.key} className={`flex flex-col items-center p-1 rounded-lg transition-all hover:scale-105 cursor-default ${isDark ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
+                    <span className="text-xs mb-0.5">{s.icon}</span>
+                    <kbd className={`px-1 py-0.5 rounded font-mono text-[9px] font-bold ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>{s.key}</kbd>
                   </div>
                 ))}
-              </div>
-              
-              {/* Quick Action Hints */}
-              <div className={`mt-2 pt-2 border-t flex justify-between items-center text-[10px] ${isDark ? 'border-slate-700 text-slate-500' : 'border-indigo-100 text-slate-500'}`}>
-                <span>↑↓ {t('quickCheckout.shortcut.navigateItems')}</span>
-                <span>←→ {t('quickCheckout.shortcut.adjustQty')}</span>
-                <span>Enter {t('quickCheckout.shortcut.addItem')}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-
-
-      {/* Shortcut Hints Bar */}
       {!isMobile && (
         <ShortcutHintsBar
           currentStep={currentStep === 'products' ? 'products' : 'review'}

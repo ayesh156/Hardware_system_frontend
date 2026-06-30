@@ -15,7 +15,6 @@
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
 
     /* Linting */
     "strict": false,
@@ -26,18 +25,15 @@
     "strictNullChecks": false,
 
     /* Path mapping */
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./client/*"],
-      "@shared/*": ["./shared/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": [
-    "client/**/*",
-    "server/**/*",
-    "shared/**/*",
-    "vite.config.ts",
-    "vite.config.server.ts"
+    "src/**/*",
+    "vite.config.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }
