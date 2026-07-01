@@ -1,13 +1,14 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { Category } from '../types/index';
 import { InventoryProduct } from '../types/index';
-import { mockCategories, inventoryItems as initialInventory, linkedCatalogItems, searchInventory } from '../data/mockData';
+import { mockCategories, linkedCatalogItems, searchInventory } from '../data/mockData';
 import { CatalogItem } from '../data/mockData';
 
 interface CatalogState {
   categories: Category[];
   inventoryItems: InventoryProduct[];
   catalogItems: CatalogItem[];
+  isInventoryLoading: boolean;
 }
 
 interface CatalogContextValue extends CatalogState {
@@ -29,7 +30,29 @@ export const useCatalog = (): CatalogContextValue => {
 
 export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [categories, setCategories] = useState<Category[]>(() => mockCategories);
-  const [inventoryItems, setInventoryItems] = useState<InventoryProduct[]>(() => initialInventory);
+  // Start with empty array; the real data is loaded lazily from its own chunk
+  const [inventoryItems, setInventoryItems] = useState<InventoryProduct[]>([]);
+  const [isInventoryLoading, setIsInventoryLoading] = useState(true);
+
+  // Lazy-load the large inventory chunk on mount — keeps the app shell fast
+  useEffect(() => {
+    let cancelled = false;
+    import('../data/inventoryData').then(mod => {
+      if (!cancelled) {
+        setInventoryItems(mod.inventoryItems);
+        setIsInventoryLoading(false);
+      }
+    }).catch(() => {
+      // Fallback: import synchronously (shouldn't happen in normal build)
+      import('../data/mockData').then(mod => {
+        if (!cancelled) {
+          setInventoryItems(mod.inventoryItems);
+          setIsInventoryLoading(false);
+        }
+      });
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Add category with auto-ID
   const addCategory = useCallback((data: Partial<Category>): Category => {
@@ -75,13 +98,14 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
     categories,
     inventoryItems,
     catalogItems: linkedCatalogItems,
+    isInventoryLoading,
     addCategory,
     updateCategory,
     deleteCategory,
     addInventoryItem,
     searchByQuery,
     getCategoryName,
-  }), [categories, inventoryItems, addCategory, updateCategory, deleteCategory, addInventoryItem, searchByQuery, getCategoryName]);
+  }), [categories, inventoryItems, isInventoryLoading, addCategory, updateCategory, deleteCategory, addInventoryItem, searchByQuery, getCategoryName]);
 
   return (
     <CatalogContext.Provider value={value}>

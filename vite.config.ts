@@ -79,6 +79,9 @@ export default defineConfig(({ mode }) => ({
             'zod',
           ],
           'i18n': ['i18next', 'react-i18next'],
+          // Real product catalogue — kept in its own chunk so the app shell
+          // doesn't have to parse 3500+ objects on initial page load.
+          'inventory-data': ['./src/data/inventoryData'],
         },
       },
     },

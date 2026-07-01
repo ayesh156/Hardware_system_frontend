@@ -11,6 +11,30 @@ interface CategoryGridProps {
   inventoryItems?: InventoryProduct[];
 }
 
+// ── Pinned category baseline — manual priority order from inventory blueprint ──
+const PINNED_CATEGORIES = [
+  'තීන්ත',
+  'ග්‍රයින්ඩර් තල',
+  'සිමෙන්ති',
+  'වතුර බට',
+  'එනමල් 1L',
+  'එනමල් 500ml',
+  'එනමල් 200ml',
+  'සිවිලින් ලයිට්',
+  'LED බල්බ්',
+  'ORANGE ELECTRIC',
+  'කම්බි කූරු',
+  'කටු කම්බි',
+  'වැලිකොල',
+  'පින්සල්',
+  'රෝල් බ්‍රෂ්',
+  'ටිනර්',
+  'රැම්කො සීට්',
+  'වයර් යාර',
+  'කැළණි වයර්',
+  'සියෙරා වයර්',
+];
+
 /** Number of categories to show before "Show More" */
 const DEFAULT_ROW_COUNT = 3;
 const ITEMS_PER_ROW = 6;
@@ -74,28 +98,66 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({ onItemSelect }) => {
 
   const { inventoryItems } = useCatalog();
 
-  // ── Compute usage counts from live inventory items ──
-  const usageCounts = useMemo(() => {
+  // ── 1. Compute live usage counts per productCategory name ──
+  const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     inventoryItems.forEach(item => {
-      const cid = item.categoryId || item.productCategory;
-      if (cid) counts[cid] = (counts[cid] || 0) + 1;
-    });
-    mockCategories.forEach(cat => {
-      if (!counts[cat.id]) counts[cat.id] = cat.usageCount || 0;
+      if (item.productCategory) {
+        counts[item.productCategory] = (counts[item.productCategory] || 0) + 1;
+      }
     });
     return counts;
   }, [inventoryItems]);
 
-  // ── Sort categories by usage frequency (highest first) ──
+  // ── 2. Hybrid pinned-sort engine — top 20 cap with "සියල්ල" prepended ──
+  const optimizedCategoryNames = useMemo(() => {
+    // All unique category names present in live inventory
+    const rawUnique = Array.from(
+      new Set(inventoryItems.map(item => item.productCategory).filter(Boolean))
+    );
+
+    // Pinned items that actually exist in live inventory (preserve blueprint order)
+    const pinnedPart = PINNED_CATEGORIES.filter(cat => rawUnique.includes(cat));
+
+    // Remaining categories not in the pinned list, sorted by volume descending
+    const unpinnedPart = rawUnique
+      .filter(cat => !PINNED_CATEGORIES.includes(cat))
+      .sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0));
+
+    // Merge and hard-cap at 19 so "සියල්ල" fills slot 0 for a total of 20
+    return ['සියල්ල', ...[...pinnedPart, ...unpinnedPart].slice(0, 19)];
+  }, [inventoryItems, categoryCounts]);
+
+  // ── 3. Map optimized name list back to Category objects for the grid ──
+  // "සියල්ල" gets a synthetic Category entry; all others resolve from mockCategories.
+  const ALL_CATEGORY_SENTINEL: Category = {
+    id: '__all__',
+    name: 'සියල්ල',
+    nameAlt: 'සියල්ල',
+    icon: 'all',
+    description: 'Show all categories',
+    usageCount: inventoryItems.length,
+  };
+
   const sortedCategories = useMemo(() => {
-    return [...mockCategories].sort((a, b) => {
-      const countA = usageCounts[a.id] || 0;
-      const countB = usageCounts[b.id] || 0;
-      if (countB !== countA) return countB - countA;
-      return a.name.localeCompare(b.name);
+    return optimizedCategoryNames.map(catName => {
+      if (catName === 'සියල්ල') return ALL_CATEGORY_SENTINEL;
+      // Match by name or nameAlt against the dynamic mockCategories array
+      return (
+        mockCategories.find(
+          c => c.name === catName || c.nameAlt === catName
+        ) ?? {
+          id: `cat-inline-${catName}`,
+          name: catName,
+          nameAlt: catName,
+          icon: 'hardware',
+          description: `${catName} category`,
+          usageCount: categoryCounts[catName] || 0,
+        }
+      );
     });
-  }, [usageCounts]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optimizedCategoryNames, categoryCounts]);
 
   const filteredCategories = useMemo(() => {
     if (!searchFilter.trim()) return sortedCategories;
@@ -115,6 +177,10 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({ onItemSelect }) => {
   // ── Get linked products for the active category from live inventoryItems ──
   const activeCategoryItems = useMemo((): CatalogDisplayItem[] => {
     if (!activeCategory) return [];
+    // "සියල්ල" sentinel: return all inventory items
+    if (activeCategory.id === '__all__') {
+      return inventoryItems.map(toDisplayItem);
+    }
     const catName = activeCategory.name.toLowerCase();
     const items = inventoryItems.filter(item =>
       (item.productCategory && item.productCategory.toLowerCase() === catName) ||

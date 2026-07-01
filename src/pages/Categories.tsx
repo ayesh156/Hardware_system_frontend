@@ -82,9 +82,10 @@ export const Categories: React.FC = () => {
     setCurrentPage(1);
   }, [searchQuery, sortOrder, rowsPerPage]);
 
-  // Stats
+  // Stats — use live getUsageCount for accurate live totals
   const totalCategories = categories.length;
   const categoriesWithProducts = categories.filter(cat => getUsageCount(cat.id, cat.name) > 0).length;
+  const totalLiveUsage = categories.reduce((s, c) => s + getUsageCount(c.id, c.name), 0);
 
   const handleAddCategory = () => {
     setSelectedCategory(null);
@@ -191,8 +192,8 @@ export const Categories: React.FC = () => {
         {[
           { icon: FolderTree, gradient: 'from-blue-500/20 to-cyan-500/20', color: 'text-blue-400', value: totalCategories, label: t('categories.totalCategories') },
           { icon: Package, gradient: 'from-emerald-500/20 to-teal-500/20', color: 'text-emerald-400', value: categoriesWithProducts, label: t('categories.withProducts') },
-          { icon: Tag, gradient: 'from-amber-500/20 to-orange-500/20', color: 'text-amber-400', value: categories.reduce((s, c) => s + (c.usageCount || 0), 0), label: t('categories.totalUsage') },
-          { icon: Layers, gradient: 'from-purple-500/20 to-pink-500/20', color: 'text-purple-400', value: Math.round(categories.reduce((s, c) => s + (c.usageCount || 0), 0) / Math.max(totalCategories, 1)), label: t('categories.avgUsage') },
+          { icon: Tag, gradient: 'from-amber-500/20 to-orange-500/20', color: 'text-amber-400', value: totalLiveUsage, label: t('categories.totalUsage') },
+          { icon: Layers, gradient: 'from-purple-500/20 to-pink-500/20', color: 'text-purple-400', value: Math.round(totalLiveUsage / Math.max(totalCategories, 1)), label: t('categories.avgUsage') },
         ].map((item, i) => {
           const Icon = item.icon;
           return (

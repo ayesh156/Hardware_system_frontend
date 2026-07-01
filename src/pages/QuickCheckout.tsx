@@ -5,7 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useDropdownPosition } from '../hooks/use-dropdown-position';
 import { useCatalog } from '../contexts/CatalogContext';
-import { mockProducts, mockInvoices, mockCustomers } from '../data/mockData';
+import { mockProducts, mockInvoices, mockCustomers, mockCategories } from '../data/mockData';
 import { Product, Invoice, InvoiceItem, FlattenedProduct, InventoryProduct, Customer } from '../types/index';
 import { flattenProducts } from '../lib/utils';
 import { printInvoice } from '../components/modals/PrintInvoiceModal';

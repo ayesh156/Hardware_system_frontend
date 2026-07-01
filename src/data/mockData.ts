@@ -1,4 +1,5 @@
-import { Customer, Product, Invoice, Brand, Category, Supplier, SupplierDelivery, InventoryProduct } from '../types/index';
+﻿import { Customer, Product, Invoice, Brand, Category, Supplier, SupplierDelivery, InventoryProduct } from '../types/index';
+import { inventoryItems } from './inventoryData';
 
 // ──────────────────────────────────────────────
 // FINANCIAL DATA (merged from financialData.ts)
@@ -124,40 +125,27 @@ export const mockBrands: Brand[] = [
 ];
 
 /**
- * 30 Flat Hardware Categories — SINGLE SOURCE OF TRUTH
+ * mockCategories — Dynamically derived from inventoryItems master dataset.
+ * Each entry is keyed by the unique productCategory value found in inventoryData.ts,
+ * with the categoryId resolved from the first matching item in that category.
+ * usageCount reflects the live count of items per category at module load time.
  */
-export const mockCategories: Category[] = [
-  { id: 'cat-001', name: 'Melwa Box Bar',             nameAlt: 'මෙල්වා බොක්ස් බාර්',             icon: 'steel',     description: 'High-strength box bars for concrete reinforcement',     usageCount: 28 },
-  { id: 'cat-002', name: 'Tokyo Super Cement',         nameAlt: 'ටෝකියෝ සුපර් සිමෙන්ති',        icon: 'building',  description: 'Premium OPC 53-grade cement for heavy construction',   usageCount: 25 },
-  { id: 'cat-003', name: 'Mahaweli Marine Cement',     nameAlt: 'මහවැලි මැරීන් සිමෙන්ති',      icon: 'building',  description: 'Specialized marine and water-resistant cement',        usageCount: 22 },
-  { id: 'cat-004', name: 'Lanwa GI Pipes',             nameAlt: 'ලන්වා GI නල',                   icon: 'steel',     description: 'Galvanized iron pipes for plumbing and structural use', usageCount: 20 },
-  { id: 'cat-005', name: 'Orange Electrical Switches', nameAlt: 'ඔරේන්ජ් විදුලි ස්විච',        icon: 'electrical',description: 'Premium modular switches and sockets',                   usageCount: 18 },
-  { id: 'cat-006', name: 'ACL Cables (Multi-strand)',  nameAlt: 'ACL කේබල් (බහු-වයර්)',        icon: 'electrical',description: 'Multi-strand copper cables for heavy-duty wiring',       usageCount: 17 },
-  { id: 'cat-007', name: 'Kelani Cables (Twin Earth)', nameAlt: 'කැලණි කේබල් (ට්වින් අර්ත්)', icon: 'electrical',description: 'Twin-core earth cables for house wiring',                 usageCount: 16 },
-  { id: 'cat-008', name: 'S-lon PVC Pipes (Type 1000)',nameAlt: 'S-lon PVC නල (වර්ගය 1000)',    icon: 'plumbing',  description: 'High-pressure PVC pipes for water supply',              usageCount: 15 },
-  { id: 'cat-009', name: 'S-lon PVC Fittings',         nameAlt: 'S-lon PVC සවිකිරීම්',          icon: 'plumbing',  description: 'PVC elbows, tees, couplings and adaptors',              usageCount: 14 },
-  { id: 'cat-010', name: 'National PVC Conduit Pipes', nameAlt: 'නැෂනල් PVC කොන්ඩියුට් නල',   icon: 'electrical',description: 'Electrical conduit pipes for cable protection',          usageCount: 14 },
-  { id: 'cat-011', name: 'JAT Sanding Sealer',         nameAlt: 'JAT සැන්ඩින් සීලර්',          icon: 'paint',     description: 'Wood sanding sealer for professional finishing',       usageCount: 13 },
-  { id: 'cat-012', name: 'Dulux WeatherShield Paint',  nameAlt: 'ඩුලක්ස් වෙදර්ශීල්ඩ් තීන්ත', icon: 'paint',     description: 'Weather-resistant exterior paint',                      usageCount: 12 },
-  { id: 'cat-013', name: 'Nippon Paint 3-in-1',        nameAlt: 'නිපොන් තීන්ත 3-in-1',          icon: 'paint',     description: 'Multi-surface paint for metal, wood, and walls',       usageCount: 11 },
-  { id: 'cat-014', name: 'Rhino Asbestos Roofing Sheets',nameAlt: 'රයිනෝ ඇස්බැස්ටෝස් වහල තහඩු',icon: 'roofing',description: 'Corrugated asbestos roofing sheets',                     usageCount: 10 },
-  { id: 'cat-015', name: 'Anton PVC Water Tanks',      nameAlt: 'ඇන්ටන් PVC ජල ටැංකි',         icon: 'plumbing',  description: 'PVC water storage tanks for domestic use',              usageCount: 9 },
-  { id: 'cat-016', name: 'Arpico Water Tanks',         nameAlt: 'ආර්පිකෝ ජල ටැංකි',            icon: 'plumbing',  description: 'Premium polyethylene water tanks',                      usageCount: 9 },
-  { id: 'cat-017', name: 'Stanley Hand Tools',         nameAlt: 'ස්ටැන්ලි අත් මෙවලම්',          icon: 'tools',     description: 'Professional-grade hand tools and accessories',         usageCount: 8 },
-  { id: 'cat-018', name: 'Bosch Power Drills',         nameAlt: 'බොෂ් බල සරඹ',                 icon: 'tools',     description: 'High-performance power drills and drivers',             usageCount: 7 },
-  { id: 'cat-019', name: 'Makita Angle Grinders',      nameAlt: 'මකිටා කෝණ ජාති',              icon: 'tools',     description: 'Industrial angle grinders for cutting and grinding',    usageCount: 7 },
-  { id: 'cat-020', name: 'DSI Safety Boots',           nameAlt: 'DSI ආරක්ෂණ බූට්',             icon: 'safety',    description: 'Steel-toe safety boots for construction workers',      usageCount: 6 },
-  { id: 'cat-021', name: 'Harris Paint Brushes',       nameAlt: 'හැරිස් තීන්ත බුරුසු',          icon: 'paint',     description: 'Professional paint brushes for smooth finish',         usageCount: 6 },
-  { id: 'cat-022', name: 'Union Mortice Door Locks',   nameAlt: 'යුනියන් මෝටිස් දොර අගුල්',   icon: 'hardware',  description: 'High-security mortice locks for wooden doors',          usageCount: 5 },
-  { id: 'cat-023', name: 'Yale Padlocks',              nameAlt: 'යේල් පැඩ්ලොක්',               icon: 'hardware',  description: 'Heavy-duty padlocks for gates and storage',             usageCount: 5 },
-  { id: 'cat-024', name: 'AMW Rubber Hoses',           nameAlt: 'AMW රබර් හෝස්',                icon: 'plumbing',  description: 'Reinforced rubber hoses for industrial use',            usageCount: 4 },
-  { id: 'cat-025', name: 'GI Binding Wire',            nameAlt: 'GI බැඳුම් කම්බි',             icon: 'steel',     description: 'Galvanized binding wire for construction tying',       usageCount: 4 },
-  { id: 'cat-026', name: 'Local River Sand',            nameAlt: 'දේශීය ගංගා වැලි',             icon: 'building',  description: 'Washed river sand for plastering and brickwork',        usageCount: 3 },
-  { id: 'cat-027', name: 'Metal Crushed Stones 3/4"',   nameAlt: 'ලෝහ තලා දැමූ ගල් 3/4"',       icon: 'building',  description: 'Crushed metal stones for concrete mixing',              usageCount: 3 },
-  { id: 'cat-028', name: 'Local Red Bricks',           nameAlt: 'දේශීය රතු ගඩොල්',             icon: 'building',  description: 'Fire-burnt clay bricks for wall construction',          usageCount: 2 },
-  { id: 'cat-029', name: 'Eco-friendly AAC Blocks',    nameAlt: 'පරිසර හිතකාමී AAC කුට්ටි',    icon: 'building',  description: 'Lightweight autoclaved aerated concrete blocks',        usageCount: 2 },
-  { id: 'cat-030', name: 'Stainless Steel Wood Screws',nameAlt: 'මල නොබැඳෙන වානේ ලී ඉස්කුරුප්පු',icon: 'hardware',description: 'Rust-proof stainless steel screws for woodwork',         usageCount: 2 },
-];
+const _uniqueCategoryNames = Array.from(
+  new Set(inventoryItems.map(item => item.productCategory).filter(Boolean))
+);
+
+export const mockCategories: Category[] = _uniqueCategoryNames.map((catName, idx) => {
+  const matchingItem = inventoryItems.find(item => item.productCategory === catName);
+  const usageCount = inventoryItems.filter(item => item.productCategory === catName).length;
+  return {
+    id: matchingItem?.categoryId || `cat-derived-${idx}`,
+    name: catName,
+    nameAlt: catName,
+    icon: 'hardware',
+    description: `All materials listed under ${catName} infrastructure inventory.`,
+    usageCount,
+  };
+});
 
 // ── Helpers to get category names list dynamically ──
 export const categoryNames: string[] = mockCategories.map(c => c.name);
@@ -168,187 +156,11 @@ mockCategories.forEach(c => { categoryIdToName[c.id] = c.name; });
 
 // ──────────────────────────────────────────────
 // SINGLE MASTER ARRAY: inventoryItems
-// Every item visible in Quick Checkout, Products page, and Category usage
-// MUST be a real record here. ~150 items (5 variants per 30 categories)
+// Moved to inventoryData.ts for code-splitting.
+// Re-exported here for backward compatibility.
 // ──────────────────────────────────────────────
+export { inventoryItems } from './inventoryData';
 
-export const inventoryItems: InventoryProduct[] = (() => {
-  const items: InventoryProduct[] = [];
-
-  // Helper to push 5 variants per category
-  function addVariants(catId: string, catName: string, baseSearchKey: string, baseNames: string[], costs: number[], lastPrices: number[], salesPrices: number[], displayPrices: number[], stocks: number[], baseStatus: InventoryProduct['status'] = 'Available') {
-    for (let i = 0; i < 5; i++) {
-      items.push({
-        id: `inv-${catId}-${String(i + 1).padStart(2, '0')}`,
-        searchKey: `${baseSearchKey}-V${i + 1}`,
-        name: baseNames[i] || `${catName} - Variant ${i + 1}`,
-        productCategory: catName,
-        categoryId: catId,
-        cost: costs[i] ?? 100,
-        lastPrice: lastPrices[i] ?? 120,
-        salesPrice: salesPrices[i] ?? 150,
-        displayPrice: displayPrices[i] ?? 160,
-        storeQty: stocks[i] ?? 50,
-        salesType: 'Piece',
-        unitQty: 1,
-        oneUnitPrice: salesPrices[i] ?? 150,
-        status: stocks[i] === 0 ? 'Out of Stock' as const : stocks[i] <= 10 ? 'Low Stock' as const : baseStatus,
-      });
-    }
-  }
-
-  // cat-001: Melwa Box Bar
-  addVariants('cat-001', 'Melwa Box Bar', 'MEL-BB',
-    ['Melwa Box Bar 3/4" x 3/4" (0.9mm)', 'Melwa Box Bar 1" x 1" (1.2mm)', 'Melwa Box Bar 1" x 1" (2.0mm)', 'Melwa Box Bar 2" x 2" (2.0mm)', 'Melwa Box Bar 1.5" x 1.5" (1.6mm)'],
-    [420, 560, 720, 980, 850], [450, 600, 780, 1050, 920], [420, 560, 720, 980, 850], [450, 600, 780, 1050, 920], [200, 180, 150, 120, 100]);
-
-  // cat-002: Tokyo Super Cement
-  addVariants('cat-002', 'Tokyo Super Cement', 'TOK-CEM',
-    ['Tokyo Super Cement 50kg Bag', 'Tokyo Super Cement Bulk 1T', 'Tokyo Super Cement Rapid Hardening', 'Tokyo Super Cement Sulphate Resistant', 'Tokyo Super Cement White'],
-    [1900, 38000, 2200, 2100, 3500], [2000, 40000, 2400, 2300, 3800], [1900, 38000, 2200, 2100, 3500], [2000, 40000, 2400, 2300, 3800], [180, 20, 100, 80, 30]);
-
-  // cat-003: Mahaweli Marine Cement
-  addVariants('cat-003', 'Mahaweli Marine Cement', 'MAH-CEM',
-    ['Mahaweli Marine Cement 50kg', 'Mahaweli Marine Cement Bulk', 'Mahaweli Marine Cement Fast Set', 'Mahaweli Marine Cement Waterproof', 'Mahaweli Marine Cement Grade 53'],
-    [2100, 42000, 2400, 2500, 2300], [2300, 45000, 2600, 2700, 2500], [2100, 42000, 2400, 2500, 2300], [2300, 45000, 2600, 2700, 2500], [120, 15, 80, 60, 90]);
-
-  // cat-004: Lanwa GI Pipes
-  addVariants('cat-004', 'Lanwa GI Pipes', 'LAN-GI',
-    ['Lanwa GI Pipe 1/2" (6m)', 'Lanwa GI Pipe 3/4" (6m)', 'Lanwa GI Pipe 1" (6m)', 'Lanwa GI Pipe 1.5" (6m)', 'Lanwa GI Pipe 2" (6m)'],
-    [650, 750, 850, 1200, 1600], [720, 830, 950, 1350, 1800], [650, 750, 850, 1200, 1600], [720, 830, 950, 1350, 1800], [50, 40, 35, 20, 10]);
-
-  // cat-005: Orange Electrical Switches
-  addVariants('cat-005', 'Orange Electrical Switches', 'ORG-SW',
-    ['Orange 1 Gang Light Switch', 'Orange 2 Gang Light Switch', 'Orange 13A Switched Socket', 'Orange 15A Round Pin Socket', 'Orange Fan Speed Controller'],
-    [185, 250, 320, 480, 650], [200, 270, 350, 520, 700], [185, 250, 320, 480, 650], [200, 270, 350, 520, 700], [500, 350, 300, 150, 100]);
-
-  // cat-006: ACL Cables (Multi-strand)
-  addVariants('cat-006', 'ACL Cables (Multi-strand)', 'ACL-CBL',
-    ['ACL Multi-strand Cable 1.5mm²', 'ACL Multi-strand Cable 2.5mm²', 'ACL Multi-strand Cable 4.0mm²', 'ACL Multi-strand Cable 6.0mm²', 'ACL Multi-strand Cable 10mm²'],
-    [85, 135, 210, 320, 550], [95, 150, 235, 355, 600], [85, 135, 210, 320, 550], [95, 150, 235, 355, 600], [2000, 1500, 800, 400, 200]);
-
-  // cat-007: Kelani Cables (Twin Earth)
-  addVariants('cat-007', 'Kelani Cables (Twin Earth)', 'KEL-TE',
-    ['Kelani Twin Earth Cable 1.0mm²', 'Kelani Twin Earth Cable 1.5mm²', 'Kelani Twin Earth Cable 2.5mm²', 'Kelani Twin Earth Cable 4.0mm²', 'Kelani Twin Earth Cable 6.0mm²'],
-    [65, 85, 135, 210, 320], [72, 95, 150, 235, 355], [65, 85, 135, 210, 320], [72, 95, 150, 235, 355], [500, 600, 400, 300, 200]);
-
-  // cat-008: S-lon PVC Pipes (Type 1000)
-  addVariants('cat-008', 'S-lon PVC Pipes (Type 1000)', 'SLON-PVC',
-    ['S-lon PVC Pipe 20mm (Domestic)', 'S-lon PVC Pipe 32mm (Domestic)', 'S-lon PVC Pipe 40mm (Commercial)', 'S-lon PVC Pipe 50mm (Commercial)', 'S-lon PVC Pipe 110mm (Drainage)'],
-    [280, 480, 620, 850, 1800], [320, 520, 680, 920, 1950], [280, 480, 620, 850, 1800], [320, 520, 680, 920, 1950], [500, 400, 350, 250, 150]);
-
-  // cat-009: S-lon PVC Fittings
-  addVariants('cat-009', 'S-lon PVC Fittings', 'SLON-FIT',
-    ['S-lon PVC Elbow 1"', 'S-lon PVC Tee 1"', 'S-lon PVC Coupling 1"', 'S-lon PVC End Cap 1"', 'S-lon PVC Union 1"'],
-    [45, 65, 35, 25, 120], [55, 80, 45, 35, 140], [45, 65, 35, 25, 120], [55, 80, 45, 35, 140], [600, 400, 500, 700, 200]);
-
-  // cat-010: National PVC Conduit Pipes
-  addVariants('cat-010', 'National PVC Conduit Pipes', 'NAT-CON',
-    ['National PVC Conduit 20mm', 'National PVC Conduit 25mm', 'National PVC Conduit 32mm', 'National PVC Conduit 40mm', 'National PVC Conduit 50mm'],
-    [120, 160, 200, 280, 350], [140, 180, 230, 310, 390], [120, 160, 200, 280, 350], [140, 180, 230, 310, 390], [400, 350, 250, 180, 120]);
-
-  // cat-011: JAT Sanding Sealer
-  addVariants('cat-011', 'JAT Sanding Sealer', 'JAT-SS',
-    ['JAT Sanding Sealer 500ml', 'JAT Sanding Sealer 1L', 'JAT Sanding Sealer 2.5L', 'JAT Sanding Sealer 5L', 'JAT Sanding Sealer 10L'],
-    [450, 850, 1800, 3200, 5800], [500, 920, 1950, 3500, 6200], [450, 850, 1800, 3200, 5800], [500, 920, 1950, 3500, 6200], [80, 120, 60, 40, 20]);
-
-  // cat-012: Dulux WeatherShield Paint
-  addVariants('cat-012', 'Dulux WeatherShield Paint', 'DUL-WS',
-    ['Dulux WeatherShield 1L White', 'Dulux WeatherShield 4L White', 'Dulux WeatherShield 10L White', 'Dulux WeatherShield 1L Cream', 'Dulux WeatherShield 4L Cream'],
-    [1350, 4800, 10500, 1350, 4800], [1500, 5300, 11500, 1500, 5300], [1350, 4800, 10500, 1350, 4800], [1500, 5300, 11500, 1500, 5300], [65, 40, 25, 50, 30]);
-
-  // cat-013: Nippon Paint 3-in-1
-  addVariants('cat-013', 'Nippon Paint 3-in-1', 'NIP-3IN1',
-    ['Nippon Paint 3-in-1 1L White', 'Nippon Paint 3-in-1 4L White', 'Nippon Paint 3-in-1 10L White', 'Nippon Paint 3-in-1 1L Ivory', 'Nippon Paint 3-in-1 4L Ivory'],
-    [1200, 4200, 9500, 1200, 4200], [1350, 4600, 10500, 1350, 4600], [1200, 4200, 9500, 1200, 4200], [1350, 4600, 10500, 1350, 4600], [100, 60, 30, 80, 45]);
-
-  // cat-014: Rhino Asbestos Roofing Sheets
-  addVariants('cat-014', 'Rhino Asbestos Roofing Sheets', 'RHN-RF',
-    ['Rhino Asbestos Sheet 8ft', 'Rhino Asbestos Sheet 10ft', 'Rhino Asbestos Sheet 12ft', 'Rhino Asbestos Sheet 14ft', 'Rhino Asbestos Sheet 16ft'],
-    [850, 1050, 1250, 1450, 1650], [950, 1150, 1380, 1600, 1820], [850, 1050, 1250, 1450, 1650], [950, 1150, 1380, 1600, 1820], [150, 100, 80, 50, 30]);
-
-  // cat-015: Anton PVC Water Tanks
-  addVariants('cat-015', 'Anton PVC Water Tanks', 'ANT-TNK',
-    ['Anton PVC Water Tank 500L', 'Anton PVC Water Tank 750L', 'Anton PVC Water Tank 1000L', 'Anton PVC Water Tank 1500L', 'Anton PVC Water Tank 2000L'],
-    [8500, 11500, 14500, 19500, 24500], [9200, 12500, 15800, 21000, 26500], [8500, 11500, 14500, 19500, 24500], [9200, 12500, 15800, 21000, 26500], [30, 25, 20, 12, 8]);
-
-  // cat-016: Arpico Water Tanks
-  addVariants('cat-016', 'Arpico Water Tanks', 'ARP-TNK',
-    ['Arpico Water Tank 500L', 'Arpico Water Tank 750L', 'Arpico Water Tank 1000L', 'Arpico Water Tank 1500L', 'Arpico Water Tank 2000L'],
-    [9500, 12500, 15500, 21000, 26500], [10200, 13500, 16800, 22500, 28500], [9500, 12500, 15500, 21000, 26500], [10200, 13500, 16800, 22500, 28500], [25, 20, 15, 10, 5]);
-
-  // cat-017: Stanley Hand Tools
-  addVariants('cat-017', 'Stanley Hand Tools', 'STN-TOOL',
-    ['Stanley Hammer 16oz', 'Stanley Screwdriver Set 6pc', 'Stanley Pliers 8"', 'Stanley Wrench 10"', 'Stanley Utility Knife'],
-    [1200, 1800, 1500, 2200, 650], [1350, 2000, 1700, 2450, 750], [1200, 1800, 1500, 2200, 650], [1350, 2000, 1700, 2450, 750], [60, 45, 50, 30, 80]);
-
-  // cat-018: Bosch Power Drills
-  addVariants('cat-018', 'Bosch Power Drills', 'BOS-DRL',
-    ['Bosch GSB 550 Impact Drill', 'Bosch GSB 20-2 Rotary Hammer', 'Bosch GSR 18V Cordless Drill', 'Bosch GBH 2-26 Rotary Hammer', 'Bosch GBM 350 Professional Drill'],
-    [12500, 28500, 18500, 32000, 8500], [13500, 31000, 20000, 35000, 9500], [12500, 28500, 18500, 32000, 8500], [13500, 31000, 20000, 35000, 9500], [15, 8, 22, 5, 30]);
-
-  // cat-019: Makita Angle Grinders
-  addVariants('cat-019', 'Makita Angle Grinders', 'MAK-GRIND',
-    ['Makita 9557HN Angle Grinder 4"', 'Makita GA5030 Angle Grinder 5"', 'Makita GA7020 Angle Grinder 7"', 'Makita DGA452 Cordless Grinder', 'Makita 9565PCV Paddle Switch'],
-    [9500, 12500, 18500, 22000, 14500], [10500, 13800, 20000, 24000, 15800], [9500, 12500, 18500, 22000, 14500], [10500, 13800, 20000, 24000, 15800], [20, 15, 10, 8, 12]);
-
-  // cat-020: DSI Safety Boots
-  addVariants('cat-020', 'DSI Safety Boots', 'DSI-BOOT',
-    ['DSI Safety Boots Size 7', 'DSI Safety Boots Size 8', 'DSI Safety Boots Size 9', 'DSI Safety Boots Size 10', 'DSI Safety Boots Size 11'],
-    [3500, 3500, 3500, 3500, 3500], [3800, 3800, 3800, 3800, 3800], [3500, 3500, 3500, 3500, 3500], [3800, 3800, 3800, 3800, 3800], [40, 60, 80, 50, 30]);
-
-  // cat-021: Harris Paint Brushes
-  addVariants('cat-021', 'Harris Paint Brushes', 'HAR-BRSH',
-    ['Harris Paint Brush 1"', 'Harris Paint Brush 2"', 'Harris Paint Brush 3"', 'Harris Paint Brush 4"', 'Harris Paint Brush Set 5pc'],
-    [180, 280, 380, 480, 1200], [200, 310, 420, 530, 1350], [180, 280, 380, 480, 1200], [200, 310, 420, 530, 1350], [150, 120, 100, 80, 60]);
-
-  // cat-022: Union Mortice Door Locks
-  addVariants('cat-022', 'Union Mortice Door Locks', 'UNI-LOCK',
-    ['Union Mortice Lock 3 Lever', 'Union Mortice Lock 5 Lever', 'Union Mortice Lock Night Latch', 'Union Mortice Lock Bathroom', 'Union Mortice Lock Design Range'],
-    [1800, 2800, 1500, 1200, 4500], [2000, 3100, 1700, 1400, 5000], [1800, 2800, 1500, 1200, 4500], [2000, 3100, 1700, 1400, 5000], [50, 35, 60, 45, 15]);
-
-  // cat-023: Yale Padlocks
-  addVariants('cat-023', 'Yale Padlocks', 'YAL-PAD',
-    ['Yale Padlock 30mm', 'Yale Padlock 40mm', 'Yale Padlock 50mm', 'Yale Padlock 60mm', 'Yale Padlock Combination'],
-    [450, 650, 850, 1200, 1800], [500, 720, 950, 1350, 2000], [450, 650, 850, 1200, 1800], [500, 720, 950, 1350, 2000], [80, 60, 40, 25, 30]);
-
-  // cat-024: AMW Rubber Hoses
-  addVariants('cat-024', 'AMW Rubber Hoses', 'AMW-HOSE',
-    ['AMW Rubber Hose 1/2" Per Meter', 'AMW Rubber Hose 3/4" Per Meter', 'AMW Rubber Hose 1" Per Meter', 'AMW Rubber Hose Reinforced 1/2"', 'AMW Rubber Hose Industrial 1"'],
-    [180, 280, 420, 350, 650], [200, 310, 460, 390, 720], [180, 280, 420, 350, 650], [200, 310, 460, 390, 720], [300, 250, 150, 200, 80]);
-
-  // cat-025: GI Binding Wire
-  addVariants('cat-025', 'GI Binding Wire', 'GI-BND',
-    ['GI Binding Wire 1kg Roll', 'GI Binding Wire 2kg Roll', 'GI Binding Wire 5kg Roll', 'GI Binding Wire 10kg Roll', 'GI Binding Wire 25kg Roll'],
-    [250, 480, 1100, 2100, 4800], [280, 520, 1200, 2300, 5200], [250, 480, 1100, 2100, 4800], [280, 520, 1200, 2300, 5200], [100, 80, 50, 30, 15]);
-
-  // cat-026: Local River Sand
-  addVariants('cat-026', 'Local River Sand', 'SAND-RIV',
-    ['Local River Sand 1/4 Cube', 'Local River Sand 1/2 Cube', 'Local River Sand 1 Cube', 'Local River Sand Washed 1/2 Cube', 'Local River Sand Washed 1 Cube'],
-    [5000, 9500, 18000, 10500, 19500], [5500, 10500, 20000, 11500, 21000], [5000, 9500, 18000, 10500, 19500], [5500, 10500, 20000, 11500, 21000], [30, 20, 15, 10, 8]);
-
-  // cat-027: Metal Crushed Stones 3/4"
-  addVariants('cat-027', 'Metal Crushed Stones 3/4"', 'METAL-34',
-    ['Metal Crushed Stone 1/4 Cube 3/4"', 'Metal Crushed Stone 1/2 Cube 3/4"', 'Metal Crushed Stone 1 Cube 3/4"', 'Metal Crushed Stone 1/2 Cube 1/2"', 'Metal Crushed Stone 1 Cube 1/2"'],
-    [4500, 8500, 16000, 8000, 15000], [5000, 9000, 17500, 8800, 16500], [4500, 8500, 16000, 8000, 15000], [5000, 9000, 17500, 8800, 16500], [25, 15, 10, 18, 12]);
-
-  // cat-028: Local Red Bricks
-  addVariants('cat-028', 'Local Red Bricks', 'BRK-RED',
-    ['Local Red Brick Standard', 'Local Red Brick Wire Cut', 'Local Red Brick Hollow', 'Local Red Brick Pavers', 'Local Red Brick Arch'],
-    [25, 30, 35, 40, 45], [28, 33, 38, 45, 50], [25, 30, 35, 40, 45], [28, 33, 38, 45, 50], [5000, 3000, 2000, 1000, 500]);
-
-  // cat-029: Eco-friendly AAC Blocks
-  addVariants('cat-029', 'Eco-friendly AAC Blocks', 'AAC-BLK',
-    ['AAC Block 4" x 8" x 24"', 'AAC Block 6" x 8" x 24"', 'AAC Block 8" x 8" x 24"', 'AAC Block 4" x 8" x 16"', 'AAC Block Lintel'],
-    [350, 450, 550, 300, 650], [380, 490, 600, 330, 700], [350, 450, 550, 300, 650], [380, 490, 600, 330, 700], [200, 150, 100, 250, 60]);
-
-  // cat-030: Stainless Steel Wood Screws
-  addVariants('cat-030', 'Stainless Steel Wood Screws', 'SS-SCRW',
-    ['SS Wood Screws 1" x 6 Box 100pc', 'SS Wood Screws 1.5" Box 100pc', 'SS Wood Screws 2" Box 100pc', 'SS Wood Screws 2.5" Box 50pc', 'SS Wood Screws 3" Box 50pc'],
-    [450, 550, 650, 500, 600], [500, 600, 720, 560, 670], [450, 550, 650, 500, 600], [500, 600, 720, 560, 670], [80, 60, 50, 40, 30]);
-
-  return items;
-})();
 
 // ── Helpers for category-name-based filtering ──
 export function getItemsByCategory(categoryId: string): InventoryProduct[] {
