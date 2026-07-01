@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useDropdownPosition } from '../hooks/use-dropdown-position';
-import { mockProducts, mockInvoices, mockCustomers } from '../data/mockData';
-import { Product, Invoice, InvoiceItem, FlattenedProduct, Customer } from '../types/index';
+import { mockProducts, mockInvoices, mockCustomers, inventoryItems } from '../data/mockData';
+import { Product, Invoice, InvoiceItem, FlattenedProduct, Customer, InventoryProduct } from '../types/index';
 import { flattenProducts } from '../lib/utils';
 import { printInvoice } from '../components/modals/PrintInvoiceModal';
 import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
@@ -239,41 +239,72 @@ export const QuickCheckout: React.FC = () => {
     }
   }, [soundEnabled]);
 
-  // Filter products by search (barcode, displaySku, searchKey, name)
+  // ── Build unified search map: searchKey → FlattenedProduct ──
+  // This syncs QuickCheckout with the master ProductTable data (inventoryItems)
+  const searchKeyToProductMap = useMemo(() => {
+    const map = new Map<string, FlattenedProduct>();
+    inventoryItems.forEach(inv => {
+      const key = inv.searchKey.toLowerCase().trim();
+      if (!key) return;
+      // Find matching FlattenedProduct by name similarity
+      const match = flattenedProducts.find(fp =>
+        fp.displayName.toLowerCase() === inv.name.toLowerCase() ||
+        fp.product.sku.toLowerCase() === key
+      );
+      if (match) map.set(key, match);
+    });
+    return map;
+  }, [flattenedProducts]);
+
+  // ── Direct search across both mockProducts (via flattenedProducts) and inventoryItems (via searchKey) ──
   const filteredProducts = useMemo((): FlattenedProduct[] => {
     if (!productSearch.trim()) return [];
     
-    const searchLower = productSearch.toLowerCase().trim();
+    const searchTerm = productSearch.trim();
+    const searchLower = searchTerm.toLowerCase();
     
-    // Exact match attempts — try barcode, then displaySku, then product.sku
-    const exactMatch = flattenedProducts.find(
+    // 1. Exact match by barcode or SKU from flattenedProducts
+    let exact = flattenedProducts.find(
       (fp) =>
-        fp.displayBarcode === productSearch ||
+        fp.displayBarcode === searchTerm ||
         fp.displaySku.toLowerCase() === searchLower ||
         fp.product.sku.toLowerCase() === searchLower
     );
+    if (exact && exact.stock > 0) return [exact];
     
-    if (exactMatch && exactMatch.stock > 0) {
-      return [exactMatch];
-    }
+    // 2. Exact match by searchKey from inventoryItems (master ProductTable)
+    const searchKeyMatch = searchKeyToProductMap.get(searchLower);
+    if (searchKeyMatch && searchKeyMatch.stock > 0) return [searchKeyMatch];
     
-    return flattenedProducts
-      .filter(
-        (fp) =>
-          fp.stock > 0 && (
-            fp.displayName.toLowerCase().includes(searchLower) ||
-            fp.displaySku.toLowerCase().includes(searchLower) ||
-            fp.product.sku.toLowerCase().includes(searchLower) ||
-            (fp.product.nameAlt && fp.product.nameAlt.includes(searchLower)) ||
-            (fp.displayBarcode && fp.displayBarcode.includes(searchLower)) ||
-            fp.product.category.toLowerCase().includes(searchLower) ||
-            (fp.variantLabel && fp.variantLabel.toLowerCase().includes(searchLower))
-          )
+    // 3. Partial match: check flattenedProducts AND inventoryItems searchKeys
+    const searchKeyPartialMatches: FlattenedProduct[] = [];
+    searchKeyToProductMap.forEach((fp, key) => {
+      if (fp.stock > 0 && (key.includes(searchLower) || searchLower.includes(key))) {
+        searchKeyPartialMatches.push(fp);
+      }
+    });
+    
+    // 4. Fuzzy match across everything
+    const fuzzyResults = flattenedProducts.filter(fp =>
+      fp.stock > 0 && (
+        fp.displayName.toLowerCase().includes(searchLower) ||
+        fp.displaySku.toLowerCase().includes(searchLower) ||
+        fp.product.sku.toLowerCase().includes(searchLower) ||
+        (fp.product.nameAlt && fp.product.nameAlt.includes(searchLower)) ||
+        (fp.displayBarcode && fp.displayBarcode.includes(searchLower)) ||
+        fp.product.category.toLowerCase().includes(searchLower) ||
+        (fp.variantLabel && fp.variantLabel.toLowerCase().includes(searchLower))
       )
-      .slice(0, 12);
-  }, [flattenedProducts, productSearch]);
-
-  // Parse common barcode scan formats
+    );
+    
+    // Merge: searchKey partial matches first (deduplicated), then fuzzy
+    const seen = new Set<string>();
+    const merged: FlattenedProduct[] = [];
+    searchKeyPartialMatches.forEach(fp => { if (!seen.has(fp.flatId)) { seen.add(fp.flatId); merged.push(fp); } });
+    fuzzyResults.forEach(fp => { if (!seen.has(fp.flatId)) { seen.add(fp.flatId); merged.push(fp); } });
+    
+    return merged.slice(0, 12);
+  }, [flattenedProducts, searchKeyToProductMap, productSearch]);
   const parseScanInput = (input: string): { code?: string; qty?: number } | null => {
     if (!input) return null;
     const trimmed = input.trim();
