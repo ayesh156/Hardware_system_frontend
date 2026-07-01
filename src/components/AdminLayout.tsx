@@ -41,8 +41,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { path: '/invoices/quick-checkout', icon: Zap, label: 'quickCheckout.title', badge: null },
     { path: '/invoices', icon: FileText, label: 'nav.invoices', badge: '12' },
     { path: '/products', icon: Package, label: 'nav.products', badge: null },
+    { path: '/categories', icon: FolderTree, label: 'nav.productCategory', badge: null },
     { path: '/suppliers', icon: Truck, label: 'nav.suppliers', badge: null },
-    { path: '/categories', icon: FolderTree, label: 'nav.categories', badge: null },
     { path: '/customers', icon: Users, label: 'nav.customers', badge: '3' },
     { path: '/financial-reports', icon: TrendingUp, label: 'nav.financialReports', badge: null },
   ];
@@ -68,10 +68,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <Link to="/" className="flex items-center gap-3 group">
           <div className="relative flex-shrink-0">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
-            <div className="relative w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
-              <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-              </svg>
+            <div className="relative w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg overflow-hidden">
+              <img src="/logo.jpg" alt="Liyanage Hardware" className="w-full h-full object-cover" />
             </div>
           </div>
           {!sidebarCollapsed && (

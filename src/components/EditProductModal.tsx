@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { X, Save, AlertTriangle, DollarSign, Package, Hash, Layers, Tag, BarChart3, ShoppingCart } from 'lucide-react';
 import { InventoryProduct } from '../types';
 
@@ -16,13 +17,8 @@ function deriveStatus(storeQty: number): InventoryProduct['status'] {
   return 'Available';
 }
 
-const CATEGORY_OPTIONS = [
-  'MELWA BOX BAR', 'MELWA ANGLE BAR', 'MELWA CHANNEL', 'MELWA FLAT BAR',
-  'MELWA PIPE', 'MELWA SQUARE PIPE', 'MELWA RECTANGLE PIPE',
-  'LANWA STEEL', 'JSW STEEL', 'KYOCERA STEEL', 'CEMENT',
-  'ELECTRICAL', 'PLUMBING', 'PAINT', 'TOOLS', 'HARDWARE',
-  'ROOFING', 'PLYWOOD', 'PVC CEILING',
-];
+import { categoryNames } from '../data/mockData';
+const CATEGORY_OPTIONS = categoryNames;
 const SALES_TYPE_OPTIONS: InventoryProduct['salesType'][] = ['Full', 'Half', 'Quarter', 'Piece', 'Kg', 'Box', 'Set'];
 
 // ── Searchable combobox ──
@@ -161,6 +157,7 @@ const FieldGroup: React.FC<FieldGroupProps> = ({ label, icon, children }) => (
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({ item, onSave, onClose }) => {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const isDark = theme === 'dark';
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -192,15 +189,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ item, onSave
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
-    if (!form.searchKey.trim()) errs.searchKey = 'Search key is required';
-    if (!form.name.trim()) errs.name = 'Product name is required';
-    if (form.cost < 0) errs.cost = 'Cost cannot be negative';
-    if (form.lastPrice < 0) errs.lastPrice = 'Last price cannot be negative';
-    if (form.salesPrice < 0) errs.salesPrice = 'Sales price cannot be negative';
-    if (form.displayPrice < 0) errs.displayPrice = 'Display price cannot be negative';
-    if (form.storeQty < 0) errs.storeQty = 'Quantity cannot be negative';
-    if (form.unitQty <= 0) errs.unitQty = 'Unit qty must be positive';
-    if (form.oneUnitPrice < 0) errs.oneUnitPrice = '1 Unit price cannot be negative';
+    if (!form.searchKey.trim()) errs.searchKey = t('addProductModal.searchKeyRequired');
+    if (!form.name.trim()) errs.name = t('addProductModal.productNameRequired');
+    if (form.cost < 0) errs.cost = t('addProductModal.costRequired');
+    if (form.lastPrice < 0) errs.lastPrice = t('addProductModal.lastPriceRequired');
+    if (form.salesPrice < 0) errs.salesPrice = t('addProductModal.salesPriceRequired');
+    if (form.displayPrice < 0) errs.displayPrice = t('addProductModal.displayPriceRequired');
+    if (form.storeQty < 0) errs.storeQty = t('addProductModal.storeQtyRequired');
+    if (form.unitQty <= 0) errs.unitQty = t('addProductModal.unitQtyRequired');
+    if (form.oneUnitPrice < 0) errs.oneUnitPrice = t('addProductModal.unitPriceRequired');
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -231,7 +228,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ item, onSave
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-rose-500 flex items-center justify-center"><Package className="w-4 h-4 text-white" /></div>
             <div>
-              <h2 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Edit Product</h2>
+              <h2 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{t('addProductModal.editTitle')}</h2>
               <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.searchKey} — {item.name.length > 40 ? item.name.slice(0, 40) + '...' : item.name}</p>
             </div>
           </div>
@@ -243,15 +240,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ item, onSave
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Search Key */}
             <div className="lg:col-span-2">
-              <FieldGroup label="Search Key" icon={<Tag className="w-3 h-3" />}>
-                <ClearableInput value={form.searchKey} isDark={isDark} onChange={(v) => handleStrUpdate('searchKey', v)} placeholder="e.g. GI BOX 3x3x2/4" hasError={!!errors.searchKey} />
+              <FieldGroup label={t('addProductModal.searchKey')} icon={<Tag className="w-3 h-3" />}>
+                <ClearableInput value={form.searchKey} isDark={isDark} onChange={(v) => handleStrUpdate('searchKey', v)} placeholder={t('addProductModal.searchKeyPlaceholder')} hasError={!!errors.searchKey} />
                 {errors.searchKey && <p className="text-[9px] text-red-400 mt-0.5">{errors.searchKey}</p>}
               </FieldGroup>
             </div>
 
             {/* Status — DISABLED, auto-derived */}
             <div>
-              <FieldGroup label="Status" icon={<AlertTriangle className="w-3 h-3" />}>
+              <FieldGroup label={t('addProductModal.status')} icon={<AlertTriangle className="w-3 h-3" />}>
                 <input type="text" value={deriveStatus(form.storeQty)} disabled
                   className={`w-full px-2.5 py-1.5 text-xs border rounded-lg opacity-70 cursor-not-allowed ${isDark ? 'bg-slate-700/30 border-slate-600 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'}`}
                 />
@@ -260,23 +257,23 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ item, onSave
 
             {/* Name */}
             <div className="lg:col-span-3">
-              <FieldGroup label="Product Name" icon={<Package className="w-3 h-3" />}>
-                <ClearableInput value={form.name} isDark={isDark} onChange={(v) => handleStrUpdate('name', v)} placeholder='e.g. 6mm GI Box Bar 3/4"x3/4" (0.9mm)' hasError={!!errors.name} />
+              <FieldGroup label={t('addProductModal.productName')} icon={<Package className="w-3 h-3" />}>
+                <ClearableInput value={form.name} isDark={isDark} onChange={(v) => handleStrUpdate('name', v)} placeholder={t('addProductModal.productNamePlaceholder')} hasError={!!errors.name} />
                 {errors.name && <p className="text-[9px] text-red-400 mt-0.5">{errors.name}</p>}
               </FieldGroup>
             </div>
 
             {/* Product Category */}
             <div className="lg:col-span-2">
-              <FieldGroup label="Product Category" icon={<Layers className="w-3 h-3" />}>
-                <SearchCombobox options={CATEGORY_OPTIONS} value={form.productCategory} onChange={(v) => updateField('productCategory', v)} placeholder="Search category..." isDark={isDark} />
+              <FieldGroup label={t('addProductModal.category')} icon={<Layers className="w-3 h-3" />}>
+                <SearchCombobox options={CATEGORY_OPTIONS} value={form.productCategory} onChange={(v) => updateField('productCategory', v)} placeholder={t('addProductModal.categoryPlaceholder')} isDark={isDark} />
               </FieldGroup>
             </div>
 
             {/* Sales Type */}
             <div>
-              <FieldGroup label="Sales Type" icon={<ShoppingCart className="w-3 h-3" />}>
-                <SearchCombobox options={SALES_TYPE_OPTIONS as unknown as string[]} value={form.salesType} onChange={(v) => updateField('salesType', v as InventoryProduct['salesType'])} placeholder="Select type..." isDark={isDark} />
+              <FieldGroup label={t('addProductModal.salesType')} icon={<ShoppingCart className="w-3 h-3" />}>
+                <SearchCombobox options={SALES_TYPE_OPTIONS as unknown as string[]} value={form.salesType} onChange={(v) => updateField('salesType', v as InventoryProduct['salesType'])} placeholder={t('addProductModal.salesTypePlaceholder')} isDark={isDark} />
               </FieldGroup>
             </div>
 
@@ -284,22 +281,22 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ item, onSave
             <div className={`lg:col-span-3 p-3 rounded-lg border ${isDark ? 'bg-slate-900/30 border-slate-700/30' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center gap-1.5 mb-2">
                 <DollarSign className="w-3.5 h-3.5 text-orange-400" />
-                <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Pricing Details</span>
+                <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('addProductModal.pricing')}</span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <FieldGroup label="Cost [0]" icon={<DollarSign className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.cost')} icon={<DollarSign className="w-3 h-3" />}>
                   <ClearableInput value={form.cost} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('cost', v)} hasError={!!errors.cost} min="0" step="0.01" />
                   {errors.cost && <p className="text-[9px] text-red-400 mt-0.5">{errors.cost}</p>}
                 </FieldGroup>
-                <FieldGroup label="Last Price [1]" icon={<BarChart3 className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.lastPrice')} icon={<BarChart3 className="w-3 h-3" />}>
                   <ClearableInput value={form.lastPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('lastPrice', v)} hasError={!!errors.lastPrice} min="0" step="0.01" />
                   {errors.lastPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.lastPrice}</p>}
                 </FieldGroup>
-                <FieldGroup label="Sales Price [3]" icon={<Tag className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.salesPrice')} icon={<Tag className="w-3 h-3" />}>
                   <ClearableInput value={form.salesPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('salesPrice', v)} hasError={!!errors.salesPrice} className="font-medium text-cyan-400" min="0" step="0.01" />
                   {errors.salesPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.salesPrice}</p>}
                 </FieldGroup>
-                <FieldGroup label="Display Price [4]" icon={<Tag className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.displayPrice')} icon={<Tag className="w-3 h-3" />}>
                   <ClearableInput value={form.displayPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('displayPrice', v)} hasError={!!errors.displayPrice} className="font-bold text-green-400" min="0" step="0.01" />
                   {errors.displayPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.displayPrice}</p>}
                 </FieldGroup>
@@ -310,24 +307,24 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ item, onSave
             <div className={`lg:col-span-3 p-3 rounded-lg border ${isDark ? 'bg-slate-900/30 border-slate-700/30' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center gap-1.5 mb-2">
                 <Package className="w-3.5 h-3.5 text-orange-400" />
-                <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Stock & Quantity</span>
+                <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('addProductModal.stock')}</span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <FieldGroup label="Store Qty" icon={<Hash className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.storeQty')} icon={<Hash className="w-3 h-3" />}>
                   <ClearableInput value={form.storeQty} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('storeQty', v)} hasError={!!errors.storeQty} className="font-bold" min="0" />
                   {errors.storeQty && <p className="text-[9px] text-red-400 mt-0.5">{errors.storeQty}</p>}
                 </FieldGroup>
-                <FieldGroup label="Unit Qty" icon={<Layers className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.unitQty')} icon={<Layers className="w-3 h-3" />}>
                   <ClearableInput value={form.unitQty} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('unitQty', v)} hasError={!!errors.unitQty} min="1" />
                   {errors.unitQty && <p className="text-[9px] text-red-400 mt-0.5">{errors.unitQty}</p>}
                 </FieldGroup>
-                <FieldGroup label="1 Unit Price" icon={<DollarSign className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.unitPrice')} icon={<DollarSign className="w-3 h-3" />}>
                   <ClearableInput value={form.oneUnitPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('oneUnitPrice', v)} hasError={!!errors.oneUnitPrice} min="0" step="0.01" />
                   {errors.oneUnitPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.oneUnitPrice}</p>}
                 </FieldGroup>
                 <div className="flex items-center justify-center">
                   <div className={`text-center p-2 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                    <p className={`text-[9px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Stock Value</p>
+                    <p className={`text-[9px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('addProductModal.stockValue')}</p>
                     <p className={`text-sm font-bold ${isDark ? 'text-green-400' : 'text-green-600'}`}>Rs. {(form.cost * form.storeQty).toLocaleString()}</p>
                   </div>
                 </div>
@@ -340,12 +337,12 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ item, onSave
         <div className={`sticky bottom-0 flex items-center justify-between px-5 py-3 border-t backdrop-blur-xl ${isDark ? 'bg-slate-800/90 border-slate-700/50' : 'bg-white/90 border-slate-200'}`}>
           <div className="flex items-center gap-2">
             <kbd className={`hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono rounded ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}><span className="text-[9px]">⌘</span> Enter</kbd>
-            <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>to save</span>
+            <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{t('addProductModal.toSave')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={onClose} className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors ${isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'}`}>Cancel</button>
+            <button onClick={onClose} className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors ${isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'}`}>{t('addProductModal.cancel')}</button>
             <button onClick={handleSubmit} className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white shadow-lg shadow-orange-500/20 transition-all">
-              <Save className="w-3.5 h-3.5" /> Save Changes
+              <Save className="w-3.5 h-3.5" /> {t('addProductModal.saveChanges')}
             </button>
           </div>
         </div>

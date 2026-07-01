@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import {
   Search, Package, AlertTriangle, XCircle, CheckCircle,
   Filter, RefreshCw, SortAsc, SortDesc, DollarSign, Hash,
@@ -15,12 +16,6 @@ function deriveStatus(storeQty: number): InventoryProduct['status'] {
   if (storeQty <= 10) return 'Low Stock';
   return 'Available';
 }
-
-const fieldLabels: Record<string, string> = {
-  cost: 'Cost[0]', lastPrice: 'Last Price[1]', salesPrice: 'Sales Price[3]',
-  displayPrice: 'Display Price[4]', storeQty: 'Store Qty', unitQty: 'Unit Qty',
-  oneUnitPrice: '1 Unit Price', searchKey: 'Search Key', name: 'Name',
-};
 
 const editableNumericFields = ['cost', 'lastPrice', 'salesPrice', 'displayPrice', 'storeQty', 'unitQty', 'oneUnitPrice'] as const;
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
@@ -179,14 +174,8 @@ const InlineTextInput: React.FC<InlineTextInputProps> = ({ value, onSave, onCanc
   );
 };
 
-// ── Inline category combobox ──
-const INLINE_CATEGORIES = [
-  'MELWA BOX BAR', 'MELWA ANGLE BAR', 'MELWA CHANNEL', 'MELWA FLAT BAR',
-  'MELWA PIPE', 'MELWA SQUARE PIPE', 'MELWA RECTANGLE PIPE',
-  'LANWA STEEL', 'JSW STEEL', 'KYOCERA STEEL', 'CEMENT',
-  'ELECTRICAL', 'PLUMBING', 'PAINT', 'TOOLS', 'HARDWARE',
-  'ROOFING', 'PLYWOOD', 'PVC CEILING',
-];
+import { categoryNames } from '../data/mockData';
+const INLINE_CATEGORIES = categoryNames;
 
 interface InlineCategorySelectProps {
   value: string; onSave: (value: string) => void; onCancel: () => void; isDark: boolean;
@@ -252,11 +241,18 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [sortField, setSortField] = useState<keyof InventoryProduct>('searchKey');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const [showFilters, setShowFilters] = useState(false);
 
   const [cellEdit, setCellEdit] = useState<CellEditState | null>(null);
   const [rowEditItem, setRowEditItem] = useState<InventoryProduct | null>(null);
   const [inlineEdit, setInlineEdit] = useState<{ itemId: string; field: string } | null>(null);
+
+  const { t } = useTranslation();
+
+  const fieldLabels: Record<string, string> = {
+    cost: t('products.costTitle'), lastPrice: t('products.lastPriceTitle'), salesPrice: t('products.salesPriceTitle'),
+    displayPrice: t('products.displayPriceTitle'), storeQty: t('products.storeQtyTitle'), unitQty: t('products.unitQtyTitle'),
+    oneUnitPrice: t('products.oneUnitPriceTitle'), searchKey: t('products.searchKey'), name: t('common.name'),
+  };
 
   const categories = useMemo(() => {
     const cats = new Set<string>();
@@ -375,33 +371,25 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
           anchorRect={cellEdit.rect} onSave={(val) => handleCellSave(cellEdit.itemId, cellEdit.field, val)} onClose={() => setCellEdit(null)} />
       )}
 
-      {/* ── TOOLBAR ── */}
-      <div className={`p-3 rounded-lg border ${isDark ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 max-w-xs">
+      {/* ── BALANCED HORIZONTAL TOOLBAR with permanently visible filters ── */}
+      <div className={`p-4 rounded-lg border ${isDark ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 max-w-xl">
             <Search className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
-            <input type="text" placeholder="Search by key, name or category..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-8 pr-3 py-1.5 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${isDark ? 'bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200'}`} />
+            <input type="text" placeholder={t('products.searchPlaceholder')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              className={`w-full pl-8 pr-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${isDark ? 'bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200'}`} />
           </div>
-          <button onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border ${hasActiveFilters ? 'bg-orange-500 text-white border-orange-500' : isDark ? 'border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
-            <Filter className="w-3 h-3" /> Filters
-          </button>
-          {hasActiveFilters && <button onClick={clearFilters} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}><RefreshCw className="w-3 h-3" /></button>}
-          <span className={`text-[10px] font-medium ml-auto ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{filteredItems.length} items</span>
+          <div className="min-w-[200px] w-64">
+            <SearchableSelect options={categories} value={categoryFilter} onChange={(v) => setCategoryFilter(v)} placeholder="Search category..." isDark={isDark} allLabel={t('filters.allCategories')} />
+          </div>
+          <div className="min-w-[180px] w-52">
+            <SearchableSelect options={['Available', 'Low Stock', 'Out of Stock']} value={statusFilter} onChange={(v) => setStatusFilter(v)} placeholder="Search status..." isDark={isDark} allLabel={t('filters.allStatus')} />
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            {hasActiveFilters && <button onClick={clearFilters} className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}><RefreshCw className="w-3 h-3" /></button>}
+            <span className={`text-[10px] font-medium whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('products.itemsCount', { count: filteredItems.length })}</span>
+          </div>
         </div>
-        {showFilters && (
-          <div className={`flex flex-wrap gap-2 pt-3 mt-3 border-t ${isDark ? 'border-slate-700/50' : 'border-slate-200'}`}>
-            <div className="flex-1 min-w-[160px]">
-              <label className={`block text-[10px] font-medium mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Category</label>
-              <SearchableSelect options={categories} value={categoryFilter} onChange={(v) => setCategoryFilter(v)} placeholder="Search category..." isDark={isDark} allLabel="All Categories" />
-            </div>
-            <div className="flex-1 min-w-[140px]">
-              <label className={`block text-[10px] font-medium mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Status</label>
-              <SearchableSelect options={['Available', 'Low Stock', 'Out of Stock']} value={statusFilter} onChange={(v) => setStatusFilter(v)} placeholder="Search status..." isDark={isDark} allLabel="All Statuses" />
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── MAIN TABLE ── */}
@@ -414,8 +402,25 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
                   <th key={i}
                     className={`px-2 py-2 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${isDark ? 'text-slate-400' : 'text-slate-500'} ${col.key ? 'cursor-pointer select-none hover:text-orange-400 transition-colors' : ''}`}
                     onClick={() => col.key && handleSort(col.key as keyof InventoryProduct)}>
-                    <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : ''}`}>
-                      {col.label}
+          <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : ''}`}>
+                      {(() => {
+                        const labelMap: Record<string, string> = {
+                          'Search Key': t('productTable.searchKey'),
+                          'Name': t('productTable.name'),
+                          'Product Category': t('productTable.category'),
+                          'Cost[0]': t('productTable.cost'),
+                          'Last Price[1]': t('productTable.lastPrice'),
+                          'Sales Price[3]': t('productTable.salesPrice'),
+                          'Display Price[4]': t('productTable.displayPrice'),
+                          'Store Qty': t('productTable.storeQty'),
+                          'Sales Type': t('productTable.salesType'),
+                          'Unit Qty': t('productTable.unitQty'),
+                          '1 Unit Price': t('productTable.unitPrice'),
+                          'Status': t('productTable.status'),
+                          'Actions': t('productTable.actions'),
+                        };
+                        return labelMap[col.label] || col.label;
+                      })()}
                       {col.key && sortField === col.key && <SortIcon className="w-3 h-3 flex-shrink-0" />}
                     </div>
                   </th>

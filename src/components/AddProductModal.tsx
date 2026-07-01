@@ -1,39 +1,37 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { X, Save, AlertTriangle, DollarSign, Package, Hash, Layers, Tag, BarChart3, ShoppingCart } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { useCatalog } from '../contexts/CatalogContext';
+import { CategoryFormModal } from '../components/modals/CategoryFormModal';
+import { X, Save, AlertTriangle, DollarSign, Package, Hash, Layers, Tag, BarChart3, ShoppingCart, Plus } from 'lucide-react';
 import { InventoryProduct } from '../types';
+import { Category } from '../types';
 
 interface AddProductModalProps {
   onSave: (product: InventoryProduct) => void;
   onClose: () => void;
+  prefillCategory?: string;
 }
 
-// ── Derived status logic ──
 function deriveStatus(storeQty: number): InventoryProduct['status'] {
   if (storeQty === 0) return 'Out of Stock';
   if (storeQty <= 10) return 'Low Stock';
   return 'Available';
 }
 
-const CATEGORY_OPTIONS = [
-  'MELWA BOX BAR', 'MELWA ANGLE BAR', 'MELWA CHANNEL', 'MELWA FLAT BAR',
-  'MELWA PIPE', 'MELWA SQUARE PIPE', 'MELWA RECTANGLE PIPE',
-  'LANWA STEEL', 'JSW STEEL', 'KYOCERA STEEL', 'CEMENT',
-  'ELECTRICAL', 'PLUMBING', 'PAINT', 'TOOLS', 'HARDWARE',
-  'ROOFING', 'PLYWOOD', 'PVC CEILING',
-];
 const SALES_TYPE_OPTIONS: string[] = ['Full', 'Half', 'Quarter', 'Piece', 'Kg', 'Box', 'Set'];
 
-// ── Searchable combobox ──
+// ── Searchable combobox with "+ Add Category" mini button ──
 interface SearchComboboxProps {
   options: string[];
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   isDark: boolean;
+  onAddCategory?: () => void;
 }
 
-const SearchCombobox: React.FC<SearchComboboxProps> = ({ options, value, onChange, placeholder, isDark }) => {
+const SearchCombobox: React.FC<SearchComboboxProps> = ({ options, value, onChange, placeholder, isDark, onAddCategory }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState(value);
@@ -52,8 +50,8 @@ const SearchCombobox: React.FC<SearchComboboxProps> = ({ options, value, onChang
   }, []);
 
   return (
-    <div ref={containerRef} className="relative">
-      <div className="relative">
+    <div ref={containerRef} className="relative flex items-center gap-1">
+      <div className="relative flex-1">
         <input ref={inputRef} type="text" value={search}
           onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
@@ -69,20 +67,28 @@ const SearchCombobox: React.FC<SearchComboboxProps> = ({ options, value, onChang
             <X className="w-3.5 h-3.5" />
           </button>
         )}
+        {open && (
+          <div className={`absolute left-0 top-full mt-0.5 w-full max-h-32 overflow-y-auto rounded-md border shadow-xl z-50 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+            {filtered.length > 0 ? filtered.map((opt) => (
+              <button key={opt} onMouseDown={(e) => e.preventDefault()} onClick={() => { onChange(opt); setSearch(opt); setOpen(false); }}
+                className={`w-full text-left px-2.5 py-1.5 text-xs font-medium transition-colors ${opt === value ? 'bg-orange-500/20 text-orange-400' : isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-100'}`}>{opt}</button>
+            )) : <div className={`px-2.5 py-1.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>No results</div>}
+          </div>
+        )}
       </div>
-      {open && (
-        <div className={`absolute left-0 top-full mt-0.5 w-full max-h-32 overflow-y-auto rounded-md border shadow-xl z-50 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-          {filtered.length > 0 ? filtered.map((opt) => (
-            <button key={opt} onMouseDown={(e) => e.preventDefault()} onClick={() => { onChange(opt); setSearch(opt); setOpen(false); }}
-              className={`w-full text-left px-2.5 py-1.5 text-xs font-medium transition-colors ${opt === value ? 'bg-orange-500/20 text-orange-400' : isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-100'}`}>{opt}</button>
-          )) : <div className={`px-2.5 py-1.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>No results</div>}
-        </div>
+      {onAddCategory && (
+        <button type="button" onClick={(e) => { e.stopPropagation(); onAddCategory(); }} title="Add new category"
+          className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg border transition-all hover:scale-105 active:scale-95 ${
+            isDark ? 'border-slate-600 bg-slate-700 hover:bg-slate-600 text-orange-400' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-orange-600'
+          }`}>
+          <Plus className="w-3.5 h-3.5" />
+        </button>
       )}
     </div>
   );
 };
 
-// ── Clearable input with leading-zero stripping ──
+// ── Clearable input ──
 interface ClearableInputProps {
   value: string | number;
   type?: 'text' | 'number';
@@ -96,41 +102,17 @@ interface ClearableInputProps {
   step?: string;
 }
 
-// ── Smart number helper: strips leading zeros, falls back to "0" on blur ──
 function sanitizeNumericInput(raw: string): string {
-  // Allow empty string for graceful clearing
   if (raw === '' || raw === '.') return raw;
-  // Strip leading zeros (e.g. "05" -> "5", "00" -> "0")
-  const cleaned = raw.replace(/^0+(?=\d)/, '');
-  return cleaned;
+  return raw.replace(/^0+(?=\d)/, '');
 }
 
 const ClearableInput: React.FC<ClearableInputProps> = ({ value, type = 'text', isNumeric, onChange, placeholder, hasError, isDark, className = '', min, step }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const strValue = String(value);
-
-  const handleFocus = () => {
-    // If current value is exactly "0", clear it so user types fresh
-    if (isNumeric && strValue === '0') {
-      onChange('');
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    if (isNumeric) {
-      onChange(sanitizeNumericInput(raw));
-    } else {
-      onChange(raw);
-    }
-  };
-
-  const handleBlur = () => {
-    if (isNumeric && strValue === '') {
-      onChange('0');
-    }
-  };
-
+  const handleFocus = () => { if (isNumeric && strValue === '0') onChange(''); };
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { const raw = e.target.value; onChange(isNumeric ? sanitizeNumericInput(raw) : raw); };
+  const handleBlur = () => { if (isNumeric && strValue === '') onChange('0'); };
   return (
     <div className="relative">
       <input ref={inputRef} type={type === 'number' ? 'number' : 'text'} value={value} onChange={handleChange} onFocus={handleFocus} onBlur={handleBlur}
@@ -162,16 +144,17 @@ const FieldGroup: React.FC<FieldGroupProps> = ({ label, icon, children }) => (
   </div>
 );
 
-export const AddProductModal: React.FC<AddProductModalProps> = ({ onSave, onClose }) => {
+export const AddProductModal: React.FC<AddProductModalProps> = ({ onSave, onClose, prefillCategory }) => {
   const { theme } = useTheme();
+  const { t } = useTranslation();
+  const { categories, addCategory } = useCatalog();
   const isDark = theme === 'dark';
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // ── Clean canvas: all empty strings, all zeros ──
   const [form, setForm] = useState({
     searchKey: '',
     name: '',
-    productCategory: '',
+    productCategory: prefillCategory || '',
     cost: 0,
     lastPrice: 0,
     salesPrice: 0,
@@ -182,9 +165,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onSave, onClos
     oneUnitPrice: 0,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showAddCategory, setShowAddCategory] = useState(false);
 
-  // ── Derive status from storeQty ──
   const derivedStatus = deriveStatus(form.storeQty);
+
+  const categoryOptions = useMemo(() => categories.map(c => c.name), [categories]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -206,15 +191,15 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onSave, onClos
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
-    if (!form.searchKey.trim()) errs.searchKey = 'Search key is required';
-    if (!form.name.trim()) errs.name = 'Product name is required';
-    if (form.cost < 0) errs.cost = 'Cost cannot be negative';
-    if (form.lastPrice < 0) errs.lastPrice = 'Last price cannot be negative';
-    if (form.salesPrice < 0) errs.salesPrice = 'Sales price cannot be negative';
-    if (form.displayPrice < 0) errs.displayPrice = 'Display price cannot be negative';
-    if (form.storeQty < 0) errs.storeQty = 'Quantity cannot be negative';
-    if (form.unitQty <= 0) errs.unitQty = 'Unit qty must be positive';
-    if (form.oneUnitPrice < 0) errs.oneUnitPrice = '1 Unit price cannot be negative';
+    if (!form.searchKey.trim()) errs.searchKey = t('addProductModal.searchKeyRequired');
+    if (!form.name.trim()) errs.name = t('addProductModal.productNameRequired');
+    if (form.cost < 0) errs.cost = t('addProductModal.costRequired');
+    if (form.lastPrice < 0) errs.lastPrice = t('addProductModal.lastPriceRequired');
+    if (form.salesPrice < 0) errs.salesPrice = t('addProductModal.salesPriceRequired');
+    if (form.displayPrice < 0) errs.displayPrice = t('addProductModal.displayPriceRequired');
+    if (form.storeQty < 0) errs.storeQty = t('addProductModal.storeQtyRequired');
+    if (form.unitQty <= 0) errs.unitQty = t('addProductModal.unitQtyRequired');
+    if (form.oneUnitPrice < 0) errs.oneUnitPrice = t('addProductModal.unitPriceRequired');
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -240,14 +225,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onSave, onClos
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit(); };
+  const handleKeyDownEvent = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit(); };
 
   const handleStrUpdate = (key: string, val: string) => {
-    // Allow empty string to pass through (for clear button)
-    if (val === '') {
-      updateField(key, '');
-      return;
-    }
+    if (val === '') { updateField(key, ''); return; }
     if (key === 'searchKey' || key === 'name' || key === 'productCategory' || key === 'salesType') {
       updateField(key, val);
     } else {
@@ -255,134 +236,144 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onSave, onClos
     }
   };
 
+  // Nested category save: creates category, auto-selects in combobox, closes sub-modal
+  const handleNewCategory = (catData: Partial<Category>) => {
+    const newCat = addCategory(catData as any);
+    updateField('productCategory', newCat.name);
+    setShowAddCategory(false);
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div ref={modalRef} onKeyDown={handleKeyDown} className={`relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl animate-slide-in ${isDark ? 'bg-slate-800 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-        {/* Header */}
-        <div className={`sticky top-0 z-10 flex items-center justify-between px-5 py-3 border-b backdrop-blur-xl ${isDark ? 'bg-slate-800/90 border-slate-700/50' : 'bg-white/90 border-slate-200'}`}>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-rose-500 flex items-center justify-center"><Package className="w-4 h-4 text-white" /></div>
-            <div>
-              <h2 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Add New Product</h2>
-              <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Fill in the details to create a new inventory item</p>
+    <>
+      {showAddCategory && (
+        <CategoryFormModal
+          isOpen={showAddCategory}
+          onClose={() => setShowAddCategory(false)}
+          onSave={handleNewCategory}
+          category={null}
+          categories={categories}
+        />
+      )}
+
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div ref={modalRef} onKeyDown={handleKeyDownEvent} className={`relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl animate-slide-in ${isDark ? 'bg-slate-800 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+          {/* Header */}
+          <div className={`sticky top-0 z-10 flex items-center justify-between px-5 py-3 border-b backdrop-blur-xl ${isDark ? 'bg-slate-800/90 border-slate-700/50' : 'bg-white/90 border-slate-200'}`}>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-rose-500 flex items-center justify-center"><Package className="w-4 h-4 text-white" /></div>
+              <div>
+                <h2 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{t('addProductModal.title')}</h2>
+                <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('addProductModal.subtitle')}</p>
+              </div>
             </div>
+            <button onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}><X className="w-4 h-4" /></button>
           </div>
-          <button onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}><X className="w-4 h-4" /></button>
-        </div>
 
-        {/* Body */}
-        <div className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Search Key */}
-            <div className="lg:col-span-2">
-              <FieldGroup label="Search Key" icon={<Tag className="w-3 h-3" />}>
-                <ClearableInput value={form.searchKey} isDark={isDark} onChange={(v) => handleStrUpdate('searchKey', v)} placeholder="e.g. GI BOX 3x3x2/4" hasError={!!errors.searchKey} />
-                {errors.searchKey && <p className="text-[9px] text-red-400 mt-0.5">{errors.searchKey}</p>}
-              </FieldGroup>
-            </div>
-
-            {/* Status — DISABLED, auto-derived */}
-            <div>
-              <FieldGroup label="Status" icon={<AlertTriangle className="w-3 h-3" />}>
-                <input type="text" value={derivedStatus} disabled
-                  className={`w-full px-2.5 py-1.5 text-xs border rounded-lg opacity-70 cursor-not-allowed ${isDark ? 'bg-slate-700/30 border-slate-600 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'}`}
-                />
-              </FieldGroup>
-            </div>
-
-            {/* Name */}
-            <div className="lg:col-span-3">
-              <FieldGroup label="Product Name" icon={<Package className="w-3 h-3" />}>
-                <ClearableInput value={form.name} isDark={isDark} onChange={(v) => handleStrUpdate('name', v)} placeholder='e.g. 6mm GI Box Bar 3/4"x3/4" (0.9mm)' hasError={!!errors.name} />
-                {errors.name && <p className="text-[9px] text-red-400 mt-0.5">{errors.name}</p>}
-              </FieldGroup>
-            </div>
-
-            {/* Product Category — searchable combobox */}
-            <div className="lg:col-span-2">
-              <FieldGroup label="Product Category" icon={<Layers className="w-3 h-3" />}>
-                <SearchCombobox options={CATEGORY_OPTIONS} value={form.productCategory} onChange={(v) => updateField('productCategory', v)} placeholder="Search category..." isDark={isDark} />
-              </FieldGroup>
-            </div>
-
-            {/* Sales Type — searchable combobox */}
-            <div>
-              <FieldGroup label="Sales Type" icon={<ShoppingCart className="w-3 h-3" />}>
-                <SearchCombobox options={SALES_TYPE_OPTIONS} value={form.salesType} onChange={(v) => updateField('salesType', v)} placeholder="Select type..." isDark={isDark} />
-              </FieldGroup>
-            </div>
-
-            {/* Pricing Section */}
-            <div className={`lg:col-span-3 p-3 rounded-lg border ${isDark ? 'bg-slate-900/30 border-slate-700/30' : 'bg-slate-50 border-slate-200'}`}>
-              <div className="flex items-center gap-1.5 mb-2">
-                <DollarSign className="w-3.5 h-3.5 text-orange-400" />
-                <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Pricing Details</span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <FieldGroup label="Cost [0]" icon={<DollarSign className="w-3 h-3" />}>
-                  <ClearableInput value={form.cost} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('cost', v)} hasError={!!errors.cost} min="0" step="0.01" />
-                  {errors.cost && <p className="text-[9px] text-red-400 mt-0.5">{errors.cost}</p>}
-                </FieldGroup>
-                <FieldGroup label="Last Price [1]" icon={<BarChart3 className="w-3 h-3" />}>
-                  <ClearableInput value={form.lastPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('lastPrice', v)} hasError={!!errors.lastPrice} min="0" step="0.01" />
-                  {errors.lastPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.lastPrice}</p>}
-                </FieldGroup>
-                <FieldGroup label="Sales Price [3]" icon={<Tag className="w-3 h-3" />}>
-                  <ClearableInput value={form.salesPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('salesPrice', v)} hasError={!!errors.salesPrice} className="font-medium text-cyan-400" min="0" step="0.01" />
-                  {errors.salesPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.salesPrice}</p>}
-                </FieldGroup>
-                <FieldGroup label="Display Price [4]" icon={<Tag className="w-3 h-3" />}>
-                  <ClearableInput value={form.displayPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('displayPrice', v)} hasError={!!errors.displayPrice} className="font-bold text-green-400" min="0" step="0.01" />
-                  {errors.displayPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.displayPrice}</p>}
+          {/* Body */}
+          <div className="p-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Search Key */}
+              <div className="lg:col-span-2">
+                <FieldGroup label={t('addProductModal.searchKey')} icon={<Tag className="w-3 h-3" />}>
+                  <ClearableInput value={form.searchKey} isDark={isDark} onChange={(v) => handleStrUpdate('searchKey', v)} placeholder={t('addProductModal.searchKeyPlaceholder')} hasError={!!errors.searchKey} />
+                  {errors.searchKey && <p className="text-[9px] text-red-400 mt-0.5">{errors.searchKey}</p>}
                 </FieldGroup>
               </div>
-            </div>
-
-            {/* Stock & Qty Section */}
-            <div className={`lg:col-span-3 p-3 rounded-lg border ${isDark ? 'bg-slate-900/30 border-slate-700/30' : 'bg-slate-50 border-slate-200'}`}>
-              <div className="flex items-center gap-1.5 mb-2">
-                <Package className="w-3.5 h-3.5 text-orange-400" />
-                <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Stock & Quantity</span>
+              <div>
+                <FieldGroup label={t('addProductModal.status')} icon={<AlertTriangle className="w-3 h-3" />}>
+                  <input type="text" value={derivedStatus} disabled className={`w-full px-2.5 py-1.5 text-xs border rounded-lg opacity-70 cursor-not-allowed ${isDark ? 'bg-slate-700/30 border-slate-600 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'}`} />
+                </FieldGroup>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <FieldGroup label="Store Qty" icon={<Hash className="w-3 h-3" />}>
-                  <ClearableInput value={form.storeQty} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('storeQty', v)} hasError={!!errors.storeQty} className="font-bold" min="0" />
-                  {errors.storeQty && <p className="text-[9px] text-red-400 mt-0.5">{errors.storeQty}</p>}
+              {/* Name */}
+              <div className="lg:col-span-3">
+                <FieldGroup label={t('addProductModal.productName')} icon={<Package className="w-3 h-3" />}>
+                  <ClearableInput value={form.name} isDark={isDark} onChange={(v) => handleStrUpdate('name', v)} placeholder={t('addProductModal.productNamePlaceholder')} hasError={!!errors.name} />
+                  {errors.name && <p className="text-[9px] text-red-400 mt-0.5">{errors.name}</p>}
                 </FieldGroup>
-                <FieldGroup label="Unit Qty" icon={<Layers className="w-3 h-3" />}>
-                  <ClearableInput value={form.unitQty} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('unitQty', v)} hasError={!!errors.unitQty} min="1" />
-                  {errors.unitQty && <p className="text-[9px] text-red-400 mt-0.5">{errors.unitQty}</p>}
+              </div>
+              {/* Product Category — dynamic + nested add button */}
+              <div className="lg:col-span-2">
+                <FieldGroup label={t('addProductModal.category')} icon={<Layers className="w-3 h-3" />}>
+                  <SearchCombobox options={categoryOptions} value={form.productCategory} onChange={(v) => updateField('productCategory', v)} placeholder={t('addProductModal.categoryPlaceholder')} isDark={isDark} onAddCategory={() => setShowAddCategory(true)} />
                 </FieldGroup>
-                <FieldGroup label="1 Unit Price" icon={<DollarSign className="w-3 h-3" />}>
-                  <ClearableInput value={form.oneUnitPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('oneUnitPrice', v)} hasError={!!errors.oneUnitPrice} min="0" step="0.01" />
-                  {errors.oneUnitPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.oneUnitPrice}</p>}
+              </div>
+              {/* Sales Type */}
+              <div>
+                <FieldGroup label={t('addProductModal.salesType')} icon={<ShoppingCart className="w-3 h-3" />}>
+                  <SearchCombobox options={SALES_TYPE_OPTIONS} value={form.salesType} onChange={(v) => updateField('salesType', v)} placeholder={t('addProductModal.salesTypePlaceholder')} isDark={isDark} />
                 </FieldGroup>
-                <div className="flex items-center justify-center">
-                  <div className={`text-center p-2 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                    <p className={`text-[9px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Stock Value</p>
-                    <p className={`text-sm font-bold ${isDark ? 'text-green-400' : 'text-green-600'}`}>Rs. {(form.cost * form.storeQty).toLocaleString()}</p>
+              </div>
+              {/* Pricing */}
+              <div className={`lg:col-span-3 p-3 rounded-lg border ${isDark ? 'bg-slate-900/30 border-slate-700/30' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <DollarSign className="w-3.5 h-3.5 text-orange-400" />
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('addProductModal.pricing')}</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <FieldGroup label={t('addProductModal.cost')} icon={<DollarSign className="w-3 h-3" />}>
+                    <ClearableInput value={form.cost} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('cost', v)} hasError={!!errors.cost} min="0" step="0.01" />
+                    {errors.cost && <p className="text-[9px] text-red-400 mt-0.5">{errors.cost}</p>}
+                  </FieldGroup>
+                  <FieldGroup label={t('addProductModal.lastPrice')} icon={<BarChart3 className="w-3 h-3" />}>
+                    <ClearableInput value={form.lastPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('lastPrice', v)} hasError={!!errors.lastPrice} min="0" step="0.01" />
+                    {errors.lastPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.lastPrice}</p>}
+                  </FieldGroup>
+                  <FieldGroup label={t('addProductModal.salesPrice')} icon={<Tag className="w-3 h-3" />}>
+                    <ClearableInput value={form.salesPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('salesPrice', v)} hasError={!!errors.salesPrice} className="font-medium text-cyan-400" min="0" step="0.01" />
+                    {errors.salesPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.salesPrice}</p>}
+                  </FieldGroup>
+                  <FieldGroup label={t('addProductModal.displayPrice')} icon={<Tag className="w-3 h-3" />}>
+                    <ClearableInput value={form.displayPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('displayPrice', v)} hasError={!!errors.displayPrice} className="font-bold text-green-400" min="0" step="0.01" />
+                    {errors.displayPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.displayPrice}</p>}
+                  </FieldGroup>
+                </div>
+              </div>
+              {/* Stock */}
+              <div className={`lg:col-span-3 p-3 rounded-lg border ${isDark ? 'bg-slate-900/30 border-slate-700/30' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Package className="w-3.5 h-3.5 text-orange-400" />
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('addProductModal.stock')}</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <FieldGroup label={t('addProductModal.storeQty')} icon={<Hash className="w-3 h-3" />}>
+                    <ClearableInput value={form.storeQty} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('storeQty', v)} hasError={!!errors.storeQty} className="font-bold" min="0" />
+                    {errors.storeQty && <p className="text-[9px] text-red-400 mt-0.5">{errors.storeQty}</p>}
+                  </FieldGroup>
+                  <FieldGroup label={t('addProductModal.unitQty')} icon={<Layers className="w-3 h-3" />}>
+                    <ClearableInput value={form.unitQty} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('unitQty', v)} hasError={!!errors.unitQty} min="1" />
+                    {errors.unitQty && <p className="text-[9px] text-red-400 mt-0.5">{errors.unitQty}</p>}
+                  </FieldGroup>
+                  <FieldGroup label={t('addProductModal.unitPrice')} icon={<DollarSign className="w-3 h-3" />}>
+                    <ClearableInput value={form.oneUnitPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('oneUnitPrice', v)} hasError={!!errors.oneUnitPrice} min="0" step="0.01" />
+                    {errors.oneUnitPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.oneUnitPrice}</p>}
+                  </FieldGroup>
+                  <div className="flex items-center justify-center">
+                    <div className={`text-center p-2 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                      <p className={`text-[9px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('addProductModal.stockValue')}</p>
+                      <p className={`text-sm font-bold ${isDark ? 'text-green-400' : 'text-green-600'}`}>Rs. {(form.cost * form.storeQty).toLocaleString()}</p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Footer */}
-        <div className={`sticky bottom-0 flex items-center justify-between px-5 py-3 border-t backdrop-blur-xl ${isDark ? 'bg-slate-800/90 border-slate-700/50' : 'bg-white/90 border-slate-200'}`}>
-          <div className="flex items-center gap-2">
-            <kbd className={`hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono rounded ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}><span className="text-[9px]">⌘</span> Enter</kbd>
-            <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>to save</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={onClose} className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors ${isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'}`}>Cancel</button>
-            <button onClick={handleSubmit} className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white shadow-lg shadow-orange-500/20 transition-all">
-              <Save className="w-3.5 h-3.5" /> Add Product
-            </button>
+          {/* Footer */}
+          <div className={`sticky bottom-0 flex items-center justify-between px-5 py-3 border-t backdrop-blur-xl ${isDark ? 'bg-slate-800/90 border-slate-700/50' : 'bg-white/90 border-slate-200'}`}>
+            <div className="flex items-center gap-2">
+              <kbd className={`hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono rounded ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'}`}><span className="text-[9px]">⌘</span> Enter</kbd>
+              <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{t('addProductModal.toSave')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={onClose} className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors ${isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'}`}>{t('addProductModal.cancel')}</button>
+              <button onClick={handleSubmit} className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white shadow-lg shadow-orange-500/20 transition-all">
+                <Save className="w-3.5 h-3.5" /> {t('addProductModal.addProduct')}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

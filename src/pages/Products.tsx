@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import {
-  Package, Plus, AlertTriangle, CheckCircle, XCircle,
-  Box, BarChart3, ScanLine
+  Package, Plus, AlertTriangle, XCircle,
+  Box, BarChart3, ScanLine, SortAsc, SortDesc
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { InventoryProduct } from '../types';
-import { inventoryItems } from '../data/inventoryData';
+import { inventoryItems } from '../data/mockData';
 import { ProductTable } from '../components/ProductTable';
 import { AddProductModal } from '../components/AddProductModal';
 
@@ -19,13 +19,11 @@ export const Products: React.FC = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
-  // ── Inventory warehouse grid state (single source of truth) ──
   const [inventoryItemsState, setInventoryItemsState] = useState<InventoryProduct[]>(() => inventoryItems);
   const [showAddModal, setShowAddModal] = useState(false);
 
   const isDark = theme === 'dark';
 
-  // ── Stats derived from inventory ──
   const stats = useMemo(() => {
     const total = inventoryItemsState.length;
     const lowStock = inventoryItemsState.filter((i) => i.status === 'Low Stock').length;
@@ -34,7 +32,6 @@ export const Products: React.FC = () => {
     return { total, lowStock, outOfStock, totalValue };
   }, [inventoryItemsState]);
 
-  // ── Add product handler ──
   const handleAddProduct = (newProduct: InventoryProduct) => {
     setInventoryItemsState((prev) => [newProduct, ...prev]);
     setShowAddModal(false);

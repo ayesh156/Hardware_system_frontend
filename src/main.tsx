@@ -10,6 +10,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./lib/i18n";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { CatalogProvider } from "./contexts/CatalogContext";
 import { AdminLayout } from "./components/AdminLayout";
 import { Login } from "./pages/Login";
 
@@ -44,6 +45,7 @@ const App = () => (
       <Sonner />
       <ThemeProvider>
         <AuthProvider>
+          <CatalogProvider>
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Suspense fallback={<div className="flex items-center justify-center h-screen bg-[#0a0f1a] text-slate-400">Loading...</div>}>
               <Routes>
@@ -160,6 +162,7 @@ const App = () => (
               </Routes>
             </Suspense>
           </BrowserRouter>
+          </CatalogProvider>
         </AuthProvider>
       </ThemeProvider>
     </TooltipProvider>

@@ -94,17 +94,18 @@ const generatePrintContentA5 = (invoice: Invoice, customer?: Customer | null): s
       </head>
       <body>
         <div style="width: 136mm; max-width: 100%; padding: 3px; margin: 0 auto; background: white; position: relative; font-family: 'Inter', sans-serif; font-size: 15px; color: #000; box-sizing: border-box;">
-          <!-- Header -->
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 12px; border-bottom: 2px solid #000; margin-bottom: 12px;">
-            <div>
-              <h1 style="font-size: 28px; font-weight: 800; color: #000; margin-bottom: 2px; letter-spacing: -0.3px;">LIYANAGE HARDWARE</h1>
-              <p style="font-size: 13px; color: #333; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">Quality Building Materials</p>
-              <p style="font-size: 14px; color: #333; line-height: 1.5;">Hakmana Rd, Deiyandara<br/>Tel: 0773751805 / 0412268217 | info@liyanage.lk</p>
-            </div>
-            <div style="text-align: right;">
-              <h2 style="font-size: 28px; font-weight: 800; color: #000; letter-spacing: 1px; white-space: nowrap;">INVOICE</h2>
-              <p style="font-size: 18px; font-weight: 600; color: #000; margin-top: 4px;">${invoice.invoiceNumber}</p>
-              <span style="display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 6px; border: 2px solid #000; background: ${isPaid ? '#000' : 'white'}; color: ${isPaid ? 'white' : '#000'};">${isPaid ? 'PAID' : 'PENDING'}</span>
+          <!-- Header — Clean centered logo, no text redundancy -->
+          <div style="display: flex; flex-direction: column; align-items: center; padding-bottom: 12px; border-bottom: 2px solid #000; margin-bottom: 12px;">
+            <img src="/inv_logo.jpg" alt="" style="width: 150px; height: auto; display: block; margin-bottom: 8px;" />
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: flex-start; margin-top: 4px;">
+              <div style="text-align: left;">
+                <p style="font-size: 13px; color: #333; line-height: 1.5;">Hakmana Rd, Deiyandara<br/>Tel: 0773751805 / 0412268217 | info@liyanage.lk</p>
+              </div>
+              <div style="text-align: right;">
+                <h2 style="font-size: 28px; font-weight: 800; color: #000; letter-spacing: 1px; white-space: nowrap;">INVOICE</h2>
+                <p style="font-size: 18px; font-weight: 600; color: #000; margin-top: 4px;">${invoice.invoiceNumber}</p>
+                <span style="display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 6px; border: 2px solid #000; background: ${isPaid ? '#000' : 'white'}; color: ${isPaid ? 'white' : '#000'};">${isPaid ? 'PAID' : 'PENDING'}</span>
+              </div>
             </div>
           </div>
 
@@ -307,30 +308,9 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
       <body>
         <div class="receipt-container" style="width: 76mm; max-width: 100%; padding: 2px; margin: 0 auto; background: white; font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #000;">
           
-          <!-- ═══ HEADER ═══ -->
-          <div style="text-align: center; padding-bottom: 4px; border-bottom: 2px double #000;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-              <!-- Creative Hardware Store Logo with L -->
-              <div style="position: relative; width: 38px; height: 38px;">
-                <!-- Outer hexagon badge -->
-                <svg width="38" height="38" viewBox="0 0 50 50" style="position: absolute; top: 0; left: 0;">
-                  <polygon points="25,2 46,14 46,36 25,48 4,36 4,14" fill="none" stroke="#000" stroke-width="2"/>
-                </svg>
-                <!-- Bold L letter with wrench accent -->
-                <svg width="38" height="38" viewBox="0 0 50 50" style="position: absolute; top: 0; left: 0;">
-                  <!-- Letter L -->
-                  <path d="M16 12 L16 38 L34 38" fill="none" stroke="#000" stroke-width="5" stroke-linecap="square" stroke-linejoin="miter"/>
-                  <!-- Small wrench detail at top right -->
-                  <circle cx="34" cy="16" r="4" fill="none" stroke="#000" stroke-width="2"/>
-                  <line x1="30" y1="20" x2="24" y2="26" stroke="#000" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-              </div>
-              <div>
-                <div style="font-size: 16px; font-weight: 900; color: #000; letter-spacing: 1px;">ලියනගේ</div>
-                <div style="font-size: 12px; font-weight: 700; color: #000; letter-spacing: 1px; border-top: 1px solid #000; padding-top: 1px;">හාඩ්වෙයාර්</div>
-              </div>
-            </div>
-            <div style="font-size: 9px; color: #666; margin-top: 2px;">★ උසස් තත්ත්වයේ ගොඩනැගිලි ද්‍රව්‍ය ★</div>
+          <!-- ═══ HEADER - Centered inv_logo.png only ═══ -->
+          <div style="text-align: center; padding-bottom: 2px; border-bottom: 2px double #000;">
+            <img src="/inv_logo.png" alt="" style="width: 100px; height: auto; display: block; margin: 0 auto;" />
             <div style="font-size: 10px; color: #333; margin-top: 3px; line-height: 1.2;">
               හක්මන පාර, දෙයියන්දර<br/>
               දුරකථන: 0773751805 / 0412268217<br/>

@@ -10,7 +10,7 @@ import { flattenProducts } from '../lib/utils';
 import { printInvoice } from '../components/modals/PrintInvoiceModal';
 import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
 import { CategoryGrid } from '../components/CategoryGrid';
-import { PosItem, PosCategory } from '../data/posCategories';
+import { PosItem, PosCategory } from '../data/mockData';
 import {
   Zap, Search, Plus, Trash2, ArrowLeft, Printer, ShoppingCart,
   Keyboard, X, Package, Calculator, Barcode, Volume2, VolumeX,
@@ -239,14 +239,18 @@ export const QuickCheckout: React.FC = () => {
     }
   }, [soundEnabled]);
 
-  // Filter products by search (SKU, barcode, name)
+  // Filter products by search (barcode, displaySku, searchKey, name)
   const filteredProducts = useMemo((): FlattenedProduct[] => {
     if (!productSearch.trim()) return [];
     
     const searchLower = productSearch.toLowerCase().trim();
     
+    // Exact match attempts — try barcode, then displaySku, then product.sku
     const exactMatch = flattenedProducts.find(
-      (fp) => fp.displayBarcode === productSearch || fp.displaySku.toLowerCase() === searchLower
+      (fp) =>
+        fp.displayBarcode === productSearch ||
+        fp.displaySku.toLowerCase() === searchLower ||
+        fp.product.sku.toLowerCase() === searchLower
     );
     
     if (exactMatch && exactMatch.stock > 0) {
@@ -259,6 +263,7 @@ export const QuickCheckout: React.FC = () => {
           fp.stock > 0 && (
             fp.displayName.toLowerCase().includes(searchLower) ||
             fp.displaySku.toLowerCase().includes(searchLower) ||
+            fp.product.sku.toLowerCase().includes(searchLower) ||
             (fp.product.nameAlt && fp.product.nameAlt.includes(searchLower)) ||
             (fp.displayBarcode && fp.displayBarcode.includes(searchLower)) ||
             fp.product.category.toLowerCase().includes(searchLower) ||
@@ -283,11 +288,16 @@ export const QuickCheckout: React.FC = () => {
     return { code: trimmed };
   };
 
-  // Auto-detect barcode scan
+  // Auto-detect barcode scan / direct paste (when field gains input)
   useEffect(() => {
-    if (filteredProducts.length === 1 && productSearch.length >= 3) {
+    if (filteredProducts.length === 1 && productSearch.length >= 2) {
       const flatProduct = filteredProducts[0];
-      if (flatProduct.displayBarcode === productSearch || flatProduct.displaySku.toLowerCase() === productSearch.toLowerCase()) {
+      const isExactMatch =
+        flatProduct.displayBarcode === productSearch ||
+        flatProduct.displaySku.toLowerCase() === productSearch.toLowerCase() ||
+        flatProduct.product.sku.toLowerCase() === productSearch.toLowerCase();
+
+      if (isExactMatch) {
         setPendingProduct(flatProduct);
         setProductSearch('');
         setSelectedProductIndex(-1);
@@ -365,6 +375,34 @@ export const QuickCheckout: React.FC = () => {
       }
     }, 50);
   }, [items, quantity, playBeep, t]);
+
+  // ── findExactMatch: checks if input is a fully-qualified barcode/SKU ──
+  const findExactMatch = useCallback((input: string): FlattenedProduct | undefined => {
+    const trimmed = input.trim();
+    if (!trimmed) return undefined;
+    const lower = trimmed.toLowerCase();
+    return flattenedProducts.find(
+      (fp) =>
+        fp.displayBarcode === trimmed ||
+        fp.displaySku.toLowerCase() === lower ||
+        fp.product.sku.toLowerCase() === lower
+    );
+  }, [flattenedProducts]);
+
+  // ── onPaste handler: direct add-to-cart for exact matches ──
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const pasted = e.clipboardData.getData('text').trim();
+    if (!pasted || pasted.length < 2) return;
+
+    const match = findExactMatch(pasted);
+    if (match && match.stock > 0) {
+      e.preventDefault();
+      addProductToCart(match, 1);
+      setProductSearch('');
+      toast.success(`${match.displayName} ${t('quickCheckout.addedToCart')}`, { duration: 1500 });
+      playBeep('add');
+    }
+  }, [findExactMatch, addProductToCart, playBeep, t]);
 
   // Remove item from cart
   const removeItem = useCallback((itemId: string) => {
@@ -1648,6 +1686,7 @@ export const QuickCheckout: React.FC = () => {
                       type="text"
                       placeholder={t('quickCheckout.searchPlaceholder')}
                       value={productSearch}
+                      onPaste={handlePaste}
                       onFocus={() => {
                         setIsCartFocused(false);
                         setSelectedCartIndex(-1);
@@ -1988,7 +2027,7 @@ export const QuickCheckout: React.FC = () => {
               <div className="flex items-center justify-between mb-1.5">
                 <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   <Package className="w-3.5 h-3.5" />
-                  Quick Categories
+                  {t('quickCheckout.quickCategories')}
                 </h3>
               </div>
               <CategoryGrid onItemSelect={(item, category) => {

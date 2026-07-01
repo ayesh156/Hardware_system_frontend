@@ -3,28 +3,23 @@ export type CustomerType = 'regular' | 'wholesale' | 'credit';
 export interface Customer {
   id: string;
   name: string;
-  nameSi?: string; // Sinhala name
+  nameSi?: string;
   businessName: string;
   email: string;
   phone: string;
   phone2?: string;
-  nic?: string; // National ID Card
+  nic?: string;
   address: string;
   photo?: string;
   registrationDate: string;
   totalSpent: number;
-
-  // Customer classification
   customerType: CustomerType;
   isActive: boolean;
-
-  // Credit/Loan tracking
   loanBalance: number;
   loanDueDate?: string;
   creditLimit?: number;
 }
 
-// Brand/Company Management
 export interface Brand {
   id: string;
   name: string;
@@ -34,25 +29,23 @@ export interface Brand {
   isActive: boolean;
 }
 
-// Product Categories with subcategories
 export interface Category {
   id: string;
   name: string;
-  nameAlt?: string; // Sinhala name
+  nameAlt?: string;
   icon?: string;
-  parentId?: string; // For subcategories
   description?: string;
+  usageCount?: number;
+  parentId?: string;
 }
 
-// Size/Variant Options
 export interface SizeOption {
   id: string;
-  label: string; // e.g., "1/2 inch", "25mm", "50kg"
+  label: string;
   value: string;
   unit: string;
 }
 
-// Product Variant (different sizes/colors of same product)
 export interface ProductVariant {
   id: string;
   productId: string;
@@ -63,117 +56,89 @@ export interface ProductVariant {
   costPrice: number;
   wholesalePrice: number;
   retailPrice: number;
-  discountedPrice?: number; // Special discounted price (if any)
+  discountedPrice?: number;
   stock: number;
-  minStock: number; // Reorder level
+  minStock: number;
   maxStock?: number;
   isActive: boolean;
 }
 
-// Flattened product entry - represents either a standalone product or a specific variant
-// Used in Invoice/Quick Checkout for displaying each variant as a distinct line item
 export interface FlattenedProduct {
-  // Unique key combining product + variant IDs
   flatId: string;
-  // Original product reference
   product: Product;
-  // Variant reference (undefined for non-variant products)
   variant?: ProductVariant;
-  // Display fields (derived from product or variant)
   displayName: string;
   displaySku: string;
   displayBarcode?: string;
-  // Pricing (from variant if present, else from product)
   costPrice: number;
   wholesalePrice: number;
   retailPrice: number;
-  discountedPrice?: number; // Special discounted price (lower than retail)
-  // Stock (from variant if present, else from product)
+  discountedPrice?: number;
   stock: number;
   minStock: number;
-  // Convenience flags
   isVariant: boolean;
-  variantLabel?: string; // e.g., "10mm" or "Red - 1.5mm²"
-  hasDiscount: boolean; // Whether this product has a discounted price
+  variantLabel?: string;
+  hasDiscount: boolean;
 }
 
-// Enhanced Product Interface
 export interface Product {
   id: string;
   name: string;
-  nameAlt?: string; // Sinhala name
+  nameAlt?: string;
   sku: string;
   barcode?: string;
   description: string;
-
-  // Categorization
   categoryId?: string;
   category: 'building_materials' | 'steel_metal' | 'electrical' | 'plumbing' | 'tools' | 'paint' | 'hardware' | 'wood_timber' | 'safety' | 'other';
   subcategory?: string;
   brandId?: string;
   brand?: string;
-
-  // Pricing (base prices - variants may override)
-  price?: number;         // Legacy field for backward compatibility
-  costPrice?: number;     // Purchase/cost price
-  wholesalePrice?: number; // Bulk/dealer price
-  retailPrice?: number;   // Selling price to customers (normal price)
-  discountedPrice?: number; // Special discounted price (lower than retail)
-
-  // Stock Management
+  price?: number;
+  costPrice?: number;
+  wholesalePrice?: number;
+  retailPrice?: number;
+  discountedPrice?: number;
   stock: number;
-  minStock?: number;      // Reorder level alert
+  minStock?: number;
   maxStock?: number;
   unit?: 'piece' | 'kg' | 'g' | 'meter' | 'feet' | 'liter' | 'bag' | 'box' | 'pack' | 'roll' | 'sheet' | 'pair' | 'set' | 'sqft' | 'sqm' | 'bundle' | 'cube';
-
-  // Product Attributes
-  sizes?: string[];       // Available sizes
-  colors?: string[];      // Available colors
-  weight?: number;        // Weight in kg
-  dimensions?: {
-    length?: number;
-    width?: number;
-    height?: number;
-    unit: 'mm' | 'cm' | 'm' | 'inch' | 'feet';
-  };
-
-  // Variants
+  sizes?: string[];
+  colors?: string[];
+  weight?: number;
+  dimensions?: { length?: number; width?: number; height?: number; unit: 'mm' | 'cm' | 'm' | 'inch' | 'feet'; };
   hasVariants?: boolean;
   variants?: ProductVariant[];
-
-  // Additional Info
   warranty?: string;
   manufacturer?: string;
   countryOfOrigin?: string;
   specifications?: Record<string, string>;
   tags?: string[];
   images?: string[];
-
-  // Supplier relationship
   supplierId?: string;
   supplierName?: string;
-
-  // Status
   isActive?: boolean;
   isFeatured?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
 
-// ── NEW: InventoryProduct — the flat schema used by the inventory/warehouse grid ──
+// ── InventoryProduct — flat schema with bilingual support ──
 export interface InventoryProduct {
   id: string;
-  searchKey: string; // SKU / Code
+  searchKey: string;
   name: string;
+  nameSi?: string;       // Sinhala title (e.g., "ACL බහු-වයර් කේබලය")
   productCategory: string;
-  cost: number;          // Cost[0]
-  lastPrice: number;     // Last Price[1]
-  salesPrice: number;    // Sales Price[3]
-  displayPrice: number;  // Display Price[4]
+  categoryId?: string;
+  categorySi?: string;   // Sinhala category name (e.g., "ACL කේබල්")
+  cost: number;
+  lastPrice: number;
+  salesPrice: number;
+  displayPrice: number;
   storeQty: number;
   salesType: 'Full' | 'Half' | 'Quarter' | 'Piece' | 'Kg' | 'Box' | 'Set' | string;
   unitQty: number;
-  oneUnitPrice: number;  // 1 Unit Price
+  oneUnitPrice: number;
   status: 'Available' | 'Out of Stock' | 'Low Stock' | 'Discontinued';
 }
 
@@ -181,12 +146,12 @@ export interface InvoiceItem {
   id: string;
   productId: string;
   productName: string;
-  productNameSi?: string; // Sinhala product name
+  productNameSi?: string;
   variantId?: string;
   size?: string;
   quantity: number;
   unitPrice: number;
-  originalPrice?: number; // Original price before any discounts
+  originalPrice?: number;
   discount?: number;
   total: number;
 }
@@ -198,15 +163,15 @@ export interface Invoice {
   customerName: string;
   items: InvoiceItem[];
   subtotal: number;
-  discount?: number; // Final discount (fixed amount)
+  discount?: number;
   discountType?: 'percentage' | 'fixed' | 'none';
   discountValue?: number;
   enableTax?: boolean;
   taxRate?: number;
   tax: number;
   total: number;
-  receivedAmount?: number; // Amount received from customer
-  changeAmount?: number; // Change to return to customer
+  receivedAmount?: number;
+  changeAmount?: number;
   issueDate: string;
   dueDate: string;
   status: 'paid' | 'pending' | 'overdue' | 'cancelled';
@@ -214,7 +179,6 @@ export interface Invoice {
   notes?: string;
 }
 
-// Supplier Management
 export type SupplierPaymentType = 'cash' | 'credit';
 
 export interface SupplierDelivery {
@@ -241,13 +205,10 @@ export interface Supplier {
   categories?: string[];
   paymentTerms?: string;
   isActive: boolean;
-  // Payment type - Cash or Credit supplier
   paymentType: SupplierPaymentType;
-  // Credit-specific fields
-  creditBalance?: number;       // Outstanding amount owed
-  creditLimit?: number;         // Maximum credit allowed
-  creditDueDate?: string;       // When credit payment is due
-  lastPaymentDate?: string;     // Last payment made to supplier
-  // Delivery records
+  creditBalance?: number;
+  creditLimit?: number;
+  creditDueDate?: string;
+  lastPaymentDate?: string;
   deliveries?: SupplierDelivery[];
 }

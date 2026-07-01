@@ -1,4 +1,103 @@
-import { Customer, Product, Invoice, Brand, Category, Supplier, SupplierDelivery } from '../types/index';
+import { Customer, Product, Invoice, Brand, Category, Supplier, SupplierDelivery, InventoryProduct } from '../types/index';
+
+// ──────────────────────────────────────────────
+// FINANCIAL DATA (merged from financialData.ts)
+// ──────────────────────────────────────────────
+export interface FinancialTransaction {
+  id: string;
+  date: string;
+  type: 'revenue' | 'expense';
+  category: string;
+  description: string;
+  amount: number;
+  paymentMethod: 'cash' | 'card' | 'bank_transfer' | 'credit';
+}
+
+export interface FinancialSummary {
+  period: string;
+  revenue: number;
+  expenses: number;
+  profit: number;
+  profitMargin: number;
+}
+
+export const mockFinancialTransactions: FinancialTransaction[] = [
+  { id: 'ft1', date: '2024-12-01', type: 'revenue', category: 'Paint Sales', description: 'Nippon Paint - 5L Emulsion', amount: 45000, paymentMethod: 'card' },
+  { id: 'ft2', date: '2024-12-01', type: 'revenue', category: 'Tools Sales', description: 'Power Drill Set', amount: 28000, paymentMethod: 'cash' },
+  { id: 'ft3', date: '2024-12-02', type: 'revenue', category: 'Cement Sales', description: 'Holcim Cement - 50kg x 20', amount: 72000, paymentMethod: 'bank_transfer' },
+  { id: 'ft4', date: '2024-12-02', type: 'revenue', category: 'Electrical', description: 'LED Bulbs Wholesale', amount: 35000, paymentMethod: 'credit' },
+  { id: 'ft5', date: '2024-12-03', type: 'revenue', category: 'Plumbing', description: 'PVC Pipes & Fittings', amount: 52000, paymentMethod: 'cash' },
+  { id: 'ft6', date: '2024-12-03', type: 'revenue', category: 'Hardware', description: 'Nails, Screws, Bolts Bulk', amount: 18500, paymentMethod: 'card' },
+  { id: 'ft7', date: '2024-12-04', type: 'revenue', category: 'Paint Sales', description: 'Asian Paints - Weather Shield', amount: 68000, paymentMethod: 'bank_transfer' },
+  { id: 'ft8', date: '2024-12-04', type: 'revenue', category: 'Safety Equipment', description: 'Safety Helmets & Gloves', amount: 24000, paymentMethod: 'cash' },
+  { id: 'ft9', date: '2024-12-05', type: 'revenue', category: 'Tools Sales', description: 'Hand Tools Assortment', amount: 42000, paymentMethod: 'card' },
+  { id: 'ft10', date: '2024-12-05', type: 'revenue', category: 'Cement Sales', description: 'Tokyo Cement - 50kg x 15', amount: 54000, paymentMethod: 'credit' },
+  { id: 'ft11', date: '2024-12-06', type: 'revenue', category: 'Electrical', description: 'Switches & Sockets', amount: 38000, paymentMethod: 'cash' },
+  { id: 'ft12', date: '2024-12-06', type: 'revenue', category: 'Paint Sales', description: 'Decorative Wall Paints', amount: 56000, paymentMethod: 'bank_transfer' },
+  { id: 'ft13', date: '2024-12-07', type: 'revenue', category: 'Plumbing', description: 'Water Tanks & Fittings', amount: 125000, paymentMethod: 'bank_transfer' },
+  { id: 'ft14', date: '2024-12-08', type: 'revenue', category: 'Hardware', description: 'Door Locks & Hinges', amount: 32000, paymentMethod: 'card' },
+  { id: 'ft15', date: '2024-12-09', type: 'revenue', category: 'Tools Sales', description: 'Electric Grinder', amount: 45000, paymentMethod: 'cash' },
+  { id: 'ft16', date: '2024-12-10', type: 'revenue', category: 'Cement Sales', description: 'Holcim Cement Bulk Order', amount: 180000, paymentMethod: 'bank_transfer' },
+  { id: 'ft17', date: '2024-12-11', type: 'revenue', category: 'Paint Sales', description: 'Berger Paints - Wood Finish', amount: 62000, paymentMethod: 'credit' },
+  { id: 'ft18', date: '2024-12-12', type: 'revenue', category: 'Electrical', description: 'Wiring & Cables', amount: 48000, paymentMethod: 'cash' },
+  { id: 'ft19', date: '2024-12-13', type: 'revenue', category: 'Plumbing', description: 'Sanitary Ware', amount: 95000, paymentMethod: 'card' },
+  { id: 'ft20', date: '2024-12-14', type: 'revenue', category: 'Tools Sales', description: 'Saw Set & Hammer', amount: 28500, paymentMethod: 'cash' },
+  // December 2024 - Expenses
+  { id: 'ft21', date: '2024-12-01', type: 'expense', category: 'Inventory Purchase', description: 'Paint Stock Replenishment', amount: 125000, paymentMethod: 'bank_transfer' },
+  { id: 'ft22', date: '2024-12-01', type: 'expense', category: 'Utilities', description: 'Electricity Bill - Nov', amount: 18500, paymentMethod: 'cash' },
+  { id: 'ft23', date: '2024-12-02', type: 'expense', category: 'Salaries', description: 'Staff Salaries - December', amount: 250000, paymentMethod: 'bank_transfer' },
+  { id: 'ft24', date: '2024-12-03', type: 'expense', category: 'Transportation', description: 'Delivery Vehicle Fuel', amount: 25000, paymentMethod: 'card' },
+  { id: 'ft25', date: '2024-12-04', type: 'expense', category: 'Inventory Purchase', description: 'Cement Stock from Holcim', amount: 180000, paymentMethod: 'bank_transfer' },
+  { id: 'ft26', date: '2024-12-05', type: 'expense', category: 'Maintenance', description: 'Shop Repairs & Painting', amount: 45000, paymentMethod: 'cash' },
+  { id: 'ft27', date: '2024-12-06', type: 'expense', category: 'Inventory Purchase', description: 'Electrical Goods Stock', amount: 95000, paymentMethod: 'bank_transfer' },
+  { id: 'ft28', date: '2024-12-07', type: 'expense', category: 'Marketing', description: 'Facebook Ads & Banners', amount: 12000, paymentMethod: 'card' },
+  { id: 'ft29', date: '2024-12-08', type: 'expense', category: 'Utilities', description: 'Water & Internet Bills', amount: 8500, paymentMethod: 'cash' },
+  { id: 'ft30', date: '2024-12-09', type: 'expense', category: 'Inventory Purchase', description: 'Plumbing Supplies', amount: 110000, paymentMethod: 'bank_transfer' },
+  { id: 'ft31', date: '2024-12-10', type: 'expense', category: 'Transportation', description: 'Delivery Vehicle Maintenance', amount: 35000, paymentMethod: 'card' },
+  { id: 'ft32', date: '2024-12-11', type: 'expense', category: 'Insurance', description: 'Shop Insurance Premium', amount: 28000, paymentMethod: 'bank_transfer' },
+  { id: 'ft33', date: '2024-12-12', type: 'expense', category: 'Inventory Purchase', description: 'Tools & Hardware Stock', amount: 88000, paymentMethod: 'bank_transfer' },
+  { id: 'ft34', date: '2024-12-13', type: 'expense', category: 'Professional Fees', description: 'Accountant Service Fee', amount: 15000, paymentMethod: 'cash' },
+  { id: 'ft35', date: '2024-12-14', type: 'expense', category: 'Utilities', description: 'Telephone & Mobile Bills', amount: 6500, paymentMethod: 'card' },
+];
+
+export const calculateFinancialSummary = (
+  transactions: FinancialTransaction[],
+  startDate: Date,
+  endDate: Date
+): FinancialSummary => {
+  const filtered = transactions.filter(t => {
+    const tDate = new Date(t.date);
+    return tDate >= startDate && tDate <= endDate;
+  });
+  const revenue = filtered.filter(t => t.type === 'revenue').reduce((sum, t) => sum + t.amount, 0);
+  const expenses = filtered.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  const profit = revenue - expenses;
+  const profitMargin = revenue > 0 ? (profit / revenue) * 100 : 0;
+  return { period: `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`, revenue, expenses, profit, profitMargin };
+};
+
+export const expenseCategories = [
+  { name: 'Inventory Purchase', color: '#3b82f6', icon: '📦' },
+  { name: 'Salaries', color: '#8b5cf6', icon: '👥' },
+  { name: 'Utilities', color: '#f59e0b', icon: '⚡' },
+  { name: 'Transportation', color: '#10b981', icon: '🚚' },
+  { name: 'Maintenance', color: '#ef4444', icon: '🔧' },
+  { name: 'Marketing', color: '#ec4899', icon: '📢' },
+  { name: 'Insurance', color: '#06b6d4', icon: '🛡️' },
+  { name: 'Professional Fees', color: '#6366f1', icon: '💼' }
+];
+export const revenueCategories = [
+  { name: 'Paint Sales', color: '#8b5cf6', icon: '🎨' },
+  { name: 'Cement Sales', color: '#64748b', icon: '🏗️' },
+  { name: 'Tools Sales', color: '#f59e0b', icon: '🔨' },
+  { name: 'Electrical', color: '#f59e0b', icon: '💡' },
+  { name: 'Plumbing', color: '#06b6d4', icon: '🚰' },
+  { name: 'Hardware', color: '#3b82f6', icon: '🔩' },
+  { name: 'Safety Equipment', color: '#10b981', icon: '🦺' }
+];
+// ──────────────────────────────────────────────
+// END FINANCIAL DATA
+// ──────────────────────────────────────────────
 
 // Sri Lankan Hardware Brands
 export const mockBrands: Brand[] = [
@@ -24,1504 +123,450 @@ export const mockBrands: Brand[] = [
   { id: 'brand-020', name: 'Elephant', country: 'Thailand', description: 'Roofing sheets', isActive: true },
 ];
 
-// Product Categories - Comprehensive Sri Lankan Hardware Store Categories
+/**
+ * 30 Flat Hardware Categories — SINGLE SOURCE OF TRUTH
+ */
 export const mockCategories: Category[] = [
-  // ========== MAIN CATEGORIES ==========
-  { id: 'cat-001', name: 'Building Materials', nameAlt: 'ගොඩනැගිලි ද්‍රව්‍ය', icon: 'building', description: 'Cement, sand, blocks, bricks and construction basics' },
-  { id: 'cat-002', name: 'Steel & Metal', nameAlt: 'වානේ සහ ලෝහ', icon: 'steel', description: 'Steel bars, sheets, pipes and metal products' },
-  { id: 'cat-003', name: 'Electrical', nameAlt: 'විදුලි භාණ්ඩ', icon: 'electrical', description: 'Cables, switches, MCBs and electrical fittings' },
-  { id: 'cat-004', name: 'Plumbing', nameAlt: 'නල කටයුතු', icon: 'plumbing', description: 'PVC pipes, fittings, taps and sanitary ware' },
-  { id: 'cat-005', name: 'Tools', nameAlt: 'මෙවලම්', icon: 'tools', description: 'Power tools, hand tools and equipment' },
-  { id: 'cat-006', name: 'Paint & Finishing', nameAlt: 'තීන්ත සහ නිමාව', icon: 'paint', description: 'Interior, exterior paints and finishing materials' },
-  { id: 'cat-007', name: 'Hardware & Fasteners', nameAlt: 'දෘඪාංග සහ බන්ධන', icon: 'hardware', description: 'Nails, screws, bolts, locks and hinges' },
-  { id: 'cat-008', name: 'Wood & Timber', nameAlt: 'දැව සහ ලී', icon: 'wood', description: 'Timber, plywood, MDF and wood products' },
-  { id: 'cat-009', name: 'Roofing & Ceiling', nameAlt: 'වහල සහ සිවිලිම', icon: 'roofing', description: 'Roofing sheets, ceiling materials and accessories' },
-  { id: 'cat-010', name: 'Safety & PPE', nameAlt: 'ආරක්ෂාව සහ PPE', icon: 'safety', description: 'Personal protective equipment and safety gear' },
-  { id: 'cat-011', name: 'Doors & Windows', nameAlt: 'දොරවල් සහ ජනෙල්', icon: 'building', description: 'Doors, windows, frames and accessories' },
-  { id: 'cat-012', name: 'Flooring & Tiles', nameAlt: 'බිම් ඇතිරිලි සහ ටයිල්', icon: 'building', description: 'Floor tiles, wall tiles and flooring materials' },
-  { id: 'cat-013', name: 'Garden & Outdoor', nameAlt: 'උද්‍යාන සහ එළිමහන්', icon: 'building', description: 'Garden tools, outdoor furniture and landscaping' },
-  { id: 'cat-014', name: 'Adhesives & Sealants', nameAlt: 'මැලියම් සහ සීලන්ට්', icon: 'hardware', description: 'Glues, adhesives, silicone and sealants' },
-  { id: 'cat-015', name: 'Lighting', nameAlt: 'ආලෝකකරණය', icon: 'electrical', description: 'Light bulbs, fixtures and lighting solutions' },
-  
-  // ========== BUILDING MATERIALS SUBCATEGORIES ==========
-  { id: 'cat-101', name: 'Cement', nameAlt: 'සිමෙන්ති', parentId: 'cat-001', description: 'OPC, PPC and specialty cements' },
-  { id: 'cat-102', name: 'Sand & Aggregates', nameAlt: 'වැලි සහ කැට', parentId: 'cat-001', description: 'River sand, sea sand, gravel and metal' },
-  { id: 'cat-103', name: 'Blocks & Bricks', nameAlt: 'කොට්ට සහ ගඩොල්', parentId: 'cat-001', description: 'Cement blocks, clay bricks, AAC blocks' },
-  { id: 'cat-104', name: 'Ready Mix Concrete', nameAlt: 'රෙඩි මික්ස් කොන්ක්‍රීට්', parentId: 'cat-001', description: 'Pre-mixed concrete and mortar' },
-  { id: 'cat-105', name: 'Waterproofing', nameAlt: 'ජල ආරක්ෂණ', parentId: 'cat-001', description: 'Waterproofing chemicals and membranes' },
-  
-  // ========== STEEL & METAL SUBCATEGORIES ==========
-  { id: 'cat-201', name: 'Reinforcement Bars', nameAlt: 'යකඩ කූරු', parentId: 'cat-002', description: 'TMT bars, MS bars for construction' },
-  { id: 'cat-202', name: 'Steel Sheets', nameAlt: 'වානේ තහඩු', parentId: 'cat-002', description: 'GI sheets, MS sheets, color coated' },
-  { id: 'cat-203', name: 'Steel Pipes & Tubes', nameAlt: 'වානේ නල', parentId: 'cat-002', description: 'GI pipes, MS pipes, square tubes' },
-  { id: 'cat-204', name: 'Structural Steel', nameAlt: 'ව්‍යුහාත්මක වානේ', parentId: 'cat-002', description: 'Angles, channels, I-beams' },
-  { id: 'cat-205', name: 'Wire & Mesh', nameAlt: 'කම්බි සහ දැල්', parentId: 'cat-002', description: 'Binding wire, welded mesh, chain link' },
-  { id: 'cat-206', name: 'Aluminum Products', nameAlt: 'ඇලුමිනියම් භාණ්ඩ', parentId: 'cat-002', description: 'Aluminum sheets, profiles, sections' },
-  
-  // ========== ELECTRICAL SUBCATEGORIES ==========
-  { id: 'cat-301', name: 'Wires & Cables', nameAlt: 'කම්බි සහ කේබල්', parentId: 'cat-003', description: 'House wiring, armored cables, flexible' },
-  { id: 'cat-302', name: 'Switches & Sockets', nameAlt: 'ස්විච් සහ සොකට්', parentId: 'cat-003', description: 'Modular switches, sockets, plates' },
-  { id: 'cat-303', name: 'MCB & Distribution', nameAlt: 'MCB සහ බෙදාහැරීම', parentId: 'cat-003', description: 'MCBs, DBs, changeover switches' },
-  { id: 'cat-304', name: 'Conduits & Fittings', nameAlt: 'කොන්ඩියුට් සහ සවිකිරීම්', parentId: 'cat-003', description: 'PVC conduits, metal conduits, fittings' },
-  { id: 'cat-305', name: 'Fans & Ventilation', nameAlt: 'විදුලි පංකා', parentId: 'cat-003', description: 'Ceiling fans, exhaust fans, ventilators' },
-  { id: 'cat-306', name: 'Earthing & Lightning', nameAlt: 'අර්ථිං සහ අකුණු', parentId: 'cat-003', description: 'Earth rods, earthing accessories, arrestors' },
-  
-  // ========== PLUMBING SUBCATEGORIES ==========
-  { id: 'cat-401', name: 'PVC Pipes & Fittings', nameAlt: 'PVC නල සහ සවිකිරීම්', parentId: 'cat-004', description: 'PVC pipes, elbows, tees, couplings' },
-  { id: 'cat-402', name: 'CPVC & PPR Pipes', nameAlt: 'CPVC සහ PPR නල', parentId: 'cat-004', description: 'Hot water pipes and fittings' },
-  { id: 'cat-403', name: 'Water Tanks', nameAlt: 'ජල ටැංකි', parentId: 'cat-004', description: 'Plastic tanks, overhead tanks, sumps' },
-  { id: 'cat-404', name: 'Taps & Faucets', nameAlt: 'ටැප් සහ ෆෝසට්', parentId: 'cat-004', description: 'Kitchen taps, bathroom faucets, mixers' },
-  { id: 'cat-405', name: 'Sanitary Ware', nameAlt: 'සනීපාරක්ෂක භාණ්ඩ', parentId: 'cat-004', description: 'Toilets, wash basins, urinals' },
-  { id: 'cat-406', name: 'Bathroom Accessories', nameAlt: 'නාන කාමර උපාංග', parentId: 'cat-004', description: 'Showers, towel rails, soap dishes' },
-  { id: 'cat-407', name: 'Pumps & Motors', nameAlt: 'පොම්ප සහ මෝටර්', parentId: 'cat-004', description: 'Water pumps, submersible, jet pumps' },
-  
-  // ========== TOOLS SUBCATEGORIES ==========
-  { id: 'cat-501', name: 'Power Tools', nameAlt: 'බල මෙවලම්', parentId: 'cat-005', description: 'Drills, grinders, saws, sanders' },
-  { id: 'cat-502', name: 'Hand Tools', nameAlt: 'අත් මෙවලම්', parentId: 'cat-005', description: 'Hammers, pliers, screwdrivers, wrenches' },
-  { id: 'cat-503', name: 'Measuring Tools', nameAlt: 'මැනුම් මෙවලම්', parentId: 'cat-005', description: 'Tape measures, levels, squares' },
-  { id: 'cat-504', name: 'Cutting Tools', nameAlt: 'කැපුම් මෙවලම්', parentId: 'cat-005', description: 'Saw blades, cutting discs, chisels' },
-  { id: 'cat-505', name: 'Welding Equipment', nameAlt: 'වෙල්ඩින් උපකරණ', parentId: 'cat-005', description: 'Welding machines, electrodes, accessories' },
-  { id: 'cat-506', name: 'Ladders & Scaffolding', nameAlt: 'ඉණිමං සහ අඩකඩ', parentId: 'cat-005', description: 'Aluminum ladders, scaffolding, platforms' },
-  
-  // ========== PAINT & FINISHING SUBCATEGORIES ==========
-  { id: 'cat-601', name: 'Interior Paints', nameAlt: 'අභ්‍යන්තර තීන්ත', parentId: 'cat-006', description: 'Emulsion, distemper, wall paints' },
-  { id: 'cat-602', name: 'Exterior Paints', nameAlt: 'බාහිර තීන්ත', parentId: 'cat-006', description: 'Weather shield, textured, exterior emulsion' },
-  { id: 'cat-603', name: 'Wood Finishes', nameAlt: 'ලී නිමාව', parentId: 'cat-006', description: 'Varnish, wood stain, polish, lacquer' },
-  { id: 'cat-604', name: 'Metal Paints', nameAlt: 'ලෝහ තීන්ත', parentId: 'cat-006', description: 'Enamel, anti-rust, primers' },
-  { id: 'cat-605', name: 'Primers & Putty', nameAlt: 'ප්‍රයිමර් සහ පටී', parentId: 'cat-006', description: 'Wall putty, primers, sealers' },
-  { id: 'cat-606', name: 'Paint Accessories', nameAlt: 'තීන්ත උපාංග', parentId: 'cat-006', description: 'Brushes, rollers, trays, thinners' },
-  
-  // ========== HARDWARE & FASTENERS SUBCATEGORIES ==========
-  { id: 'cat-701', name: 'Nails & Screws', nameAlt: 'ඇණ සහ ඉස්කුරුප්පු', parentId: 'cat-007', description: 'Wire nails, wood screws, self-tapping' },
-  { id: 'cat-702', name: 'Bolts & Nuts', nameAlt: 'බෝල්ට් සහ නට්', parentId: 'cat-007', description: 'Hex bolts, carriage bolts, anchor bolts' },
-  { id: 'cat-703', name: 'Locks & Security', nameAlt: 'අගුල් සහ ආරක්ෂාව', parentId: 'cat-007', description: 'Padlocks, door locks, digital locks' },
-  { id: 'cat-704', name: 'Hinges & Door Hardware', nameAlt: 'හින්ජ් සහ දොර දෘඩාංග', parentId: 'cat-007', description: 'Door hinges, handles, closers, stoppers' },
-  { id: 'cat-705', name: 'Brackets & Supports', nameAlt: 'බ්‍රැකට් සහ ආධාරක', parentId: 'cat-007', description: 'Shelf brackets, corner brackets, angles' },
-  { id: 'cat-706', name: 'Chains & Ropes', nameAlt: 'දම් සහ කඹ', parentId: 'cat-007', description: 'Metal chains, nylon ropes, wire ropes' },
-  
-  // ========== WOOD & TIMBER SUBCATEGORIES ==========
-  { id: 'cat-801', name: 'Timber & Lumber', nameAlt: 'ලී සහ දැව', parentId: 'cat-008', description: 'Teak, mahogany, jak, pine timber' },
-  { id: 'cat-802', name: 'Plywood & Boards', nameAlt: 'ප්ලයිවුඩ් සහ පුවරු', parentId: 'cat-008', description: 'Commercial ply, marine ply, MDF, particle board' },
-  { id: 'cat-803', name: 'Doors & Frames', nameAlt: 'දොරවල් සහ රාමු', parentId: 'cat-008', description: 'Wooden doors, door frames, flush doors' },
-  { id: 'cat-804', name: 'Mouldings & Trims', nameAlt: 'මෝල්ඩින් සහ ටිම්', parentId: 'cat-008', description: 'Skirting, architrave, cornices, beadings' },
-  
-  // ========== ROOFING & CEILING SUBCATEGORIES ==========
-  { id: 'cat-901', name: 'Roofing Sheets', nameAlt: 'වහල තහඩු', parentId: 'cat-009', description: 'Asbestos, metal, polycarbonate sheets' },
-  { id: 'cat-902', name: 'Clay & Concrete Tiles', nameAlt: 'මැටි සහ කොන්ක්‍රීට් ටයිල්', parentId: 'cat-009', description: 'Roof tiles, ridge caps' },
-  { id: 'cat-903', name: 'Ceiling Materials', nameAlt: 'සිවිලිම් ද්‍රව්‍ය', parentId: 'cat-009', description: 'Gypsum boards, PVC ceiling, T-grid' },
-  { id: 'cat-904', name: 'Gutters & Downpipes', nameAlt: 'වහල පොළොක් සහ නල', parentId: 'cat-009', description: 'Rain gutters, downpipes, accessories' },
-  { id: 'cat-905', name: 'Insulation', nameAlt: 'පරිවරණය', parentId: 'cat-009', description: 'Thermal insulation, roof insulation' },
-  
-  // ========== SAFETY & PPE SUBCATEGORIES ==========
-  { id: 'cat-1001', name: 'Head Protection', nameAlt: 'හිස ආරක්ෂණය', parentId: 'cat-010', description: 'Safety helmets, hard hats, bump caps' },
-  { id: 'cat-1002', name: 'Eye & Face Protection', nameAlt: 'ඇස් සහ මුහුණ ආරක්ෂණය', parentId: 'cat-010', description: 'Safety glasses, goggles, face shields' },
-  { id: 'cat-1003', name: 'Hand Protection', nameAlt: 'අත් ආරක්ෂණය', parentId: 'cat-010', description: 'Work gloves, rubber gloves, cut resistant' },
-  { id: 'cat-1004', name: 'Foot Protection', nameAlt: 'පා ආරක්ෂණය', parentId: 'cat-010', description: 'Safety boots, gum boots, safety shoes' },
-  { id: 'cat-1005', name: 'High Visibility', nameAlt: 'ඉහළ දෘශ්‍යතාව', parentId: 'cat-010', description: 'Safety vests, reflective jackets' },
-  { id: 'cat-1006', name: 'Respiratory Protection', nameAlt: 'ශ්වසන ආරක්ෂණය', parentId: 'cat-010', description: 'Dust masks, respirators, filters' },
-  
-  // ========== DOORS & WINDOWS SUBCATEGORIES ==========
-  { id: 'cat-1101', name: 'Wooden Doors', nameAlt: 'ලී දොරවල්', parentId: 'cat-011', description: 'Panel doors, flush doors, carved doors' },
-  { id: 'cat-1102', name: 'Aluminum Windows', nameAlt: 'ඇලුමිනියම් ජනෙල්', parentId: 'cat-011', description: 'Sliding windows, casement, louver' },
-  { id: 'cat-1103', name: 'uPVC Doors & Windows', nameAlt: 'uPVC දොරවල් සහ ජනෙල්', parentId: 'cat-011', description: 'uPVC profiles, frames, glass panels' },
-  { id: 'cat-1104', name: 'Glass & Mirrors', nameAlt: 'වීදුරු සහ කණ්ණාඩි', parentId: 'cat-011', description: 'Float glass, tempered, mirrors' },
-  
-  // ========== FLOORING & TILES SUBCATEGORIES ==========
-  { id: 'cat-1201', name: 'Floor Tiles', nameAlt: 'බිම් ටයිල්', parentId: 'cat-012', description: 'Ceramic, porcelain, vitrified tiles' },
-  { id: 'cat-1202', name: 'Wall Tiles', nameAlt: 'බිත්ති ටයිල්', parentId: 'cat-012', description: 'Kitchen tiles, bathroom tiles, decorative' },
-  { id: 'cat-1203', name: 'Granite & Marble', nameAlt: 'ග්‍රැනයිට් සහ මාබල්', parentId: 'cat-012', description: 'Natural stone, granite slabs, marble' },
-  { id: 'cat-1204', name: 'Tile Adhesive & Grout', nameAlt: 'ටයිල් මැලියම් සහ ග්‍රවුට්', parentId: 'cat-012', description: 'Tile adhesive, grout, spacers' },
-  
-  // ========== GARDEN & OUTDOOR SUBCATEGORIES ==========
-  { id: 'cat-1301', name: 'Garden Tools', nameAlt: 'උද්‍යාන මෙවලම්', parentId: 'cat-013', description: 'Spades, rakes, pruners, hoses' },
-  { id: 'cat-1302', name: 'Outdoor Furniture', nameAlt: 'එළිමහන් ගෘහභාණ්ඩ', parentId: 'cat-013', description: 'Garden chairs, benches, tables' },
-  { id: 'cat-1303', name: 'Fencing & Gates', nameAlt: 'වැට සහ ගේට්ටු', parentId: 'cat-013', description: 'Chain link, welded mesh, gates' },
-  { id: 'cat-1304', name: 'Paving & Landscaping', nameAlt: 'පෝදැමීම සහ භූමි අලංකරණය', parentId: 'cat-013', description: 'Paving blocks, garden stones, edging' },
-  
-  // ========== ADHESIVES & SEALANTS SUBCATEGORIES ==========
-  { id: 'cat-1401', name: 'Construction Adhesives', nameAlt: 'ඉදිකිරීම් මැලියම්', parentId: 'cat-014', description: 'Wood glue, PVA, contact cement' },
-  { id: 'cat-1402', name: 'Silicone & Sealants', nameAlt: 'සිලිකෝන් සහ සීලන්ට්', parentId: 'cat-014', description: 'Silicone sealant, acrylic sealant, PU foam' },
-  { id: 'cat-1403', name: 'Tapes', nameAlt: 'ටේප්', parentId: 'cat-014', description: 'Masking tape, duct tape, insulation tape' },
-  
-  // ========== LIGHTING SUBCATEGORIES ==========
-  { id: 'cat-1501', name: 'LED Lights', nameAlt: 'LED ලයිට්', parentId: 'cat-015', description: 'LED bulbs, tubes, panels, strips' },
-  { id: 'cat-1502', name: 'Light Fixtures', nameAlt: 'ආලෝක කට්ටල', parentId: 'cat-015', description: 'Ceiling lights, wall lights, chandeliers' },
-  { id: 'cat-1503', name: 'Outdoor Lighting', nameAlt: 'එළිමහන් ආලෝකකරණය', parentId: 'cat-015', description: 'Garden lights, flood lights, solar lights' },
-  { id: 'cat-1504', name: 'Emergency Lighting', nameAlt: 'හදිසි ආලෝකකරණය', parentId: 'cat-015', description: 'Emergency lights, exit signs, torches' },
+  { id: 'cat-001', name: 'Melwa Box Bar',             nameAlt: 'මෙල්වා බොක්ස් බාර්',             icon: 'steel',     description: 'High-strength box bars for concrete reinforcement',     usageCount: 28 },
+  { id: 'cat-002', name: 'Tokyo Super Cement',         nameAlt: 'ටෝකියෝ සුපර් සිමෙන්ති',        icon: 'building',  description: 'Premium OPC 53-grade cement for heavy construction',   usageCount: 25 },
+  { id: 'cat-003', name: 'Mahaweli Marine Cement',     nameAlt: 'මහවැලි මැරීන් සිමෙන්ති',      icon: 'building',  description: 'Specialized marine and water-resistant cement',        usageCount: 22 },
+  { id: 'cat-004', name: 'Lanwa GI Pipes',             nameAlt: 'ලන්වා GI නල',                   icon: 'steel',     description: 'Galvanized iron pipes for plumbing and structural use', usageCount: 20 },
+  { id: 'cat-005', name: 'Orange Electrical Switches', nameAlt: 'ඔරේන්ජ් විදුලි ස්විච',        icon: 'electrical',description: 'Premium modular switches and sockets',                   usageCount: 18 },
+  { id: 'cat-006', name: 'ACL Cables (Multi-strand)',  nameAlt: 'ACL කේබල් (බහු-වයර්)',        icon: 'electrical',description: 'Multi-strand copper cables for heavy-duty wiring',       usageCount: 17 },
+  { id: 'cat-007', name: 'Kelani Cables (Twin Earth)', nameAlt: 'කැලණි කේබල් (ට්වින් අර්ත්)', icon: 'electrical',description: 'Twin-core earth cables for house wiring',                 usageCount: 16 },
+  { id: 'cat-008', name: 'S-lon PVC Pipes (Type 1000)',nameAlt: 'S-lon PVC නල (වර්ගය 1000)',    icon: 'plumbing',  description: 'High-pressure PVC pipes for water supply',              usageCount: 15 },
+  { id: 'cat-009', name: 'S-lon PVC Fittings',         nameAlt: 'S-lon PVC සවිකිරීම්',          icon: 'plumbing',  description: 'PVC elbows, tees, couplings and adaptors',              usageCount: 14 },
+  { id: 'cat-010', name: 'National PVC Conduit Pipes', nameAlt: 'නැෂනල් PVC කොන්ඩියුට් නල',   icon: 'electrical',description: 'Electrical conduit pipes for cable protection',          usageCount: 14 },
+  { id: 'cat-011', name: 'JAT Sanding Sealer',         nameAlt: 'JAT සැන්ඩින් සීලර්',          icon: 'paint',     description: 'Wood sanding sealer for professional finishing',       usageCount: 13 },
+  { id: 'cat-012', name: 'Dulux WeatherShield Paint',  nameAlt: 'ඩුලක්ස් වෙදර්ශීල්ඩ් තීන්ත', icon: 'paint',     description: 'Weather-resistant exterior paint',                      usageCount: 12 },
+  { id: 'cat-013', name: 'Nippon Paint 3-in-1',        nameAlt: 'නිපොන් තීන්ත 3-in-1',          icon: 'paint',     description: 'Multi-surface paint for metal, wood, and walls',       usageCount: 11 },
+  { id: 'cat-014', name: 'Rhino Asbestos Roofing Sheets',nameAlt: 'රයිනෝ ඇස්බැස්ටෝස් වහල තහඩු',icon: 'roofing',description: 'Corrugated asbestos roofing sheets',                     usageCount: 10 },
+  { id: 'cat-015', name: 'Anton PVC Water Tanks',      nameAlt: 'ඇන්ටන් PVC ජල ටැංකි',         icon: 'plumbing',  description: 'PVC water storage tanks for domestic use',              usageCount: 9 },
+  { id: 'cat-016', name: 'Arpico Water Tanks',         nameAlt: 'ආර්පිකෝ ජල ටැංකි',            icon: 'plumbing',  description: 'Premium polyethylene water tanks',                      usageCount: 9 },
+  { id: 'cat-017', name: 'Stanley Hand Tools',         nameAlt: 'ස්ටැන්ලි අත් මෙවලම්',          icon: 'tools',     description: 'Professional-grade hand tools and accessories',         usageCount: 8 },
+  { id: 'cat-018', name: 'Bosch Power Drills',         nameAlt: 'බොෂ් බල සරඹ',                 icon: 'tools',     description: 'High-performance power drills and drivers',             usageCount: 7 },
+  { id: 'cat-019', name: 'Makita Angle Grinders',      nameAlt: 'මකිටා කෝණ ජාති',              icon: 'tools',     description: 'Industrial angle grinders for cutting and grinding',    usageCount: 7 },
+  { id: 'cat-020', name: 'DSI Safety Boots',           nameAlt: 'DSI ආරක්ෂණ බූට්',             icon: 'safety',    description: 'Steel-toe safety boots for construction workers',      usageCount: 6 },
+  { id: 'cat-021', name: 'Harris Paint Brushes',       nameAlt: 'හැරිස් තීන්ත බුරුසු',          icon: 'paint',     description: 'Professional paint brushes for smooth finish',         usageCount: 6 },
+  { id: 'cat-022', name: 'Union Mortice Door Locks',   nameAlt: 'යුනියන් මෝටිස් දොර අගුල්',   icon: 'hardware',  description: 'High-security mortice locks for wooden doors',          usageCount: 5 },
+  { id: 'cat-023', name: 'Yale Padlocks',              nameAlt: 'යේල් පැඩ්ලොක්',               icon: 'hardware',  description: 'Heavy-duty padlocks for gates and storage',             usageCount: 5 },
+  { id: 'cat-024', name: 'AMW Rubber Hoses',           nameAlt: 'AMW රබර් හෝස්',                icon: 'plumbing',  description: 'Reinforced rubber hoses for industrial use',            usageCount: 4 },
+  { id: 'cat-025', name: 'GI Binding Wire',            nameAlt: 'GI බැඳුම් කම්බි',             icon: 'steel',     description: 'Galvanized binding wire for construction tying',       usageCount: 4 },
+  { id: 'cat-026', name: 'Local River Sand',            nameAlt: 'දේශීය ගංගා වැලි',             icon: 'building',  description: 'Washed river sand for plastering and brickwork',        usageCount: 3 },
+  { id: 'cat-027', name: 'Metal Crushed Stones 3/4"',   nameAlt: 'ලෝහ තලා දැමූ ගල් 3/4"',       icon: 'building',  description: 'Crushed metal stones for concrete mixing',              usageCount: 3 },
+  { id: 'cat-028', name: 'Local Red Bricks',           nameAlt: 'දේශීය රතු ගඩොල්',             icon: 'building',  description: 'Fire-burnt clay bricks for wall construction',          usageCount: 2 },
+  { id: 'cat-029', name: 'Eco-friendly AAC Blocks',    nameAlt: 'පරිසර හිතකාමී AAC කුට්ටි',    icon: 'building',  description: 'Lightweight autoclaved aerated concrete blocks',        usageCount: 2 },
+  { id: 'cat-030', name: 'Stainless Steel Wood Screws',nameAlt: 'මල නොබැඳෙන වානේ ලී ඉස්කුරුප්පු',icon: 'hardware',description: 'Rust-proof stainless steel screws for woodwork',         usageCount: 2 },
 ];
 
-// Suppliers with Cash/Credit payment types and delivery records
+// ── Helpers to get category names list dynamically ──
+export const categoryNames: string[] = mockCategories.map(c => c.name);
+export const categoryNameToId: Record<string, string> = {};
+mockCategories.forEach(c => { categoryNameToId[c.name] = c.id; });
+export const categoryIdToName: Record<string, string> = {};
+mockCategories.forEach(c => { categoryIdToName[c.id] = c.name; });
+
+// ──────────────────────────────────────────────
+// SINGLE MASTER ARRAY: inventoryItems
+// Every item visible in Quick Checkout, Products page, and Category usage
+// MUST be a real record here. ~150 items (5 variants per 30 categories)
+// ──────────────────────────────────────────────
+
+export const inventoryItems: InventoryProduct[] = (() => {
+  const items: InventoryProduct[] = [];
+
+  // Helper to push 5 variants per category
+  function addVariants(catId: string, catName: string, baseSearchKey: string, baseNames: string[], costs: number[], lastPrices: number[], salesPrices: number[], displayPrices: number[], stocks: number[], baseStatus: InventoryProduct['status'] = 'Available') {
+    for (let i = 0; i < 5; i++) {
+      items.push({
+        id: `inv-${catId}-${String(i + 1).padStart(2, '0')}`,
+        searchKey: `${baseSearchKey}-V${i + 1}`,
+        name: baseNames[i] || `${catName} - Variant ${i + 1}`,
+        productCategory: catName,
+        categoryId: catId,
+        cost: costs[i] ?? 100,
+        lastPrice: lastPrices[i] ?? 120,
+        salesPrice: salesPrices[i] ?? 150,
+        displayPrice: displayPrices[i] ?? 160,
+        storeQty: stocks[i] ?? 50,
+        salesType: 'Piece',
+        unitQty: 1,
+        oneUnitPrice: salesPrices[i] ?? 150,
+        status: stocks[i] === 0 ? 'Out of Stock' as const : stocks[i] <= 10 ? 'Low Stock' as const : baseStatus,
+      });
+    }
+  }
+
+  // cat-001: Melwa Box Bar
+  addVariants('cat-001', 'Melwa Box Bar', 'MEL-BB',
+    ['Melwa Box Bar 3/4" x 3/4" (0.9mm)', 'Melwa Box Bar 1" x 1" (1.2mm)', 'Melwa Box Bar 1" x 1" (2.0mm)', 'Melwa Box Bar 2" x 2" (2.0mm)', 'Melwa Box Bar 1.5" x 1.5" (1.6mm)'],
+    [420, 560, 720, 980, 850], [450, 600, 780, 1050, 920], [420, 560, 720, 980, 850], [450, 600, 780, 1050, 920], [200, 180, 150, 120, 100]);
+
+  // cat-002: Tokyo Super Cement
+  addVariants('cat-002', 'Tokyo Super Cement', 'TOK-CEM',
+    ['Tokyo Super Cement 50kg Bag', 'Tokyo Super Cement Bulk 1T', 'Tokyo Super Cement Rapid Hardening', 'Tokyo Super Cement Sulphate Resistant', 'Tokyo Super Cement White'],
+    [1900, 38000, 2200, 2100, 3500], [2000, 40000, 2400, 2300, 3800], [1900, 38000, 2200, 2100, 3500], [2000, 40000, 2400, 2300, 3800], [180, 20, 100, 80, 30]);
+
+  // cat-003: Mahaweli Marine Cement
+  addVariants('cat-003', 'Mahaweli Marine Cement', 'MAH-CEM',
+    ['Mahaweli Marine Cement 50kg', 'Mahaweli Marine Cement Bulk', 'Mahaweli Marine Cement Fast Set', 'Mahaweli Marine Cement Waterproof', 'Mahaweli Marine Cement Grade 53'],
+    [2100, 42000, 2400, 2500, 2300], [2300, 45000, 2600, 2700, 2500], [2100, 42000, 2400, 2500, 2300], [2300, 45000, 2600, 2700, 2500], [120, 15, 80, 60, 90]);
+
+  // cat-004: Lanwa GI Pipes
+  addVariants('cat-004', 'Lanwa GI Pipes', 'LAN-GI',
+    ['Lanwa GI Pipe 1/2" (6m)', 'Lanwa GI Pipe 3/4" (6m)', 'Lanwa GI Pipe 1" (6m)', 'Lanwa GI Pipe 1.5" (6m)', 'Lanwa GI Pipe 2" (6m)'],
+    [650, 750, 850, 1200, 1600], [720, 830, 950, 1350, 1800], [650, 750, 850, 1200, 1600], [720, 830, 950, 1350, 1800], [50, 40, 35, 20, 10]);
+
+  // cat-005: Orange Electrical Switches
+  addVariants('cat-005', 'Orange Electrical Switches', 'ORG-SW',
+    ['Orange 1 Gang Light Switch', 'Orange 2 Gang Light Switch', 'Orange 13A Switched Socket', 'Orange 15A Round Pin Socket', 'Orange Fan Speed Controller'],
+    [185, 250, 320, 480, 650], [200, 270, 350, 520, 700], [185, 250, 320, 480, 650], [200, 270, 350, 520, 700], [500, 350, 300, 150, 100]);
+
+  // cat-006: ACL Cables (Multi-strand)
+  addVariants('cat-006', 'ACL Cables (Multi-strand)', 'ACL-CBL',
+    ['ACL Multi-strand Cable 1.5mm²', 'ACL Multi-strand Cable 2.5mm²', 'ACL Multi-strand Cable 4.0mm²', 'ACL Multi-strand Cable 6.0mm²', 'ACL Multi-strand Cable 10mm²'],
+    [85, 135, 210, 320, 550], [95, 150, 235, 355, 600], [85, 135, 210, 320, 550], [95, 150, 235, 355, 600], [2000, 1500, 800, 400, 200]);
+
+  // cat-007: Kelani Cables (Twin Earth)
+  addVariants('cat-007', 'Kelani Cables (Twin Earth)', 'KEL-TE',
+    ['Kelani Twin Earth Cable 1.0mm²', 'Kelani Twin Earth Cable 1.5mm²', 'Kelani Twin Earth Cable 2.5mm²', 'Kelani Twin Earth Cable 4.0mm²', 'Kelani Twin Earth Cable 6.0mm²'],
+    [65, 85, 135, 210, 320], [72, 95, 150, 235, 355], [65, 85, 135, 210, 320], [72, 95, 150, 235, 355], [500, 600, 400, 300, 200]);
+
+  // cat-008: S-lon PVC Pipes (Type 1000)
+  addVariants('cat-008', 'S-lon PVC Pipes (Type 1000)', 'SLON-PVC',
+    ['S-lon PVC Pipe 20mm (Domestic)', 'S-lon PVC Pipe 32mm (Domestic)', 'S-lon PVC Pipe 40mm (Commercial)', 'S-lon PVC Pipe 50mm (Commercial)', 'S-lon PVC Pipe 110mm (Drainage)'],
+    [280, 480, 620, 850, 1800], [320, 520, 680, 920, 1950], [280, 480, 620, 850, 1800], [320, 520, 680, 920, 1950], [500, 400, 350, 250, 150]);
+
+  // cat-009: S-lon PVC Fittings
+  addVariants('cat-009', 'S-lon PVC Fittings', 'SLON-FIT',
+    ['S-lon PVC Elbow 1"', 'S-lon PVC Tee 1"', 'S-lon PVC Coupling 1"', 'S-lon PVC End Cap 1"', 'S-lon PVC Union 1"'],
+    [45, 65, 35, 25, 120], [55, 80, 45, 35, 140], [45, 65, 35, 25, 120], [55, 80, 45, 35, 140], [600, 400, 500, 700, 200]);
+
+  // cat-010: National PVC Conduit Pipes
+  addVariants('cat-010', 'National PVC Conduit Pipes', 'NAT-CON',
+    ['National PVC Conduit 20mm', 'National PVC Conduit 25mm', 'National PVC Conduit 32mm', 'National PVC Conduit 40mm', 'National PVC Conduit 50mm'],
+    [120, 160, 200, 280, 350], [140, 180, 230, 310, 390], [120, 160, 200, 280, 350], [140, 180, 230, 310, 390], [400, 350, 250, 180, 120]);
+
+  // cat-011: JAT Sanding Sealer
+  addVariants('cat-011', 'JAT Sanding Sealer', 'JAT-SS',
+    ['JAT Sanding Sealer 500ml', 'JAT Sanding Sealer 1L', 'JAT Sanding Sealer 2.5L', 'JAT Sanding Sealer 5L', 'JAT Sanding Sealer 10L'],
+    [450, 850, 1800, 3200, 5800], [500, 920, 1950, 3500, 6200], [450, 850, 1800, 3200, 5800], [500, 920, 1950, 3500, 6200], [80, 120, 60, 40, 20]);
+
+  // cat-012: Dulux WeatherShield Paint
+  addVariants('cat-012', 'Dulux WeatherShield Paint', 'DUL-WS',
+    ['Dulux WeatherShield 1L White', 'Dulux WeatherShield 4L White', 'Dulux WeatherShield 10L White', 'Dulux WeatherShield 1L Cream', 'Dulux WeatherShield 4L Cream'],
+    [1350, 4800, 10500, 1350, 4800], [1500, 5300, 11500, 1500, 5300], [1350, 4800, 10500, 1350, 4800], [1500, 5300, 11500, 1500, 5300], [65, 40, 25, 50, 30]);
+
+  // cat-013: Nippon Paint 3-in-1
+  addVariants('cat-013', 'Nippon Paint 3-in-1', 'NIP-3IN1',
+    ['Nippon Paint 3-in-1 1L White', 'Nippon Paint 3-in-1 4L White', 'Nippon Paint 3-in-1 10L White', 'Nippon Paint 3-in-1 1L Ivory', 'Nippon Paint 3-in-1 4L Ivory'],
+    [1200, 4200, 9500, 1200, 4200], [1350, 4600, 10500, 1350, 4600], [1200, 4200, 9500, 1200, 4200], [1350, 4600, 10500, 1350, 4600], [100, 60, 30, 80, 45]);
+
+  // cat-014: Rhino Asbestos Roofing Sheets
+  addVariants('cat-014', 'Rhino Asbestos Roofing Sheets', 'RHN-RF',
+    ['Rhino Asbestos Sheet 8ft', 'Rhino Asbestos Sheet 10ft', 'Rhino Asbestos Sheet 12ft', 'Rhino Asbestos Sheet 14ft', 'Rhino Asbestos Sheet 16ft'],
+    [850, 1050, 1250, 1450, 1650], [950, 1150, 1380, 1600, 1820], [850, 1050, 1250, 1450, 1650], [950, 1150, 1380, 1600, 1820], [150, 100, 80, 50, 30]);
+
+  // cat-015: Anton PVC Water Tanks
+  addVariants('cat-015', 'Anton PVC Water Tanks', 'ANT-TNK',
+    ['Anton PVC Water Tank 500L', 'Anton PVC Water Tank 750L', 'Anton PVC Water Tank 1000L', 'Anton PVC Water Tank 1500L', 'Anton PVC Water Tank 2000L'],
+    [8500, 11500, 14500, 19500, 24500], [9200, 12500, 15800, 21000, 26500], [8500, 11500, 14500, 19500, 24500], [9200, 12500, 15800, 21000, 26500], [30, 25, 20, 12, 8]);
+
+  // cat-016: Arpico Water Tanks
+  addVariants('cat-016', 'Arpico Water Tanks', 'ARP-TNK',
+    ['Arpico Water Tank 500L', 'Arpico Water Tank 750L', 'Arpico Water Tank 1000L', 'Arpico Water Tank 1500L', 'Arpico Water Tank 2000L'],
+    [9500, 12500, 15500, 21000, 26500], [10200, 13500, 16800, 22500, 28500], [9500, 12500, 15500, 21000, 26500], [10200, 13500, 16800, 22500, 28500], [25, 20, 15, 10, 5]);
+
+  // cat-017: Stanley Hand Tools
+  addVariants('cat-017', 'Stanley Hand Tools', 'STN-TOOL',
+    ['Stanley Hammer 16oz', 'Stanley Screwdriver Set 6pc', 'Stanley Pliers 8"', 'Stanley Wrench 10"', 'Stanley Utility Knife'],
+    [1200, 1800, 1500, 2200, 650], [1350, 2000, 1700, 2450, 750], [1200, 1800, 1500, 2200, 650], [1350, 2000, 1700, 2450, 750], [60, 45, 50, 30, 80]);
+
+  // cat-018: Bosch Power Drills
+  addVariants('cat-018', 'Bosch Power Drills', 'BOS-DRL',
+    ['Bosch GSB 550 Impact Drill', 'Bosch GSB 20-2 Rotary Hammer', 'Bosch GSR 18V Cordless Drill', 'Bosch GBH 2-26 Rotary Hammer', 'Bosch GBM 350 Professional Drill'],
+    [12500, 28500, 18500, 32000, 8500], [13500, 31000, 20000, 35000, 9500], [12500, 28500, 18500, 32000, 8500], [13500, 31000, 20000, 35000, 9500], [15, 8, 22, 5, 30]);
+
+  // cat-019: Makita Angle Grinders
+  addVariants('cat-019', 'Makita Angle Grinders', 'MAK-GRIND',
+    ['Makita 9557HN Angle Grinder 4"', 'Makita GA5030 Angle Grinder 5"', 'Makita GA7020 Angle Grinder 7"', 'Makita DGA452 Cordless Grinder', 'Makita 9565PCV Paddle Switch'],
+    [9500, 12500, 18500, 22000, 14500], [10500, 13800, 20000, 24000, 15800], [9500, 12500, 18500, 22000, 14500], [10500, 13800, 20000, 24000, 15800], [20, 15, 10, 8, 12]);
+
+  // cat-020: DSI Safety Boots
+  addVariants('cat-020', 'DSI Safety Boots', 'DSI-BOOT',
+    ['DSI Safety Boots Size 7', 'DSI Safety Boots Size 8', 'DSI Safety Boots Size 9', 'DSI Safety Boots Size 10', 'DSI Safety Boots Size 11'],
+    [3500, 3500, 3500, 3500, 3500], [3800, 3800, 3800, 3800, 3800], [3500, 3500, 3500, 3500, 3500], [3800, 3800, 3800, 3800, 3800], [40, 60, 80, 50, 30]);
+
+  // cat-021: Harris Paint Brushes
+  addVariants('cat-021', 'Harris Paint Brushes', 'HAR-BRSH',
+    ['Harris Paint Brush 1"', 'Harris Paint Brush 2"', 'Harris Paint Brush 3"', 'Harris Paint Brush 4"', 'Harris Paint Brush Set 5pc'],
+    [180, 280, 380, 480, 1200], [200, 310, 420, 530, 1350], [180, 280, 380, 480, 1200], [200, 310, 420, 530, 1350], [150, 120, 100, 80, 60]);
+
+  // cat-022: Union Mortice Door Locks
+  addVariants('cat-022', 'Union Mortice Door Locks', 'UNI-LOCK',
+    ['Union Mortice Lock 3 Lever', 'Union Mortice Lock 5 Lever', 'Union Mortice Lock Night Latch', 'Union Mortice Lock Bathroom', 'Union Mortice Lock Design Range'],
+    [1800, 2800, 1500, 1200, 4500], [2000, 3100, 1700, 1400, 5000], [1800, 2800, 1500, 1200, 4500], [2000, 3100, 1700, 1400, 5000], [50, 35, 60, 45, 15]);
+
+  // cat-023: Yale Padlocks
+  addVariants('cat-023', 'Yale Padlocks', 'YAL-PAD',
+    ['Yale Padlock 30mm', 'Yale Padlock 40mm', 'Yale Padlock 50mm', 'Yale Padlock 60mm', 'Yale Padlock Combination'],
+    [450, 650, 850, 1200, 1800], [500, 720, 950, 1350, 2000], [450, 650, 850, 1200, 1800], [500, 720, 950, 1350, 2000], [80, 60, 40, 25, 30]);
+
+  // cat-024: AMW Rubber Hoses
+  addVariants('cat-024', 'AMW Rubber Hoses', 'AMW-HOSE',
+    ['AMW Rubber Hose 1/2" Per Meter', 'AMW Rubber Hose 3/4" Per Meter', 'AMW Rubber Hose 1" Per Meter', 'AMW Rubber Hose Reinforced 1/2"', 'AMW Rubber Hose Industrial 1"'],
+    [180, 280, 420, 350, 650], [200, 310, 460, 390, 720], [180, 280, 420, 350, 650], [200, 310, 460, 390, 720], [300, 250, 150, 200, 80]);
+
+  // cat-025: GI Binding Wire
+  addVariants('cat-025', 'GI Binding Wire', 'GI-BND',
+    ['GI Binding Wire 1kg Roll', 'GI Binding Wire 2kg Roll', 'GI Binding Wire 5kg Roll', 'GI Binding Wire 10kg Roll', 'GI Binding Wire 25kg Roll'],
+    [250, 480, 1100, 2100, 4800], [280, 520, 1200, 2300, 5200], [250, 480, 1100, 2100, 4800], [280, 520, 1200, 2300, 5200], [100, 80, 50, 30, 15]);
+
+  // cat-026: Local River Sand
+  addVariants('cat-026', 'Local River Sand', 'SAND-RIV',
+    ['Local River Sand 1/4 Cube', 'Local River Sand 1/2 Cube', 'Local River Sand 1 Cube', 'Local River Sand Washed 1/2 Cube', 'Local River Sand Washed 1 Cube'],
+    [5000, 9500, 18000, 10500, 19500], [5500, 10500, 20000, 11500, 21000], [5000, 9500, 18000, 10500, 19500], [5500, 10500, 20000, 11500, 21000], [30, 20, 15, 10, 8]);
+
+  // cat-027: Metal Crushed Stones 3/4"
+  addVariants('cat-027', 'Metal Crushed Stones 3/4"', 'METAL-34',
+    ['Metal Crushed Stone 1/4 Cube 3/4"', 'Metal Crushed Stone 1/2 Cube 3/4"', 'Metal Crushed Stone 1 Cube 3/4"', 'Metal Crushed Stone 1/2 Cube 1/2"', 'Metal Crushed Stone 1 Cube 1/2"'],
+    [4500, 8500, 16000, 8000, 15000], [5000, 9000, 17500, 8800, 16500], [4500, 8500, 16000, 8000, 15000], [5000, 9000, 17500, 8800, 16500], [25, 15, 10, 18, 12]);
+
+  // cat-028: Local Red Bricks
+  addVariants('cat-028', 'Local Red Bricks', 'BRK-RED',
+    ['Local Red Brick Standard', 'Local Red Brick Wire Cut', 'Local Red Brick Hollow', 'Local Red Brick Pavers', 'Local Red Brick Arch'],
+    [25, 30, 35, 40, 45], [28, 33, 38, 45, 50], [25, 30, 35, 40, 45], [28, 33, 38, 45, 50], [5000, 3000, 2000, 1000, 500]);
+
+  // cat-029: Eco-friendly AAC Blocks
+  addVariants('cat-029', 'Eco-friendly AAC Blocks', 'AAC-BLK',
+    ['AAC Block 4" x 8" x 24"', 'AAC Block 6" x 8" x 24"', 'AAC Block 8" x 8" x 24"', 'AAC Block 4" x 8" x 16"', 'AAC Block Lintel'],
+    [350, 450, 550, 300, 650], [380, 490, 600, 330, 700], [350, 450, 550, 300, 650], [380, 490, 600, 330, 700], [200, 150, 100, 250, 60]);
+
+  // cat-030: Stainless Steel Wood Screws
+  addVariants('cat-030', 'Stainless Steel Wood Screws', 'SS-SCRW',
+    ['SS Wood Screws 1" x 6 Box 100pc', 'SS Wood Screws 1.5" Box 100pc', 'SS Wood Screws 2" Box 100pc', 'SS Wood Screws 2.5" Box 50pc', 'SS Wood Screws 3" Box 50pc'],
+    [450, 550, 650, 500, 600], [500, 600, 720, 560, 670], [450, 550, 650, 500, 600], [500, 600, 720, 560, 670], [80, 60, 50, 40, 30]);
+
+  return items;
+})();
+
+// ── Helpers for category-name-based filtering ──
+export function getItemsByCategory(categoryId: string): InventoryProduct[] {
+  return inventoryItems.filter(item => item.categoryId === categoryId);
+}
+export function getItemsByCategoryName(categoryName: string): InventoryProduct[] {
+  return inventoryItems.filter(item => item.productCategory === categoryName);
+}
+export function searchInventory(query: string): InventoryProduct[] {
+  if (query.trim().length < 2) return [];
+  const q = query.toLowerCase().trim();
+  return inventoryItems.filter(item =>
+    item.searchKey.toLowerCase().includes(q) ||
+    item.name.toLowerCase().includes(q) ||
+    item.productCategory.toLowerCase().includes(q)
+  );
+}
+
+// ── CatalogItem for CategoryGrid / Quick Checkout (derived from inventoryItems) ──
+export interface CatalogItem {
+  id: string;
+  sku: string;
+  name: string;
+  nameSi?: string;
+  unitRate: number;
+  stock: number;
+  unit: string;
+  categoryId: string;
+  barcode?: string;
+}
+
+/** Build catalog from master inventoryItems — ALL items exist in both arrays */
+export const linkedCatalogItems: CatalogItem[] = inventoryItems.map(item => ({
+  id: `cat-${item.id}`,
+  sku: item.searchKey,
+  name: item.name,
+  unitRate: item.salesPrice,
+  stock: item.storeQty,
+  unit: 'piece',
+  categoryId: item.categoryId,
+}));
+
+// ──────────────────────────────────────────────
+// Suppliers (unchanged)
+// ──────────────────────────────────────────────
 export const mockSuppliers: Supplier[] = [
-  {
-    id: 'sup-001',
-    name: 'INSEE Cement (Lanka) Ltd',
-    contactPerson: 'Roshan Fernando',
-    email: 'roshan@insee.lk',
-    phone: '+94 11 234 5678',
-    address: '75, Kumaran Ratnam Road, Colombo 02',
-    paymentType: 'credit',
-    creditLimit: 500000,
-    creditBalance: 125000,
-    creditDueDate: '2025-12-25',
-    lastPaymentDate: '2024-12-01',
-    isActive: true,
-    deliveries: [
-      { id: 'del-001', supplierId: 'sup-001', productId: 'prod-001', productName: 'INSEE Cement 50kg', quantity: 100, unitPrice: 2100, totalAmount: 210000, deliveryDate: '2024-12-15', invoiceNumber: 'INS-2024-1234' },
-      { id: 'del-002', supplierId: 'sup-001', productId: 'prod-001', productName: 'INSEE Cement 50kg', quantity: 50, unitPrice: 2100, totalAmount: 105000, deliveryDate: '2024-12-01', invoiceNumber: 'INS-2024-1198' },
-      { id: 'del-003', supplierId: 'sup-001', productId: 'prod-001', productName: 'INSEE Cement 50kg', quantity: 75, unitPrice: 2050, totalAmount: 153750, deliveryDate: '2024-11-15', invoiceNumber: 'INS-2024-1156' },
-    ],
-  },
-  {
-    id: 'sup-002',
-    name: 'Tokyo Cement Company',
-    contactPerson: 'Chaminda Silva',
-    email: 'chaminda@tokyocement.lk',
-    phone: '+94 11 345 6789',
-    address: '42, Baseline Road, Colombo 09',
-    paymentType: 'cash',
-    isActive: true,
-    deliveries: [
-      { id: 'del-004', supplierId: 'sup-002', productId: 'prod-002', productName: 'Tokyo Super Cement 50kg', quantity: 80, unitPrice: 2050, totalAmount: 164000, deliveryDate: '2024-12-10', invoiceNumber: 'TKY-2024-5567' },
-      { id: 'del-005', supplierId: 'sup-002', productId: 'prod-002', productName: 'Tokyo Super Cement 50kg', quantity: 60, unitPrice: 2050, totalAmount: 123000, deliveryDate: '2024-11-25', invoiceNumber: 'TKY-2024-5534' },
-    ],
-  },
-  {
-    id: 'sup-003',
-    name: 'Lanwa Steel Industries',
-    contactPerson: 'Priyantha Jayawardena',
-    email: 'priyantha@lanwasteel.lk',
-    phone: '+94 11 456 7890',
-    address: '156, Negombo Road, Wattala',
-    paymentType: 'credit',
-    creditLimit: 750000,
-    creditBalance: 280000,
-    creditDueDate: '2025-12-20',
-    lastPaymentDate: '2024-11-28',
-    isActive: true,
-    deliveries: [
-      { id: 'del-006', supplierId: 'sup-003', productId: 'prod-003', productName: 'Lanwa Steel Bar 10mm', quantity: 200, unitPrice: 850, totalAmount: 170000, deliveryDate: '2024-12-12', invoiceNumber: 'LNW-2024-8890' },
-      { id: 'del-007', supplierId: 'sup-003', productId: 'prod-003', productName: 'Lanwa Steel Bar 12mm', quantity: 150, unitPrice: 1100, totalAmount: 165000, deliveryDate: '2024-12-05', invoiceNumber: 'LNW-2024-8875' },
-    ],
-  },
-  {
-    id: 'sup-004',
-    name: 'Kelani Cables PLC',
-    contactPerson: 'Sunil Perera',
-    email: 'sunil@kelanicables.com',
-    phone: '+94 11 567 8901',
-    address: '88, Kelani Valley Road, Colombo 15',
-    paymentType: 'cash',
-    isActive: true,
-    deliveries: [
-      { id: 'del-008', supplierId: 'sup-004', productId: 'prod-005', productName: 'Kelani House Wire 1.5mm', quantity: 50, unitPrice: 4500, totalAmount: 225000, deliveryDate: '2024-12-08', invoiceNumber: 'KEL-2024-3321' },
-    ],
-  },
-  {
-    id: 'sup-005',
-    name: 'National PVC Distributors',
-    contactPerson: 'Mahesh Kumar',
-    email: 'mahesh@nationalpvc.lk',
-    phone: '+94 11 678 9012',
-    address: '234, Galle Road, Moratuwa',
-    paymentType: 'credit',
-    creditLimit: 300000,
-    creditBalance: 95000,
-    creditDueDate: '2025-12-22',
-    lastPaymentDate: '2024-12-05',
-    isActive: true,
-    deliveries: [
-      { id: 'del-009', supplierId: 'sup-005', productId: 'prod-004', productName: 'PVC Pipe 1 inch', quantity: 100, unitPrice: 450, totalAmount: 45000, deliveryDate: '2024-12-14', invoiceNumber: 'NAT-2024-2234' },
-      { id: 'del-010', supplierId: 'sup-005', productId: 'prod-004', productName: 'PVC Pipe 2 inch', quantity: 75, unitPrice: 780, totalAmount: 58500, deliveryDate: '2024-12-07', invoiceNumber: 'NAT-2024-2221' },
-    ],
-  },
-  {
-    id: 'sup-006',
-    name: 'Nippon Paint Lanka',
-    contactPerson: 'Ranjith Dissanayake',
-    email: 'ranjith@nipponpaint.lk',
-    phone: '+94 11 789 0123',
-    address: '56, Pannipitiya Road, Battaramulla',
-    paymentType: 'cash',
-    isActive: true,
-    deliveries: [],
-  },
-  {
-    id: 'sup-007',
-    name: 'Bosch Power Tools Sri Lanka',
-    contactPerson: 'Ashan Gunasekara',
-    email: 'ashan@bosch.lk',
-    phone: '+94 11 890 1234',
-    address: '12, Duplication Road, Colombo 03',
-    paymentType: 'credit',
-    creditLimit: 400000,
-    creditBalance: 0,
-    creditDueDate: undefined,
-    lastPaymentDate: '2024-12-10',
-    isActive: true,
-    deliveries: [],
-  },
+  { id: 'sup-001', name: 'INSEE Cement (Lanka) Ltd', contactPerson: 'Roshan Fernando', email: 'roshan@insee.lk', phone: '+94 11 234 5678', address: '75, Kumaran Ratnam Road, Colombo 02', paymentType: 'credit', creditLimit: 500000, creditBalance: 125000, creditDueDate: '2025-12-25', lastPaymentDate: '2024-12-01', isActive: true, deliveries: [
+    { id: 'del-001', supplierId: 'sup-001', productId: 'prod-001', productName: 'INSEE Cement 50kg', quantity: 100, unitPrice: 2100, totalAmount: 210000, deliveryDate: '2024-12-15', invoiceNumber: 'INS-2024-1234' },
+    { id: 'del-002', supplierId: 'sup-001', productId: 'prod-001', productName: 'INSEE Cement 50kg', quantity: 50, unitPrice: 2100, totalAmount: 105000, deliveryDate: '2024-12-01', invoiceNumber: 'INS-2024-1198' },
+    { id: 'del-003', supplierId: 'sup-001', productId: 'prod-001', productName: 'INSEE Cement 50kg', quantity: 75, unitPrice: 2050, totalAmount: 153750, deliveryDate: '2024-11-15', invoiceNumber: 'INS-2024-1156' },
+  ]},
+  { id: 'sup-002', name: 'Tokyo Cement Company', contactPerson: 'Chaminda Silva', email: 'chaminda@tokyocement.lk', phone: '+94 11 345 6789', address: '42, Baseline Road, Colombo 09', paymentType: 'cash', isActive: true, deliveries: [
+    { id: 'del-004', supplierId: 'sup-002', productId: 'prod-002', productName: 'Tokyo Super Cement 50kg', quantity: 80, unitPrice: 2050, totalAmount: 164000, deliveryDate: '2024-12-10', invoiceNumber: 'TKY-2024-5567' },
+    { id: 'del-005', supplierId: 'sup-002', productId: 'prod-002', productName: 'Tokyo Super Cement 50kg', quantity: 60, unitPrice: 2050, totalAmount: 123000, deliveryDate: '2024-11-25', invoiceNumber: 'TKY-2024-5534' },
+  ]},
+  { id: 'sup-003', name: 'Lanwa Steel Industries', contactPerson: 'Priyantha Jayawardena', email: 'priyantha@lanwasteel.lk', phone: '+94 11 456 7890', address: '156, Negombo Road, Wattala', paymentType: 'credit', creditLimit: 750000, creditBalance: 280000, creditDueDate: '2025-12-20', lastPaymentDate: '2024-11-28', isActive: true, deliveries: [
+    { id: 'del-006', supplierId: 'sup-003', productId: 'prod-003', productName: 'Lanwa Steel Bar 10mm', quantity: 200, unitPrice: 850, totalAmount: 170000, deliveryDate: '2024-12-12', invoiceNumber: 'LNW-2024-8890' },
+    { id: 'del-007', supplierId: 'sup-003', productId: 'prod-003', productName: 'Lanwa Steel Bar 12mm', quantity: 150, unitPrice: 1100, totalAmount: 165000, deliveryDate: '2024-12-05', invoiceNumber: 'LNW-2024-8875' },
+  ]},
+  { id: 'sup-004', name: 'Kelani Cables PLC', contactPerson: 'Sunil Perera', email: 'sunil@kelanicables.com', phone: '+94 11 567 8901', address: '88, Kelani Valley Road, Colombo 15', paymentType: 'cash', isActive: true, deliveries: [
+    { id: 'del-008', supplierId: 'sup-004', productId: 'prod-005', productName: 'Kelani House Wire 1.5mm', quantity: 50, unitPrice: 4500, totalAmount: 225000, deliveryDate: '2024-12-08', invoiceNumber: 'KEL-2024-3321' },
+  ]},
+  { id: 'sup-005', name: 'National PVC Distributors', contactPerson: 'Mahesh Kumar', email: 'mahesh@nationalpvc.lk', phone: '+94 11 678 9012', address: '234, Galle Road, Moratuwa', paymentType: 'credit', creditLimit: 300000, creditBalance: 95000, creditDueDate: '2025-12-22', lastPaymentDate: '2024-12-05', isActive: true, deliveries: [
+    { id: 'del-009', supplierId: 'sup-005', productId: 'prod-004', productName: 'PVC Pipe 1 inch', quantity: 100, unitPrice: 450, totalAmount: 45000, deliveryDate: '2024-12-14', invoiceNumber: 'NAT-2024-2234' },
+    { id: 'del-010', supplierId: 'sup-005', productId: 'prod-004', productName: 'PVC Pipe 2 inch', quantity: 75, unitPrice: 780, totalAmount: 58500, deliveryDate: '2024-12-07', invoiceNumber: 'NAT-2024-2221' },
+  ]},
+  { id: 'sup-006', name: 'Nippon Paint Lanka', contactPerson: 'Ranjith Dissanayake', email: 'ranjith@nipponpaint.lk', phone: '+94 11 789 0123', address: '56, Pannipitiya Road, Battaramulla', paymentType: 'cash', isActive: true, deliveries: [] },
+  { id: 'sup-007', name: 'Bosch Power Tools Sri Lanka', contactPerson: 'Ashan Gunasekara', email: 'ashan@bosch.lk', phone: '+94 11 890 1234', address: '12, Duplication Road, Colombo 03', paymentType: 'credit', creditLimit: 400000, creditBalance: 0, creditDueDate: undefined, lastPaymentDate: '2024-12-10', isActive: true, deliveries: [] },
 ];
 
+// ──────────────────────────────────────────────
+// Customers (unchanged)
+// ──────────────────────────────────────────────
 export const mockCustomers: Customer[] = [
-  {
-    id: 'cust-001',
-    name: 'Nimal Rajapaksha',
-    nameSi: 'නිමල් රාජපක්ෂ',
-    businessName: 'Rajapaksha Builders & Co.',
-    email: 'nimal@rajapakshabuilders.lk',
-    phone: '+94 71 555 1234',
-    phone2: '+94 11 234 5678',
-    nic: '751234567V',
-    address: '45 Temple Road, Colombo 7',
-    photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
-    registrationDate: '2024-02-10',
-    totalSpent: 892500,
-    customerType: 'wholesale',
-    isActive: true,
-    loanBalance: 125000,
-    loanDueDate: '2025-01-15',
-    creditLimit: 500000,
-  },
-  {
-    id: 'cust-002',
-    name: 'Chamari Silva',
-    nameSi: 'චමරි සිල්වා',
-    businessName: 'Silva Home Décor',
-    email: 'chamari@silvahomedecor.lk',
-    phone: '+94 77 888 4567',
-    address: '78 Lake View, Kandy',
-    registrationDate: '2024-03-15',
-    totalSpent: 356000,
-    customerType: 'regular',
-    isActive: true,
-    loanBalance: 0,
-  },
-  {
-    id: 'cust-003',
-    name: 'Dinesh Wickramasinghe',
-    nameSi: 'දිනේශ් වික්‍රමසිංහ',
-    businessName: 'D.W. Electrical Solutions',
-    email: 'dinesh@dwelectrical.lk',
-    phone: '+94 70 222 7890',
-    phone2: '+94 11 567 8901',
-    nic: '821234568V',
-    address: '12 Fort Street, Galle',
-    registrationDate: '2024-04-20',
-    totalSpent: 678000,
-    customerType: 'credit',
-    isActive: true,
-    loanBalance: 85000,
-    loanDueDate: '2024-12-20', // Overdue
-    creditLimit: 200000,
-  },
-  {
-    id: 'cust-004',
-    name: 'Amali Gunasekara',
-    nameSi: 'අමාලි ගුණසේකර',
-    businessName: 'Gunasekara Hardware Mart',
-    email: 'amali@ghmart.lk',
-    phone: '+94 76 333 2468',
-    address: '90 Main Street, Negombo',
-    registrationDate: '2024-05-05',
-    totalSpent: 445000,
-    customerType: 'wholesale',
-    isActive: true,
-    loanBalance: 0,
-    creditLimit: 300000,
-  },
-  {
-    id: 'cust-005',
-    name: 'Kasun Bandara',
-    nameSi: 'කසුන් බණ්ඩාර',
-    businessName: 'Bandara Industrial Supplies',
-    email: 'kasun@bandaraindustrial.lk',
-    phone: '+94 78 444 1357',
-    nic: '901234569V',
-    address: '156 Industrial Zone, Colombo 15',
-    photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop',
-    registrationDate: '2024-06-12',
-    totalSpent: 1250000,
-    customerType: 'wholesale',
-    isActive: true,
-    loanBalance: 250000,
-    loanDueDate: '2025-02-28',
-    creditLimit: 1000000,
-  },
-  {
-    id: 'cust-006',
-    name: 'Sanduni Herath',
-    nameSi: 'සඳුනි හෙරත්',
-    businessName: 'Herath Construction',
-    email: 'sanduni@herathconstruction.lk',
-    phone: '+94 75 666 9876',
-    address: '34 Hill Road, Nuwara Eliya',
-    registrationDate: '2024-07-08',
-    totalSpent: 567000,
-    customerType: 'credit',
-    isActive: true,
-    loanBalance: 45000,
-    loanDueDate: '2024-11-30', // Overdue
-    creditLimit: 150000,
-  },
-  {
-    id: 'cust-007',
-    name: 'Pradeep Fernando',
-    nameSi: 'ප්‍රදීප් ෆර්නාන්දෝ',
-    businessName: 'Fernando & Sons Hardware',
-    email: 'pradeep@fernandohardware.lk',
-    phone: '+94 72 111 2233',
-    phone2: '+94 11 888 9999',
-    nic: '781234570V',
-    address: '22 Galle Road, Moratuwa',
-    photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop',
-    registrationDate: '2024-08-01',
-    totalSpent: 234000,
-    customerType: 'regular',
-    isActive: true,
-    loanBalance: 0,
-  },
-  {
-    id: 'cust-008',
-    name: 'Malika Perera',
-    nameSi: 'මලිකා පෙරේරා',
-    businessName: 'Perera Paints & More',
-    email: 'malika@pererapaints.lk',
-    phone: '+94 77 999 8877',
-    address: '55 Kandy Road, Kadawatha',
-    registrationDate: '2024-01-20',
-    totalSpent: 189000,
-    customerType: 'regular',
-    isActive: false,
-    loanBalance: 12000,
-    loanDueDate: '2024-10-15', // Overdue - inactive customer with debt
-    creditLimit: 50000,
-  },
+  { id: 'cust-001', name: 'Nimal Rajapaksha', nameSi: 'නිමල් රාජපක්ෂ', businessName: 'Rajapaksha Builders & Co.', email: 'nimal@rajapakshabuilders.lk', phone: '+94 71 555 1234', phone2: '+94 11 234 5678', nic: '751234567V', address: '45 Temple Road, Colombo 7', photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop', registrationDate: '2024-02-10', totalSpent: 892500, customerType: 'wholesale', isActive: true, loanBalance: 125000, loanDueDate: '2025-01-15', creditLimit: 500000 },
+  { id: 'cust-002', name: 'Chamari Silva', nameSi: 'චමරි සිල්වා', businessName: 'Silva Home Décor', email: 'chamari@silvahomedecor.lk', phone: '+94 77 888 4567', address: '78 Lake View, Kandy', registrationDate: '2024-03-15', totalSpent: 356000, customerType: 'regular', isActive: true, loanBalance: 0 },
+  { id: 'cust-003', name: 'Dinesh Wickramasinghe', nameSi: 'දිනේශ් වික්‍රමසිංහ', businessName: 'D.W. Electrical Solutions', email: 'dinesh@dwelectrical.lk', phone: '+94 70 222 7890', phone2: '+94 11 567 8901', nic: '821234568V', address: '12 Fort Street, Galle', registrationDate: '2024-04-20', totalSpent: 678000, customerType: 'credit', isActive: true, loanBalance: 85000, loanDueDate: '2024-12-20', creditLimit: 200000 },
+  { id: 'cust-004', name: 'Amali Gunasekara', nameSi: 'අමාලි ගුණසේකර', businessName: 'Gunasekara Hardware Mart', email: 'amali@ghmart.lk', phone: '+94 76 333 2468', address: '90 Main Street, Negombo', registrationDate: '2024-05-05', totalSpent: 445000, customerType: 'wholesale', isActive: true, loanBalance: 0, creditLimit: 300000 },
+  { id: 'cust-005', name: 'Kasun Bandara', nameSi: 'කසුන් බණ්ඩාර', businessName: 'Bandara Industrial Supplies', email: 'kasun@bandaraindustrial.lk', phone: '+94 78 444 1357', nic: '901234569V', address: '156 Industrial Zone, Colombo 15', photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop', registrationDate: '2024-06-12', totalSpent: 1250000, customerType: 'wholesale', isActive: true, loanBalance: 250000, loanDueDate: '2025-02-28', creditLimit: 1000000 },
+  { id: 'cust-006', name: 'Sanduni Herath', nameSi: 'සඳුනි හෙරත්', businessName: 'Herath Construction', email: 'sanduni@herathconstruction.lk', phone: '+94 75 666 9876', address: '34 Hill Road, Nuwara Eliya', registrationDate: '2024-07-08', totalSpent: 567000, customerType: 'credit', isActive: true, loanBalance: 45000, loanDueDate: '2024-11-30', creditLimit: 150000 },
+  { id: 'cust-007', name: 'Pradeep Fernando', nameSi: 'ප්‍රදීප් ෆර්නාන්දෝ', businessName: 'Fernando & Sons Hardware', email: 'pradeep@fernandohardware.lk', phone: '+94 72 111 2233', phone2: '+94 11 888 9999', nic: '781234570V', address: '22 Galle Road, Moratuwa', photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop', registrationDate: '2024-08-01', totalSpent: 234000, customerType: 'regular', isActive: true, loanBalance: 0 },
+  { id: 'cust-008', name: 'Malika Perera', nameSi: 'මලිකා පෙරේරා', businessName: 'Perera Paints & More', email: 'malika@pererapaints.lk', phone: '+94 77 999 8877', address: '55 Kandy Road, Kadawatha', registrationDate: '2024-01-20', totalSpent: 189000, customerType: 'regular', isActive: false, loanBalance: 12000, loanDueDate: '2024-10-15', creditLimit: 50000 },
 ];
 
-// Enhanced Products with Sri Lankan Hardware Focus
+// Enhanced Products with Sri Lankan Hardware Focus (legacy, kept for backward compatibility)
 export const mockProducts: Product[] = [
-  // Building Materials - Cement
-  {
-    id: 'prod-001',
-    name: 'INSEE Sanstha Cement',
-    nameAlt: 'ඉන්සී සංස්ථා සිමෙන්ති',
-    sku: 'CEM-INSEE-50',
-    barcode: '8901234567001',
-    description: 'Premium quality Portland cement for all construction needs. Ideal for structural work, plastering, and general construction.',
-    categoryId: 'cat-001',
-    category: 'building_materials',
-    subcategory: 'cement',
-    brandId: 'brand-001',
-    brand: 'INSEE',
-    costPrice: 1850,
-    wholesalePrice: 1950,
-    retailPrice: 2100,
-    discountedPrice: 1950,
-    stock: 250,
-    minStock: 50,
-    maxStock: 500,
-    unit: 'bag',
-    sizes: ['50kg'],
-    weight: 50,
-    hasVariants: false,
-    manufacturer: 'INSEE Cement',
-    countryOfOrigin: 'Sri Lanka',
-    warranty: 'N/A',
-    specifications: {
-      'Type': 'OPC (Ordinary Portland Cement)',
-      'Grade': '43 Grade',
-      'Weight': '50kg',
-      'Setting Time': '30-600 minutes',
-    },
-    tags: ['cement', 'construction', 'building', 'insee'],
-    isActive: true,
-    isFeatured: true,
-    supplierId: 'sup-001',
-    supplierName: 'INSEE Cement (Lanka) Ltd',
-    createdAt: '2024-01-15',
-    updatedAt: '2024-12-01',
-  },
-  {
-    id: 'prod-002',
-    name: 'Tokyo Super Cement',
-    nameAlt: 'ටෝකියෝ සුපර් සිමෙන්ති',
-    sku: 'CEM-TOKYO-50',
-    barcode: '8901234567002',
-    description: 'High-strength cement for heavy-duty construction. Perfect for foundations and structural columns.',
-    categoryId: 'cat-001',
-    category: 'building_materials',
-    subcategory: 'cement',
-    brandId: 'brand-002',
-    brand: 'Tokyo Cement',
-    costPrice: 1900,
-    wholesalePrice: 2000,
-    retailPrice: 2200,
-    discountedPrice: 1999,
-    stock: 180,
-    minStock: 40,
-    maxStock: 400,
-    unit: 'bag',
-    sizes: ['50kg'],
-    weight: 50,
-    hasVariants: false,
-    manufacturer: 'Tokyo Cement PLC',
-    countryOfOrigin: 'Sri Lanka',
-    specifications: {
-      'Type': 'OPC',
-      'Grade': '53 Grade',
-      'Weight': '50kg',
-    },
-    tags: ['cement', 'construction', 'tokyo', 'premium'],
-    isActive: true,
-    isFeatured: true,
-    supplierId: 'sup-002',
-    supplierName: 'Tokyo Cement Company',
-    createdAt: '2024-01-15',
-    updatedAt: '2024-12-01',
-  },
-  
-  // Steel Products
-  {
-    id: 'prod-003',
-    name: 'Lanwa Steel Bar',
-    nameAlt: 'ලන්වා වානේ කූරු',
-    sku: 'STL-LANWA-10',
-    barcode: '8901234567003',
-    description: 'High tensile strength steel reinforcement bars. TMT bars for concrete reinforcement.',
-    categoryId: 'cat-002',
-    category: 'steel_metal',
-    subcategory: 'reinforcement',
-    brandId: 'brand-004',
-    brand: 'Lanwa',
-    costPrice: 280,
-    wholesalePrice: 310,
-    retailPrice: 350,
-    stock: 500,
-    minStock: 100,
-    maxStock: 1000,
-    unit: 'kg',
-    sizes: ['8mm', '10mm', '12mm', '16mm', '20mm', '25mm'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-003-1', productId: 'prod-003', size: '8mm', sku: 'STL-LANWA-8MM', barcode: '8901234567003001', costPrice: 270, wholesalePrice: 300, retailPrice: 340, discountedPrice: 299, stock: 150, minStock: 30, isActive: true },
-      { id: 'var-003-2', productId: 'prod-003', size: '10mm', sku: 'STL-LANWA-10MM', barcode: '8901234567003002', costPrice: 280, wholesalePrice: 310, retailPrice: 350, discountedPrice: 315, stock: 200, minStock: 40, isActive: true },
-      { id: 'var-003-3', productId: 'prod-003', size: '12mm', sku: 'STL-LANWA-12MM', barcode: '8901234567003003', costPrice: 285, wholesalePrice: 315, retailPrice: 360, discountedPrice: 320, stock: 100, minStock: 30, isActive: true },
-      { id: 'var-003-4', productId: 'prod-003', size: '16mm', sku: 'STL-LANWA-16MM', barcode: '8901234567003004', costPrice: 290, wholesalePrice: 320, retailPrice: 365, discountedPrice: 330, stock: 50, minStock: 20, isActive: true },
-    ],
-    manufacturer: 'Lanwa Steel',
-    countryOfOrigin: 'Sri Lanka',
-    specifications: {
-      'Grade': 'Fe 500D',
-      'Type': 'TMT Bar',
-      'Standard': 'SLS 375',
-    },
-    tags: ['steel', 'reinforcement', 'construction', 'lanwa'],
-    isActive: true,
-    isFeatured: true,
-    supplierId: 'sup-003',
-    supplierName: 'Lanwa Steel Industries',
-    createdAt: '2024-01-20',
-    updatedAt: '2024-12-01',
-  },
-  {
-    id: 'prod-004',
-    name: 'Melwa GI Pipe',
-    nameAlt: 'මෙල්වා GI නල',
-    sku: 'PIPE-MELWA-GI',
-    barcode: '8901234567004',
-    description: 'Galvanized iron pipes for plumbing and construction. Corrosion resistant.',
-    categoryId: 'cat-002',
-    category: 'steel_metal',
-    subcategory: 'pipes',
-    brandId: 'brand-005',
-    brand: 'Melwa',
-    costPrice: 850,
-    wholesalePrice: 950,
-    retailPrice: 1100,
-    stock: 120,
-    minStock: 25,
-    maxStock: 200,
-    unit: 'piece',
-    sizes: ['1/2"', '3/4"', '1"', '1 1/4"', '1 1/2"', '2"'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-004-1', productId: 'prod-004', size: '1/2"', sku: 'PIPE-MELWA-GI-0.5', barcode: '8901234567004001', costPrice: 650, wholesalePrice: 720, retailPrice: 850, discountedPrice: 749, stock: 30, minStock: 10, isActive: true },
-      { id: 'var-004-2', productId: 'prod-004', size: '3/4"', sku: 'PIPE-MELWA-GI-0.75', barcode: '8901234567004002', costPrice: 750, wholesalePrice: 830, retailPrice: 950, discountedPrice: 850, stock: 25, minStock: 10, isActive: true },
-      { id: 'var-004-3', productId: 'prod-004', size: '1"', sku: 'PIPE-MELWA-GI-1', barcode: '8901234567004003', costPrice: 850, wholesalePrice: 950, retailPrice: 1100, discountedPrice: 999, stock: 35, minStock: 10, isActive: true },
-      { id: 'var-004-4', productId: 'prod-004', size: '1 1/2"', sku: 'PIPE-MELWA-GI-1.5', barcode: '8901234567004004', costPrice: 1200, wholesalePrice: 1350, retailPrice: 1550, discountedPrice: 1399, stock: 20, minStock: 5, isActive: true },
-      { id: 'var-004-5', productId: 'prod-004', size: '2"', sku: 'PIPE-MELWA-GI-2', barcode: '8901234567004005', costPrice: 1600, wholesalePrice: 1800, retailPrice: 2100, discountedPrice: 1899, stock: 10, minStock: 5, isActive: true },
-    ],
-    manufacturer: 'Melwa Industries',
-    countryOfOrigin: 'Sri Lanka',
-    specifications: {
-      'Material': 'Galvanized Iron',
-      'Length': '6 meters',
-      'Standard': 'BS 1387',
-    },
-    tags: ['pipe', 'gi', 'plumbing', 'melwa'],
-    isActive: true,
-    supplierId: 'sup-005',
-    supplierName: 'National PVC Distributors',
-    createdAt: '2024-02-01',
-    updatedAt: '2024-12-01',
-  },
-
-  // Electrical Products
-  {
-    id: 'prod-005',
-    name: 'Kelani House Wire',
-    nameAlt: 'කෙළණි ගෘහ කේබල්',
-    sku: 'ELC-KELANI-HW',
-    barcode: '8901234567005',
-    description: 'PVC insulated copper house wiring cable. Safe and durable for domestic electrical installations.',
-    categoryId: 'cat-003',
-    category: 'electrical',
-    subcategory: 'cables',
-    brandId: 'brand-010',
-    brand: 'Kelani Cables',
-    costPrice: 85,
-    wholesalePrice: 95,
-    retailPrice: 110,
-    stock: 2000,
-    minStock: 500,
-    maxStock: 5000,
-    unit: 'meter',
-    sizes: ['1.0mm²', '1.5mm²', '2.5mm²', '4.0mm²', '6.0mm²'],
-    colors: ['Red', 'Black', 'Blue', 'Yellow', 'Green'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-005-1', productId: 'prod-005', size: '1.0mm²', color: 'Red', sku: 'ELC-KELANI-1.0-R', barcode: '8901234567005001', costPrice: 65, wholesalePrice: 72, retailPrice: 85, discountedPrice: 75, stock: 500, minStock: 100, isActive: true },
-      { id: 'var-005-2', productId: 'prod-005', size: '1.5mm²', color: 'Red', sku: 'ELC-KELANI-1.5-R', barcode: '8901234567005002', costPrice: 85, wholesalePrice: 95, retailPrice: 110, discountedPrice: 95, stock: 600, minStock: 150, isActive: true },
-      { id: 'var-005-3', productId: 'prod-005', size: '2.5mm²', color: 'Red', sku: 'ELC-KELANI-2.5-R', barcode: '8901234567005003', costPrice: 135, wholesalePrice: 150, retailPrice: 175, discountedPrice: 155, stock: 400, minStock: 100, isActive: true },
-      { id: 'var-005-4', productId: 'prod-005', size: '4.0mm²', color: 'Red', sku: 'ELC-KELANI-4.0-R', barcode: '8901234567005004', costPrice: 210, wholesalePrice: 235, retailPrice: 275, discountedPrice: 245, stock: 300, minStock: 80, isActive: true },
-      { id: 'var-005-5', productId: 'prod-005', size: '6.0mm²', color: 'Red', sku: 'ELC-KELANI-6.0-R', barcode: '8901234567005005', costPrice: 320, wholesalePrice: 355, retailPrice: 420, discountedPrice: 380, stock: 200, minStock: 50, isActive: true },
-    ],
-    manufacturer: 'Kelani Cables PLC',
-    countryOfOrigin: 'Sri Lanka',
-    specifications: {
-      'Conductor': '99.9% Pure Copper',
-      'Insulation': 'PVC',
-      'Voltage Rating': '450/750V',
-      'Standard': 'SLS 733',
-    },
-    tags: ['cable', 'wire', 'electrical', 'kelani', 'copper'],
-    isActive: true,
-    isFeatured: true,
-    supplierId: 'sup-004',
-    supplierName: 'Kelani Cables PLC',
-    createdAt: '2024-01-25',
-    updatedAt: '2024-12-01',
-  },
-  {
-    id: 'prod-006',
-    name: 'Orange 1-Way Switch',
-    nameAlt: 'ඔරේන්ජ් 1-මාර්ග ස්විචය',
-    sku: 'ELC-ORANGE-SW1',
-    barcode: '8901234567006',
-    description: 'Premium quality electrical switch with sleek design. Fire retardant material.',
-    categoryId: 'cat-003',
-    category: 'electrical',
-    subcategory: 'switches',
-    brandId: 'brand-012',
-    brand: 'Orange Electric',
-    costPrice: 120,
-    wholesalePrice: 145,
-    retailPrice: 185,
-    stock: 350,
-    minStock: 50,
-    maxStock: 500,
-    unit: 'piece',
-    colors: ['White', 'Black', 'Grey'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-006-1', productId: 'prod-006', color: 'White', sku: 'ELC-ORANGE-SW1-W', barcode: '8901234567006001', costPrice: 120, wholesalePrice: 145, retailPrice: 185, discountedPrice: 159, stock: 200, minStock: 30, isActive: true },
-      { id: 'var-006-2', productId: 'prod-006', color: 'Black', sku: 'ELC-ORANGE-SW1-B', barcode: '8901234567006002', costPrice: 130, wholesalePrice: 155, retailPrice: 195, discountedPrice: 169, stock: 100, minStock: 20, isActive: true },
-      { id: 'var-006-3', productId: 'prod-006', color: 'Grey', sku: 'ELC-ORANGE-SW1-G', barcode: '8901234567006003', costPrice: 130, wholesalePrice: 155, retailPrice: 195, discountedPrice: 175, stock: 50, minStock: 15, isActive: true },
-    ],
-    manufacturer: 'Orange Electric',
-    countryOfOrigin: 'Sri Lanka',
-    specifications: {
-      'Rating': '6A/250V',
-      'Material': 'Polycarbonate',
-      'Standard': 'SLS',
-    },
-    tags: ['switch', 'electrical', 'orange', '1-way'],
-    isActive: true,
-    supplierId: 'sup-004',
-    supplierName: 'Kelani Cables PLC',
-    createdAt: '2024-02-10',
-    updatedAt: '2024-12-01',
-  },
-  {
-    id: 'prod-007',
-    name: 'ACL MCB Single Pole',
-    nameAlt: 'ACL MCB තනි ධ්‍රැවය',
-    sku: 'ELC-ACL-MCB-SP',
-    barcode: '8901234567007',
-    description: 'Miniature Circuit Breaker for electrical protection. High breaking capacity.',
-    categoryId: 'cat-003',
-    category: 'electrical',
-    subcategory: 'mcb',
-    brandId: 'brand-011',
-    brand: 'ACL Cables',
-    costPrice: 380,
-    wholesalePrice: 420,
-    retailPrice: 495,
-    stock: 180,
-    minStock: 30,
-    maxStock: 300,
-    unit: 'piece',
-    sizes: ['6A', '10A', '16A', '20A', '25A', '32A', '40A', '63A'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-007-1', productId: 'prod-007', size: '6A', sku: 'ELC-ACL-MCB-6A', barcode: '8901234567007001', costPrice: 350, wholesalePrice: 390, retailPrice: 460, discountedPrice: 420, stock: 25, minStock: 5, isActive: true },
-      { id: 'var-007-2', productId: 'prod-007', size: '16A', sku: 'ELC-ACL-MCB-16A', barcode: '8901234567007002', costPrice: 380, wholesalePrice: 420, retailPrice: 495, discountedPrice: 450, stock: 40, minStock: 10, isActive: true },
-      { id: 'var-007-3', productId: 'prod-007', size: '32A', sku: 'ELC-ACL-MCB-32A', barcode: '8901234567007003', costPrice: 420, wholesalePrice: 465, retailPrice: 550, discountedPrice: 499, stock: 35, minStock: 8, isActive: true },
-      { id: 'var-007-4', productId: 'prod-007', size: '63A', sku: 'ELC-ACL-MCB-63A', barcode: '8901234567007004', costPrice: 580, wholesalePrice: 640, retailPrice: 750, discountedPrice: 680, stock: 20, minStock: 5, isActive: true },
-    ],
-    manufacturer: 'ACL Cables PLC',
-    countryOfOrigin: 'Sri Lanka',
-    specifications: {
-      'Type': 'B Curve',
-      'Poles': 'Single Pole',
-      'Breaking Capacity': '6kA',
-      'Standard': 'IEC 60898',
-    },
-    tags: ['mcb', 'circuit breaker', 'electrical', 'acl', 'protection'],
-    isActive: true,
-    supplierId: 'sup-004',
-    supplierName: 'Kelani Cables PLC',
-    createdAt: '2024-02-15',
-    updatedAt: '2024-12-01',
-  },
-
-  // Plumbing Products
-  {
-    id: 'prod-008',
-    name: 'National PVC Pipe',
-    nameAlt: 'නැෂනල් PVC නල',
-    sku: 'PLB-NATIONAL-PVC',
-    barcode: '8901234567008',
-    description: 'High quality PVC pressure pipes for water supply. UV resistant and durable.',
-    categoryId: 'cat-004',
-    category: 'plumbing',
-    subcategory: 'pipes',
-    brandId: 'brand-009',
-    brand: 'National PVC',
-    costPrice: 450,
-    wholesalePrice: 520,
-    retailPrice: 620,
-    stock: 200,
-    minStock: 40,
-    maxStock: 400,
-    unit: 'piece',
-    sizes: ['1/2"', '3/4"', '1"', '1 1/4"', '1 1/2"', '2"', '3"', '4"'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-008-1', productId: 'prod-008', size: '1/2"', sku: 'PLB-NAT-PVC-0.5', barcode: '8901234567008001', costPrice: 280, wholesalePrice: 320, retailPrice: 380, discountedPrice: 340, stock: 50, minStock: 15, isActive: true },
-      { id: 'var-008-2', productId: 'prod-008', size: '3/4"', sku: 'PLB-NAT-PVC-0.75', barcode: '8901234567008002', costPrice: 350, wholesalePrice: 400, retailPrice: 480, discountedPrice: 430, stock: 45, minStock: 12, isActive: true },
-      { id: 'var-008-3', productId: 'prod-008', size: '1"', sku: 'PLB-NAT-PVC-1', barcode: '8901234567008003', costPrice: 450, wholesalePrice: 520, retailPrice: 620, discountedPrice: 560, stock: 40, minStock: 10, isActive: true },
-      { id: 'var-008-4', productId: 'prod-008', size: '2"', sku: 'PLB-NAT-PVC-2', barcode: '8901234567008004', costPrice: 750, wholesalePrice: 850, retailPrice: 1000, discountedPrice: 899, stock: 35, minStock: 8, isActive: true },
-      { id: 'var-008-5', productId: 'prod-008', size: '4"', sku: 'PLB-NAT-PVC-4', barcode: '8901234567008005', costPrice: 1400, wholesalePrice: 1600, retailPrice: 1900, discountedPrice: 1699, stock: 30, minStock: 5, isActive: true },
-    ],
-    manufacturer: 'National PVC',
-    countryOfOrigin: 'Sri Lanka',
-    specifications: {
-      'Material': 'uPVC',
-      'Class': 'Class D (6 Bar)',
-      'Length': '6 meters',
-      'Standard': 'SLS 147',
-    },
-    tags: ['pvc', 'pipe', 'plumbing', 'national', 'water'],
-    isActive: true,
-    isFeatured: true,
-    supplierId: 'sup-005',
-    supplierName: 'National PVC Distributors',
-    createdAt: '2024-02-20',
-    updatedAt: '2024-12-01',
-  },
-
-  // Paint Products
-  {
-    id: 'prod-009',
-    name: 'Nippon Weatherbond',
-    nameAlt: 'නිපොන් වෙදර්බොන්ඩ්',
-    sku: 'PNT-NIPPON-WB',
-    barcode: '8901234567009',
-    description: 'Premium exterior emulsion paint. Weather resistant with anti-fungal properties.',
-    categoryId: 'cat-006',
-    category: 'paint',
-    subcategory: 'exterior',
-    brandId: 'brand-006',
-    brand: 'Nippon Paint',
-    costPrice: 4200,
-    wholesalePrice: 4600,
-    retailPrice: 5200,
-    stock: 85,
-    minStock: 15,
-    maxStock: 150,
-    unit: 'liter',
-    sizes: ['1L', '4L', '10L', '20L'],
-    colors: ['White', 'Cream', 'Light Blue', 'Light Green', 'Peach'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-009-1', productId: 'prod-009', size: '1L', color: 'White', sku: 'PNT-NIP-WB-1L-W', barcode: '8901234567009001', costPrice: 850, wholesalePrice: 950, retailPrice: 1100, discountedPrice: 999, stock: 20, minStock: 5, isActive: true },
-      { id: 'var-009-2', productId: 'prod-009', size: '4L', color: 'White', sku: 'PNT-NIP-WB-4L-W', barcode: '8901234567009002', costPrice: 2800, wholesalePrice: 3100, retailPrice: 3600, discountedPrice: 3200, stock: 25, minStock: 5, isActive: true },
-      { id: 'var-009-3', productId: 'prod-009', size: '10L', color: 'White', sku: 'PNT-NIP-WB-10L-W', barcode: '8901234567009003', costPrice: 4200, wholesalePrice: 4600, retailPrice: 5200, discountedPrice: 4750, stock: 20, minStock: 3, isActive: true },
-      { id: 'var-009-4', productId: 'prod-009', size: '20L', color: 'White', sku: 'PNT-NIP-WB-20L-W', barcode: '8901234567009004', costPrice: 7800, wholesalePrice: 8500, retailPrice: 9500, discountedPrice: 8699, stock: 20, minStock: 3, isActive: true },
-    ],
-    manufacturer: 'Nippon Paint',
-    countryOfOrigin: 'Japan',
-    warranty: '5 Years',
-    specifications: {
-      'Finish': 'Matt',
-      'Coverage': '10-12 sqm/L',
-      'Drying Time': '2-4 hours',
-      'Recoat Time': '4-6 hours',
-    },
-    tags: ['paint', 'exterior', 'nippon', 'weatherbond', 'emulsion'],
-    isActive: true,
-    isFeatured: true,
-    supplierId: 'sup-006',
-    supplierName: 'Nippon Paint Lanka',
-    createdAt: '2024-03-01',
-    updatedAt: '2024-12-01',
-  },
-  {
-    id: 'prod-010',
-    name: 'Dulux Super Gloss Enamel',
-    nameAlt: 'ඩල්ක්ස් සුපර් ග්ලොස් එනමල්',
-    sku: 'PNT-DULUX-SGE',
-    barcode: '8901234567010',
-    description: 'High gloss enamel paint for wood and metal surfaces. Excellent durability.',
-    categoryId: 'cat-006',
-    category: 'paint',
-    subcategory: 'enamel',
-    brandId: 'brand-007',
-    brand: 'Dulux',
-    costPrice: 2800,
-    wholesalePrice: 3100,
-    retailPrice: 3600,
-    stock: 65,
-    minStock: 12,
-    maxStock: 120,
-    unit: 'liter',
-    sizes: ['500ml', '1L', '4L'],
-    colors: ['White', 'Black', 'Red', 'Blue', 'Green', 'Yellow', 'Brown'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-010-1', productId: 'prod-010', size: '500ml', color: 'White', sku: 'PNT-DUL-SGE-500-W', barcode: '8901234567010001', costPrice: 750, wholesalePrice: 850, retailPrice: 1000, discountedPrice: 899, stock: 15, minStock: 3, isActive: true },
-      { id: 'var-010-2', productId: 'prod-010', size: '1L', color: 'White', sku: 'PNT-DUL-SGE-1L-W', barcode: '8901234567010002', costPrice: 1350, wholesalePrice: 1500, retailPrice: 1750, discountedPrice: 1550, stock: 20, minStock: 5, isActive: true },
-      { id: 'var-010-3', productId: 'prod-010', size: '4L', color: 'White', sku: 'PNT-DUL-SGE-4L-W', barcode: '8901234567010003', costPrice: 4800, wholesalePrice: 5300, retailPrice: 6200, discountedPrice: 5499, stock: 15, minStock: 3, isActive: true },
-    ],
-    manufacturer: 'Dulux (AkzoNobel)',
-    countryOfOrigin: 'Netherlands',
-    specifications: {
-      'Finish': 'High Gloss',
-      'Coverage': '12-14 sqm/L',
-      'Drying Time': '6-8 hours',
-    },
-    tags: ['paint', 'enamel', 'dulux', 'gloss', 'metal'],
-    isActive: true,
-    supplierId: 'sup-006',
-    supplierName: 'Nippon Paint Lanka',
-    createdAt: '2024-03-05',
-    updatedAt: '2024-12-01',
-  },
-
-  // Tools
-  {
-    id: 'prod-011',
-    name: 'Bosch GSB 550 Impact Drill',
-    nameAlt: 'බොෂ් GSB 550 ඉම්පැක්ට් ඩ්‍රිල්',
-    sku: 'TLS-BOSCH-GSB550',
-    barcode: '8901234567011',
-    description: 'Professional impact drill for concrete, wood, and metal. Powerful 550W motor.',
-    categoryId: 'cat-005',
-    category: 'tools',
-    subcategory: 'power_tools',
-    brandId: 'brand-014',
-    brand: 'Bosch',
-    costPrice: 12500,
-    wholesalePrice: 13500,
-    retailPrice: 15500,
-    discountedPrice: 13999,
-    stock: 15,
-    minStock: 3,
-    maxStock: 30,
-    unit: 'piece',
-    hasVariants: false,
-    manufacturer: 'Robert Bosch GmbH',
-    countryOfOrigin: 'Germany',
-    warranty: '1 Year',
-    specifications: {
-      'Power': '550W',
-      'No Load Speed': '0-3000 rpm',
-      'Chuck Size': '13mm',
-      'Drilling Capacity': 'Concrete 13mm, Steel 10mm, Wood 25mm',
-    },
-    tags: ['drill', 'power tool', 'bosch', 'impact', 'professional'],
-    isActive: true,
-    isFeatured: true,
-    supplierId: 'sup-007',
-    supplierName: 'Bosch Power Tools Sri Lanka',
-    createdAt: '2024-03-10',
-    updatedAt: '2024-12-01',
-  },
-  {
-    id: 'prod-012',
-    name: 'Stanley FatMax Tape Measure',
-    nameAlt: 'ස්ටැන්ලි FatMax මීටර් පටිය',
-    sku: 'TLS-STANLEY-TAPE',
-    barcode: '8901234567012',
-    description: 'Professional grade tape measure with blade armor coating. Extra wide blade.',
-    categoryId: 'cat-005',
-    category: 'tools',
-    subcategory: 'measuring',
-    brandId: 'brand-016',
-    brand: 'Stanley',
-    costPrice: 1800,
-    wholesalePrice: 2000,
-    retailPrice: 2400,
-    stock: 45,
-    minStock: 10,
-    maxStock: 80,
-    unit: 'piece',
-    sizes: ['5m', '8m', '10m'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-012-1', productId: 'prod-012', size: '5m', sku: 'TLS-STAN-TAPE-5M', barcode: '8901234567012001', costPrice: 1500, wholesalePrice: 1700, retailPrice: 2000, discountedPrice: 1799, stock: 20, minStock: 5, isActive: true },
-      { id: 'var-012-2', productId: 'prod-012', size: '8m', sku: 'TLS-STAN-TAPE-8M', barcode: '8901234567012002', costPrice: 1800, wholesalePrice: 2000, retailPrice: 2400, discountedPrice: 2150, stock: 15, minStock: 3, isActive: true },
-      { id: 'var-012-3', productId: 'prod-012', size: '10m', sku: 'TLS-STAN-TAPE-10M', barcode: '8901234567012003', costPrice: 2200, wholesalePrice: 2450, retailPrice: 2900, discountedPrice: 2599, stock: 10, minStock: 3, isActive: true },
-    ],
-    manufacturer: 'Stanley Black & Decker',
-    countryOfOrigin: 'USA',
-    warranty: '2 Years',
-    specifications: {
-      'Blade Width': '32mm',
-      'Coating': 'Blade Armor',
-      'Hook': 'True Zero Hook',
-    },
-    tags: ['tape', 'measuring', 'stanley', 'fatmax', 'hand tool'],
-    isActive: true,
-    supplierId: 'sup-007',
-    supplierName: 'Bosch Power Tools Sri Lanka',
-    createdAt: '2024-03-15',
-    updatedAt: '2024-12-01',
-  },
-
-  // Hardware - Nails, Screws, etc.
-  {
-    id: 'prod-013',
-    name: 'Wire Nails (Common Nails)',
-    nameAlt: 'වයර් ඇණ',
-    sku: 'HW-NAILS-WIRE',
-    barcode: '8901234567013',
-    description: 'General purpose wire nails for construction and carpentry work.',
-    categoryId: 'cat-007',
-    category: 'hardware',
-    subcategory: 'nails',
-    costPrice: 180,
-    wholesalePrice: 210,
-    retailPrice: 260,
-    stock: 500,
-    minStock: 100,
-    maxStock: 1000,
-    unit: 'kg',
-    sizes: ['1"', '1.5"', '2"', '2.5"', '3"', '4"'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-013-1', productId: 'prod-013', size: '1"', sku: 'HW-NAILS-1IN', barcode: '8901234567013001', costPrice: 200, wholesalePrice: 230, retailPrice: 280, discountedPrice: 249, stock: 80, minStock: 20, isActive: true },
-      { id: 'var-013-2', productId: 'prod-013', size: '2"', sku: 'HW-NAILS-2IN', barcode: '8901234567013002', costPrice: 190, wholesalePrice: 220, retailPrice: 270, discountedPrice: 240, stock: 120, minStock: 25, isActive: true },
-      { id: 'var-013-3', productId: 'prod-013', size: '3"', sku: 'HW-NAILS-3IN', barcode: '8901234567013003', costPrice: 180, wholesalePrice: 210, retailPrice: 260, discountedPrice: 230, stock: 150, minStock: 30, isActive: true },
-      { id: 'var-013-4', productId: 'prod-013', size: '4"', sku: 'HW-NAILS-4IN', barcode: '8901234567013004', costPrice: 175, wholesalePrice: 205, retailPrice: 255, discountedPrice: 225, stock: 100, minStock: 20, isActive: true },
-    ],
-    countryOfOrigin: 'Sri Lanka',
-    specifications: {
-      'Material': 'Mild Steel',
-      'Finish': 'Bright',
-    },
-    tags: ['nails', 'wire nails', 'hardware', 'construction'],
-    isActive: true,
-    supplierId: 'sup-003',
-    supplierName: 'Lanwa Steel Industries',
-    createdAt: '2024-03-20',
-    updatedAt: '2024-12-01',
-  },
-  {
-    id: 'prod-014',
-    name: 'Wood Screws (Phillips Head)',
-    nameAlt: 'ලී ඉස්කුරුප්පු',
-    sku: 'HW-SCREW-WOOD',
-    barcode: '8901234567014',
-    description: 'Phillips head wood screws with sharp threads for easy driving.',
-    categoryId: 'cat-007',
-    category: 'hardware',
-    subcategory: 'screws',
-    costPrice: 350,
-    wholesalePrice: 400,
-    retailPrice: 480,
-    stock: 300,
-    minStock: 50,
-    maxStock: 600,
-    unit: 'box',
-    sizes: ['1" x 6', '1.5" x 8', '2" x 8', '2" x 10', '3" x 10'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-014-1', productId: 'prod-014', size: '1" x 6', sku: 'HW-SCREW-1X6', barcode: '8901234567014001', costPrice: 280, wholesalePrice: 320, retailPrice: 380, discountedPrice: 340, stock: 60, minStock: 10, isActive: true },
-      { id: 'var-014-2', productId: 'prod-014', size: '1.5" x 8', sku: 'HW-SCREW-1.5X8', barcode: '8901234567014002', costPrice: 320, wholesalePrice: 365, retailPrice: 430, discountedPrice: 385, stock: 80, minStock: 15, isActive: true },
-      { id: 'var-014-3', productId: 'prod-014', size: '2" x 8', sku: 'HW-SCREW-2X8', barcode: '8901234567014003', costPrice: 350, wholesalePrice: 400, retailPrice: 480, discountedPrice: 430, stock: 90, minStock: 15, isActive: true },
-      { id: 'var-014-4', productId: 'prod-014', size: '3" x 10', sku: 'HW-SCREW-3X10', barcode: '8901234567014004', costPrice: 450, wholesalePrice: 510, retailPrice: 600, discountedPrice: 540, stock: 70, minStock: 10, isActive: true },
-    ],
-    specifications: {
-      'Head Type': 'Phillips',
-      'Material': 'Zinc Plated Steel',
-      'Quantity': '100 pcs/box',
-    },
-    tags: ['screws', 'wood screws', 'hardware', 'phillips'],
-    isActive: true,
-    supplierId: 'sup-003',
-    supplierName: 'Lanwa Steel Industries',
-    createdAt: '2024-03-25',
-    updatedAt: '2024-12-01',
-  },
-
-  // Roofing
-  {
-    id: 'prod-015',
-    name: 'Amano Roofing Sheet',
-    nameAlt: 'අමානෝ වහල පත්‍ර',
-    sku: 'ROOF-AMANO-SHEET',
-    barcode: '8901234567015',
-    description: 'Color coated galvanized steel roofing sheets. 0.47mm thickness.',
-    categoryId: 'cat-009',
-    category: 'other',
-    subcategory: 'roofing',
-    brandId: 'brand-019',
-    brand: 'Amano',
-    costPrice: 850,
-    wholesalePrice: 950,
-    retailPrice: 1100,
-    stock: 150,
-    minStock: 30,
-    maxStock: 300,
-    unit: 'sheet',
-    sizes: ['8ft', '10ft', '12ft', '14ft', '16ft'],
-    colors: ['Tile Red', 'Dark Green', 'Blue', 'Grey'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-015-1', productId: 'prod-015', size: '8ft', color: 'Tile Red', sku: 'ROOF-AMA-8-RED', barcode: '8901234567015001', costPrice: 650, wholesalePrice: 720, retailPrice: 850, discountedPrice: 770, stock: 40, minStock: 10, isActive: true },
-      { id: 'var-015-2', productId: 'prod-015', size: '10ft', color: 'Tile Red', sku: 'ROOF-AMA-10-RED', barcode: '8901234567015002', costPrice: 850, wholesalePrice: 950, retailPrice: 1100, discountedPrice: 999, stock: 50, minStock: 12, isActive: true },
-      { id: 'var-015-3', productId: 'prod-015', size: '12ft', color: 'Tile Red', sku: 'ROOF-AMA-12-RED', barcode: '8901234567015003', costPrice: 1050, wholesalePrice: 1150, retailPrice: 1350, discountedPrice: 1220, stock: 35, minStock: 8, isActive: true },
-      { id: 'var-015-4', productId: 'prod-015', size: '10ft', color: 'Dark Green', sku: 'ROOF-AMA-10-GRN', barcode: '8901234567015004', costPrice: 850, wholesalePrice: 950, retailPrice: 1100, discountedPrice: 999, stock: 25, minStock: 5, isActive: true },
-    ],
-    manufacturer: 'Amano Roofing',
-    countryOfOrigin: 'Sri Lanka',
-    warranty: '10 Years',
-    specifications: {
-      'Thickness': '0.47mm (0.40mm base metal)',
-      'Width': '1050mm effective',
-      'Coating': 'Color Coated Galvalume',
-    },
-    tags: ['roofing', 'sheet', 'amano', 'galvanized', 'color coated'],
-    isActive: true,
-    isFeatured: true,
-    supplierId: 'sup-003',
-    supplierName: 'Lanwa Steel Industries',
-    createdAt: '2024-04-01',
-    updatedAt: '2024-12-01',
-  },
-
-  // Safety Equipment
-  {
-    id: 'prod-016',
-    name: 'Safety Helmet (Hard Hat)',
-    nameAlt: 'ආරක්ෂක හිස්වැසුම',
-    sku: 'SAF-HELMET-STD',
-    barcode: '8901234567016',
-    description: 'Industrial safety helmet with adjustable headband. HDPE shell.',
-    supplierId: 'sup-007',
-    supplierName: 'Bosch Power Tools Lanka',
-    categoryId: 'cat-010',
-    category: 'safety',
-    subcategory: 'head_protection',
-    costPrice: 450,
-    wholesalePrice: 520,
-    retailPrice: 650,
-    stock: 80,
-    minStock: 15,
-    maxStock: 150,
-    unit: 'piece',
-    colors: ['White', 'Yellow', 'Blue', 'Red', 'Orange'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-016-1', productId: 'prod-016', color: 'White', sku: 'SAF-HELMET-WHT', barcode: '8901234567016001', costPrice: 450, wholesalePrice: 520, retailPrice: 650, discountedPrice: 580, stock: 25, minStock: 5, isActive: true },
-      { id: 'var-016-2', productId: 'prod-016', color: 'Yellow', sku: 'SAF-HELMET-YLW', barcode: '8901234567016002', costPrice: 450, wholesalePrice: 520, retailPrice: 650, discountedPrice: 580, stock: 30, minStock: 5, isActive: true },
-      { id: 'var-016-3', productId: 'prod-016', color: 'Blue', sku: 'SAF-HELMET-BLU', barcode: '8901234567016003', costPrice: 450, wholesalePrice: 520, retailPrice: 650, discountedPrice: 580, stock: 15, minStock: 3, isActive: true },
-      { id: 'var-016-4', productId: 'prod-016', color: 'Red', sku: 'SAF-HELMET-RED', barcode: '8901234567016004', costPrice: 450, wholesalePrice: 520, retailPrice: 650, discountedPrice: 580, stock: 10, minStock: 3, isActive: true },
-    ],
-    specifications: {
-      'Material': 'HDPE',
-      'Standard': 'EN 397',
-      'Adjustment': 'Ratchet type',
-    },
-    tags: ['safety', 'helmet', 'hard hat', 'construction', 'ppe'],
-    isActive: true,
-    createdAt: '2024-04-05',
-    updatedAt: '2024-12-01',
-  },
-
-  // Aggregates - Sand & Stones
-  {
-    id: 'prod-017',
-    name: 'River Sand (Suduwella)',
-    nameAlt: 'ගඟේ වැලි (සුදු වැලි)',
-    sku: 'AGG-SAND-RIVER',
-    barcode: '8901234567017',
-    description: 'Washed river sand suitable for plastering and concrete work.',
-    supplierId: 'sup-001',
-    supplierName: 'INSEE Cement (Lanka) Ltd',
-    categoryId: 'cat-001',
-    category: 'building_materials',
-    subcategory: 'sand_aggregates',
-    costPrice: 18000,
-    wholesalePrice: 20000,
-    retailPrice: 22000,
-    stock: 50,
-    minStock: 5,
-    maxStock: 100,
-    unit: 'cube',
-    sizes: ['0.5 Cube', '1 Cube'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-017-1', productId: 'prod-017', size: '0.5 Cube', sku: 'AGG-SAND-RIV-0.5', barcode: '8901234567017001', costPrice: 9500, wholesalePrice: 10500, retailPrice: 11500, discountedPrice: 10499, stock: 20, minStock: 2, isActive: true },
-      { id: 'var-017-2', productId: 'prod-017', size: '1 Cube', sku: 'AGG-SAND-RIV-1', barcode: '8901234567017002', costPrice: 18000, wholesalePrice: 20000, retailPrice: 22000, discountedPrice: 19999, stock: 30, minStock: 3, isActive: true },
-    ],
-    countryOfOrigin: 'Sri Lanka',
-    tags: ['sand', 'river sand', 'construction', 'plastering'],
-    isActive: true,
-    createdAt: '2024-04-10',
-    updatedAt: '2024-12-01',
-  },
-  {
-    id: 'prod-018',
-    name: '3/4" Metal (Crushed Stone)',
-    nameAlt: '3/4 කළු ගල්',
-    sku: 'AGG-METAL-0.75',
-    barcode: '8901234567018',
-    description: '3/4 inch crushed stone for concrete mixtures and construction.',
-    supplierId: 'sup-001',
-    supplierName: 'INSEE Cement (Lanka) Ltd',
-    categoryId: 'cat-001',
-    category: 'building_materials',
-    subcategory: 'sand_aggregates',
-    costPrice: 16000,
-    wholesalePrice: 17500,
-    retailPrice: 19000,
-    stock: 40,
-    minStock: 5,
-    maxStock: 80,
-    unit: 'cube',
-    sizes: ['0.5 Cube', '1 Cube'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-018-1', productId: 'prod-018', size: '0.5 Cube', sku: 'AGG-MET-0.75-0.5', barcode: '8901234567018001', costPrice: 8500, wholesalePrice: 9000, retailPrice: 10000, discountedPrice: 8999, stock: 15, minStock: 2, isActive: true },
-      { id: 'var-018-2', productId: 'prod-018', size: '1 Cube', sku: 'AGG-MET-0.75-1', barcode: '8901234567018002', costPrice: 16000, wholesalePrice: 17500, retailPrice: 19000, discountedPrice: 17499, stock: 25, minStock: 3, isActive: true },
-    ],
-    countryOfOrigin: 'Sri Lanka',
-    tags: ['metal', 'stone', 'concrete', 'construction'],
-    isActive: true,
-    createdAt: '2024-04-12',
-    updatedAt: '2024-12-01',
-  },
-
-  // Bricks & Blocks
-  {
-    id: 'prod-019',
-    name: 'Red Clay Bricks',
-    nameAlt: 'රතු ගඩොල්',
-    sku: 'BLK-BRICK-RED',
-    barcode: '8901234567019',
-    description: 'Standard size red clay bricks for wall construction.',
-    supplierId: 'sup-002',
-    supplierName: 'Tokyo Super Cement (Pvt) Ltd',
-    categoryId: 'cat-001',
-    category: 'building_materials',
-    subcategory: 'blocks_bricks',
-    costPrice: 25,
-    wholesalePrice: 28,
-    retailPrice: 35,
-    discountedPrice: 30,
-    stock: 5000,
-    minStock: 1000,
-    maxStock: 10000,
-    unit: 'piece',
-    hasVariants: false,
-    countryOfOrigin: 'Sri Lanka',
-    specifications: {
-      'Size': 'Standard',
-      'Material': 'Clay',
-    },
-    tags: ['brick', 'red brick', 'wall', 'construction'],
-    isActive: true,
-    createdAt: '2024-04-15',
-    updatedAt: '2024-12-01',
-  },
-  {
-    id: 'prod-020',
-    name: 'Cement Blocks',
-    nameAlt: 'සිමෙන්ති ගල් (බ්ලොක් ගල්)',
-    sku: 'BLK-CEMENT-STD',
-    barcode: '8901234567020',
-    description: 'Hollow cement blocks for faster wall construction.',
-    supplierId: 'sup-002',
-    supplierName: 'Tokyo Super Cement (Pvt) Ltd',
-    categoryId: 'cat-001',
-    category: 'building_materials',
-    subcategory: 'blocks_bricks',
-    costPrice: 65,
-    wholesalePrice: 75,
-    retailPrice: 90,
-    stock: 2000,
-    minStock: 500,
-    maxStock: 5000,
-    unit: 'piece',
-    sizes: ['4 inch', '6 inch'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-020-1', productId: 'prod-020', size: '4 inch', sku: 'BLK-CEM-4IN', barcode: '8901234567020001', costPrice: 65, wholesalePrice: 75, retailPrice: 90, discountedPrice: 80, stock: 1200, minStock: 300, isActive: true },
-      { id: 'var-020-2', productId: 'prod-020', size: '6 inch', sku: 'BLK-CEM-6IN', barcode: '8901234567020002', costPrice: 85, wholesalePrice: 95, retailPrice: 115, discountedPrice: 100, stock: 800, minStock: 200, isActive: true },
-    ],
-    countryOfOrigin: 'Sri Lanka',
-    tags: ['block', 'cement block', 'wall', 'construction'],
-    isActive: true,
-    createdAt: '2024-04-18',
-    updatedAt: '2024-12-01',
-  },
-
-  // Fasteners - Bolts & Nuts
-  {
-    id: 'prod-021',
-    name: 'Hex Bolt & Nut Set',
-    nameAlt: 'හෙක්ස් බෝල්ට් සහ නට්',
-    sku: 'HW-BOLT-HEX',
-    barcode: '8901234567021',
-    description: 'High tensile hex head bolts with matching nuts. Zinc plated.',
-    supplierId: 'sup-007',
-    supplierName: 'Bosch Power Tools Lanka',
-    categoryId: 'cat-007',
-    category: 'hardware',
-    subcategory: 'bolts_nuts',
-    costPrice: 45,
-    wholesalePrice: 55,
-    retailPrice: 75,
-    stock: 1000,
-    minStock: 200,
-    maxStock: 2000,
-    unit: 'piece',
-    sizes: ['1/4" x 1"', '1/4" x 2"', '3/8" x 2"', '1/2" x 3"'],
-    hasVariants: true,
-    variants: [
-      { id: 'var-021-1', productId: 'prod-021', size: '1/4" x 1"', sku: 'HW-BOLT-0.25X1', barcode: '8901234567021001', costPrice: 25, wholesalePrice: 30, retailPrice: 45, stock: 300, minStock: 50, isActive: true },
-      { id: 'var-021-2', productId: 'prod-021', size: '1/4" x 2"', sku: 'HW-BOLT-0.25X2', barcode: '8901234567021002', costPrice: 35, wholesalePrice: 40, retailPrice: 55, stock: 250, minStock: 50, isActive: true },
-      { id: 'var-021-3', productId: 'prod-021', size: '3/8" x 2"', sku: 'HW-BOLT-0.375X2', barcode: '8901234567021003', costPrice: 55, wholesalePrice: 65, retailPrice: 85, stock: 200, minStock: 40, isActive: true },
-      { id: 'var-021-4', productId: 'prod-021', size: '1/2" x 3"', sku: 'HW-BOLT-0.5X3', barcode: '8901234567021004', costPrice: 85, wholesalePrice: 100, retailPrice: 130, stock: 150, minStock: 30, isActive: true },
-    ],
-    specifications: {
-      'Material': 'High Tensile Steel',
-      'Grade': '8.8',
-      'Finish': 'Zinc Plated',
-    },
-    tags: ['bolt', 'nut', 'hex', 'fastener', 'hardware'],
-    isActive: true,
-    createdAt: '2024-04-20',
-    updatedAt: '2024-12-01',
-  },
+  { id: 'prod-001', name: 'INSEE Sanstha Cement', nameAlt: 'ඉන්සී සංස්ථා සිමෙන්ති', sku: 'CEM-INSEE-50', barcode: '8901234567001', description: 'Premium quality Portland cement for all construction needs.', categoryId: 'cat-001', category: 'building_materials', subcategory: 'cement', brandId: 'brand-001', brand: 'INSEE', costPrice: 1850, wholesalePrice: 1950, retailPrice: 2100, discountedPrice: 1950, stock: 250, minStock: 50, maxStock: 500, unit: 'bag', sizes: ['50kg'], hasVariants: false, manufacturer: 'INSEE Cement', countryOfOrigin: 'Sri Lanka', supplierId: 'sup-001', supplierName: 'INSEE Cement (Lanka) Ltd', isActive: true, isFeatured: true, createdAt: '2024-01-15', updatedAt: '2024-12-01' },
+  { id: 'prod-002', name: 'Tokyo Super Cement', nameAlt: 'ටෝකියෝ සුපර් සිමෙන්ති', sku: 'CEM-TOKYO-50', barcode: '8901234567002', description: 'High-strength cement for heavy-duty construction.', categoryId: 'cat-001', category: 'building_materials', subcategory: 'cement', brandId: 'brand-002', brand: 'Tokyo Cement', costPrice: 1900, wholesalePrice: 2000, retailPrice: 2200, discountedPrice: 1999, stock: 180, minStock: 40, maxStock: 400, unit: 'bag', sizes: ['50kg'], hasVariants: false, manufacturer: 'Tokyo Cement PLC', countryOfOrigin: 'Sri Lanka', supplierId: 'sup-002', supplierName: 'Tokyo Cement Company', isActive: true, isFeatured: true, createdAt: '2024-01-15', updatedAt: '2024-12-01' },
+  { id: 'prod-003', name: 'Lanwa Steel Bar', nameAlt: 'ලන්වා වානේ කූරු', sku: 'STL-LANWA-10', barcode: '8901234567003', description: 'High tensile strength steel reinforcement bars.', categoryId: 'cat-002', category: 'steel_metal', subcategory: 'reinforcement', brandId: 'brand-004', brand: 'Lanwa', costPrice: 280, wholesalePrice: 310, retailPrice: 350, stock: 500, minStock: 100, maxStock: 1000, unit: 'kg', sizes: ['8mm', '10mm', '12mm', '16mm', '20mm', '25mm'], hasVariants: true, variants: [
+    { id: 'var-003-1', productId: 'prod-003', size: '8mm', sku: 'STL-LANWA-8MM', barcode: '8901234567003001', costPrice: 270, wholesalePrice: 300, retailPrice: 340, discountedPrice: 299, stock: 150, minStock: 30, isActive: true },
+    { id: 'var-003-2', productId: 'prod-003', size: '10mm', sku: 'STL-LANWA-10MM', barcode: '8901234567003002', costPrice: 280, wholesalePrice: 310, retailPrice: 350, discountedPrice: 315, stock: 200, minStock: 40, isActive: true },
+    { id: 'var-003-3', productId: 'prod-003', size: '12mm', sku: 'STL-LANWA-12MM', barcode: '8901234567003003', costPrice: 285, wholesalePrice: 315, retailPrice: 360, discountedPrice: 320, stock: 100, minStock: 30, isActive: true },
+    { id: 'var-003-4', productId: 'prod-003', size: '16mm', sku: 'STL-LANWA-16MM', barcode: '8901234567003004', costPrice: 290, wholesalePrice: 320, retailPrice: 365, discountedPrice: 330, stock: 50, minStock: 20, isActive: true },
+  ], manufacturer: 'Lanwa Steel', countryOfOrigin: 'Sri Lanka', supplierId: 'sup-003', supplierName: 'Lanwa Steel Industries', isActive: true, isFeatured: true, createdAt: '2024-01-20', updatedAt: '2024-12-01' },
+  { id: 'prod-004', name: 'Melwa GI Pipe', nameAlt: 'මෙල්වා GI නල', sku: 'PIPE-MELWA-GI', barcode: '8901234567004', description: 'Galvanized iron pipes for plumbing and construction.', categoryId: 'cat-002', category: 'steel_metal', subcategory: 'pipes', brandId: 'brand-005', brand: 'Melwa', costPrice: 850, wholesalePrice: 950, retailPrice: 1100, stock: 120, minStock: 25, maxStock: 200, unit: 'piece', sizes: ['1/2"', '3/4"', '1"', '1 1/4"', '1 1/2"', '2"'], hasVariants: true, variants: [
+    { id: 'var-004-1', productId: 'prod-004', size: '1/2"', sku: 'PIPE-MELWA-GI-0.5', barcode: '8901234567004001', costPrice: 650, wholesalePrice: 720, retailPrice: 850, discountedPrice: 749, stock: 30, minStock: 10, isActive: true },
+    { id: 'var-004-2', productId: 'prod-004', size: '3/4"', sku: 'PIPE-MELWA-GI-0.75', barcode: '8901234567004002', costPrice: 750, wholesalePrice: 830, retailPrice: 950, discountedPrice: 850, stock: 25, minStock: 10, isActive: true },
+    { id: 'var-004-3', productId: 'prod-004', size: '1"', sku: 'PIPE-MELWA-GI-1', barcode: '8901234567004003', costPrice: 850, wholesalePrice: 950, retailPrice: 1100, discountedPrice: 999, stock: 35, minStock: 10, isActive: true },
+    { id: 'var-004-4', productId: 'prod-004', size: '1 1/2"', sku: 'PIPE-MELWA-GI-1.5', barcode: '8901234567004004', costPrice: 1200, wholesalePrice: 1350, retailPrice: 1550, discountedPrice: 1399, stock: 20, minStock: 5, isActive: true },
+    { id: 'var-004-5', productId: 'prod-004', size: '2"', sku: 'PIPE-MELWA-GI-2', barcode: '8901234567004005', costPrice: 1600, wholesalePrice: 1800, retailPrice: 2100, discountedPrice: 1899, stock: 10, minStock: 5, isActive: true },
+  ], manufacturer: 'Melwa Industries', countryOfOrigin: 'Sri Lanka', supplierId: 'sup-005', supplierName: 'National PVC Distributors', isActive: true, createdAt: '2024-02-01', updatedAt: '2024-12-01' },
+  { id: 'prod-005', name: 'Kelani House Wire', nameAlt: 'කෙළණි ගෘහ කේබල්', sku: 'ELC-KELANI-HW', barcode: '8901234567005', description: 'PVC insulated copper house wiring cable.', categoryId: 'cat-003', category: 'electrical', subcategory: 'cables', brandId: 'brand-010', brand: 'Kelani Cables', costPrice: 85, wholesalePrice: 95, retailPrice: 110, stock: 2000, minStock: 500, maxStock: 5000, unit: 'meter', sizes: ['1.0mm²', '1.5mm²', '2.5mm²', '4.0mm²', '6.0mm²'], colors: ['Red', 'Black', 'Blue', 'Yellow', 'Green'], hasVariants: true, variants: [
+    { id: 'var-005-1', productId: 'prod-005', size: '1.0mm²', color: 'Red', sku: 'ELC-KELANI-1.0-R', barcode: '8901234567005001', costPrice: 65, wholesalePrice: 72, retailPrice: 85, discountedPrice: 75, stock: 500, minStock: 100, isActive: true },
+    { id: 'var-005-2', productId: 'prod-005', size: '1.5mm²', color: 'Red', sku: 'ELC-KELANI-1.5-R', barcode: '8901234567005002', costPrice: 85, wholesalePrice: 95, retailPrice: 110, discountedPrice: 95, stock: 600, minStock: 150, isActive: true },
+    { id: 'var-005-3', productId: 'prod-005', size: '2.5mm²', color: 'Red', sku: 'ELC-KELANI-2.5-R', barcode: '8901234567005003', costPrice: 135, wholesalePrice: 150, retailPrice: 175, discountedPrice: 155, stock: 400, minStock: 100, isActive: true },
+    { id: 'var-005-4', productId: 'prod-005', size: '4.0mm²', color: 'Red', sku: 'ELC-KELANI-4.0-R', barcode: '8901234567005004', costPrice: 210, wholesalePrice: 235, retailPrice: 275, discountedPrice: 245, stock: 300, minStock: 80, isActive: true },
+    { id: 'var-005-5', productId: 'prod-005', size: '6.0mm²', color: 'Red', sku: 'ELC-KELANI-6.0-R', barcode: '8901234567005005', costPrice: 320, wholesalePrice: 355, retailPrice: 420, discountedPrice: 380, stock: 200, minStock: 50, isActive: true },
+  ], manufacturer: 'Kelani Cables PLC', countryOfOrigin: 'Sri Lanka', supplierId: 'sup-004', supplierName: 'Kelani Cables PLC', isActive: true, isFeatured: true, createdAt: '2024-01-25', updatedAt: '2024-12-01' },
+  { id: 'prod-006', name: 'Orange 1-Way Switch', nameAlt: 'ඔරේන්ජ් 1-මාර්ග ස්විචය', sku: 'ELC-ORANGE-SW1', barcode: '8901234567006', description: 'Premium quality electrical switch.', categoryId: 'cat-003', category: 'electrical', subcategory: 'switches', brandId: 'brand-012', brand: 'Orange Electric', costPrice: 120, wholesalePrice: 145, retailPrice: 185, stock: 350, minStock: 50, maxStock: 500, unit: 'piece', colors: ['White', 'Black', 'Grey'], hasVariants: true, variants: [
+    { id: 'var-006-1', productId: 'prod-006', color: 'White', sku: 'ELC-ORANGE-SW1-W', barcode: '8901234567006001', costPrice: 120, wholesalePrice: 145, retailPrice: 185, discountedPrice: 159, stock: 200, minStock: 30, isActive: true },
+    { id: 'var-006-2', productId: 'prod-006', color: 'Black', sku: 'ELC-ORANGE-SW1-B', barcode: '8901234567006002', costPrice: 130, wholesalePrice: 155, retailPrice: 195, discountedPrice: 169, stock: 100, minStock: 20, isActive: true },
+    { id: 'var-006-3', productId: 'prod-006', color: 'Grey', sku: 'ELC-ORANGE-SW1-G', barcode: '8901234567006003', costPrice: 130, wholesalePrice: 155, retailPrice: 195, discountedPrice: 175, stock: 50, minStock: 15, isActive: true },
+  ], manufacturer: 'Orange Electric', countryOfOrigin: 'Sri Lanka', supplierId: 'sup-004', supplierName: 'Kelani Cables PLC', isActive: true, createdAt: '2024-02-10', updatedAt: '2024-12-01' },
+  { id: 'prod-007', name: 'ACL MCB Single Pole', nameAlt: 'ACL MCB තනි ධ්‍රැවය', sku: 'ELC-ACL-MCB-SP', barcode: '8901234567007', description: 'Miniature Circuit Breaker.', categoryId: 'cat-003', category: 'electrical', subcategory: 'mcb', brandId: 'brand-011', brand: 'ACL Cables', costPrice: 380, wholesalePrice: 420, retailPrice: 495, stock: 180, minStock: 30, maxStock: 300, unit: 'piece', sizes: ['6A', '10A', '16A', '20A', '25A', '32A', '40A', '63A'], hasVariants: true, variants: [
+    { id: 'var-007-1', productId: 'prod-007', size: '6A', sku: 'ELC-ACL-MCB-6A', barcode: '8901234567007001', costPrice: 350, wholesalePrice: 390, retailPrice: 460, discountedPrice: 420, stock: 25, minStock: 5, isActive: true },
+    { id: 'var-007-2', productId: 'prod-007', size: '16A', sku: 'ELC-ACL-MCB-16A', barcode: '8901234567007002', costPrice: 380, wholesalePrice: 420, retailPrice: 495, discountedPrice: 450, stock: 40, minStock: 10, isActive: true },
+    { id: 'var-007-3', productId: 'prod-007', size: '32A', sku: 'ELC-ACL-MCB-32A', barcode: '8901234567007003', costPrice: 420, wholesalePrice: 465, retailPrice: 550, discountedPrice: 499, stock: 35, minStock: 8, isActive: true },
+    { id: 'var-007-4', productId: 'prod-007', size: '63A', sku: 'ELC-ACL-MCB-63A', barcode: '8901234567007004', costPrice: 580, wholesalePrice: 640, retailPrice: 750, discountedPrice: 680, stock: 20, minStock: 5, isActive: true },
+  ], manufacturer: 'ACL Cables PLC', countryOfOrigin: 'Sri Lanka', supplierId: 'sup-004', supplierName: 'Kelani Cables PLC', isActive: true, createdAt: '2024-02-15', updatedAt: '2024-12-01' },
+  { id: 'prod-008', name: 'National PVC Pipe', nameAlt: 'නැෂනල් PVC නල', sku: 'PLB-NATIONAL-PVC', barcode: '8901234567008', description: 'High quality PVC pressure pipes.', categoryId: 'cat-004', category: 'plumbing', subcategory: 'pipes', brandId: 'brand-009', brand: 'National PVC', costPrice: 450, wholesalePrice: 520, retailPrice: 620, stock: 200, minStock: 40, maxStock: 400, unit: 'piece', sizes: ['1/2"', '3/4"', '1"', '1 1/4"', '1 1/2"', '2"', '3"', '4"'], hasVariants: true, variants: [
+    { id: 'var-008-1', productId: 'prod-008', size: '1/2"', sku: 'PLB-NAT-PVC-0.5', barcode: '8901234567008001', costPrice: 280, wholesalePrice: 320, retailPrice: 380, discountedPrice: 340, stock: 50, minStock: 15, isActive: true },
+    { id: 'var-008-2', productId: 'prod-008', size: '3/4"', sku: 'PLB-NAT-PVC-0.75', barcode: '8901234567008002', costPrice: 350, wholesalePrice: 400, retailPrice: 480, discountedPrice: 430, stock: 45, minStock: 12, isActive: true },
+  ], manufacturer: 'National PVC', countryOfOrigin: 'Sri Lanka', supplierId: 'sup-005', supplierName: 'National PVC Distributors', isActive: true, isFeatured: true, createdAt: '2024-02-20', updatedAt: '2024-12-01' },
+  { id: 'prod-009', name: 'Nippon Weatherbond', nameAlt: 'නිපොන් වෙදර්බොන්ඩ්', sku: 'PNT-NIPPON-WB', barcode: '8901234567009', description: 'Premium exterior emulsion paint.', categoryId: 'cat-006', category: 'paint', subcategory: 'exterior', brandId: 'brand-006', brand: 'Nippon Paint', costPrice: 4200, wholesalePrice: 4600, retailPrice: 5200, stock: 85, minStock: 15, maxStock: 150, unit: 'liter', sizes: ['1L', '4L', '10L', '20L'], colors: ['White', 'Cream', 'Light Blue', 'Light Green', 'Peach'], hasVariants: true, variants: [
+    { id: 'var-009-1', productId: 'prod-009', size: '1L', color: 'White', sku: 'PNT-NIP-WB-1L-W', barcode: '8901234567009001', costPrice: 850, wholesalePrice: 950, retailPrice: 1100, discountedPrice: 999, stock: 20, minStock: 5, isActive: true },
+    { id: 'var-009-2', productId: 'prod-009', size: '4L', color: 'White', sku: 'PNT-NIP-WB-4L-W', barcode: '8901234567009002', costPrice: 2800, wholesalePrice: 3100, retailPrice: 3600, discountedPrice: 3200, stock: 25, minStock: 5, isActive: true },
+  ], manufacturer: 'Nippon Paint', countryOfOrigin: 'Japan', supplierId: 'sup-006', supplierName: 'Nippon Paint Lanka', isActive: true, isFeatured: true, createdAt: '2024-03-01', updatedAt: '2024-12-01' },
+  { id: 'prod-010', name: 'Dulux Super Gloss Enamel', nameAlt: 'ඩල්ක්ස් සුපර් ග්ලොස් එනමල්', sku: 'PNT-DULUX-SGE', barcode: '8901234567010', description: 'High gloss enamel paint.', categoryId: 'cat-006', category: 'paint', subcategory: 'enamel', brandId: 'brand-007', brand: 'Dulux', costPrice: 2800, wholesalePrice: 3100, retailPrice: 3600, stock: 65, minStock: 12, maxStock: 120, unit: 'liter', sizes: ['500ml', '1L', '4L'], colors: ['White', 'Black', 'Red', 'Blue', 'Green', 'Yellow', 'Brown'], hasVariants: true, variants: [
+    { id: 'var-010-1', productId: 'prod-010', size: '500ml', color: 'White', sku: 'PNT-DUL-SGE-500-W', barcode: '8901234567010001', costPrice: 750, wholesalePrice: 850, retailPrice: 1000, discountedPrice: 899, stock: 15, minStock: 3, isActive: true },
+    { id: 'var-010-2', productId: 'prod-010', size: '1L', color: 'White', sku: 'PNT-DUL-SGE-1L-W', barcode: '8901234567010002', costPrice: 1350, wholesalePrice: 1500, retailPrice: 1750, discountedPrice: 1550, stock: 20, minStock: 5, isActive: true },
+  ], manufacturer: 'Dulux (AkzoNobel)', countryOfOrigin: 'Netherlands', supplierId: 'sup-006', supplierName: 'Nippon Paint Lanka', isActive: true, createdAt: '2024-03-05', updatedAt: '2024-12-01' },
+  { id: 'prod-011', name: 'Bosch GSB 550 Impact Drill', nameAlt: 'බොෂ් GSB 550 ඉම්පැක්ට් ඩ්‍රිල්', sku: 'TLS-BOSCH-GSB550', barcode: '8901234567011', description: 'Professional impact drill.', categoryId: 'cat-005', category: 'tools', subcategory: 'power_tools', brandId: 'brand-014', brand: 'Bosch', costPrice: 12500, wholesalePrice: 13500, retailPrice: 15500, discountedPrice: 13999, stock: 15, minStock: 3, maxStock: 30, unit: 'piece', hasVariants: false, manufacturer: 'Robert Bosch GmbH', countryOfOrigin: 'Germany', warranty: '1 Year', supplierId: 'sup-007', supplierName: 'Bosch Power Tools Sri Lanka', isActive: true, isFeatured: true, createdAt: '2024-03-10', updatedAt: '2024-12-01' },
+  { id: 'prod-012', name: 'Stanley FatMax Tape Measure', nameAlt: 'ස්ටැන්ලි FatMax මීටර් පටිය', sku: 'TLS-STANLEY-TAPE', barcode: '8901234567012', description: 'Professional grade tape measure.', categoryId: 'cat-005', category: 'tools', subcategory: 'measuring', brandId: 'brand-016', brand: 'Stanley', costPrice: 1800, wholesalePrice: 2000, retailPrice: 2400, stock: 45, minStock: 10, maxStock: 80, unit: 'piece', sizes: ['5m', '8m', '10m'], hasVariants: true, variants: [
+    { id: 'var-012-1', productId: 'prod-012', size: '5m', sku: 'TLS-STAN-TAPE-5M', barcode: '8901234567012001', costPrice: 1500, wholesalePrice: 1700, retailPrice: 2000, discountedPrice: 1799, stock: 20, minStock: 5, isActive: true },
+    { id: 'var-012-2', productId: 'prod-012', size: '8m', sku: 'TLS-STAN-TAPE-8M', barcode: '8901234567012002', costPrice: 1800, wholesalePrice: 2000, retailPrice: 2400, discountedPrice: 2150, stock: 15, minStock: 3, isActive: true },
+  ], manufacturer: 'Stanley Black & Decker', countryOfOrigin: 'USA', warranty: '2 Years', supplierId: 'sup-007', supplierName: 'Bosch Power Tools Sri Lanka', isActive: true, createdAt: '2024-03-15', updatedAt: '2024-12-01' },
+  { id: 'prod-013', name: 'Wire Nails (Common Nails)', nameAlt: 'වයර් ඇණ', sku: 'HW-NAILS-WIRE', barcode: '8901234567013', description: 'General purpose wire nails.', categoryId: 'cat-007', category: 'hardware', subcategory: 'nails', costPrice: 180, wholesalePrice: 210, retailPrice: 260, stock: 500, minStock: 100, maxStock: 1000, unit: 'kg', sizes: ['1"', '1.5"', '2"', '2.5"', '3"', '4"'], hasVariants: true, variants: [
+    { id: 'var-013-1', productId: 'prod-013', size: '1"', sku: 'HW-NAILS-1IN', barcode: '8901234567013001', costPrice: 200, wholesalePrice: 230, retailPrice: 280, discountedPrice: 249, stock: 80, minStock: 20, isActive: true },
+    { id: 'var-013-2', productId: 'prod-013', size: '2"', sku: 'HW-NAILS-2IN', barcode: '8901234567013002', costPrice: 190, wholesalePrice: 220, retailPrice: 270, discountedPrice: 240, stock: 120, minStock: 25, isActive: true },
+  ], countryOfOrigin: 'Sri Lanka', supplierId: 'sup-003', supplierName: 'Lanwa Steel Industries', isActive: true, createdAt: '2024-03-20', updatedAt: '2024-12-01' },
+  { id: 'prod-021', name: 'Hex Bolt & Nut Set', nameAlt: 'හෙක්ස් බෝල්ට් සහ නට්', sku: 'HW-BOLT-HEX', barcode: '8901234567021', description: 'High tensile hex head bolts with matching nuts.', categoryId: 'cat-007', category: 'hardware', subcategory: 'bolts_nuts', costPrice: 45, wholesalePrice: 55, retailPrice: 75, stock: 1000, minStock: 200, maxStock: 2000, unit: 'piece', sizes: ['1/4" x 1"', '1/4" x 2"', '3/8" x 2"', '1/2" x 3"'], hasVariants: true, variants: [
+    { id: 'var-021-1', productId: 'prod-021', size: '1/4" x 1"', sku: 'HW-BOLT-0.25X1', barcode: '8901234567021001', costPrice: 25, wholesalePrice: 30, retailPrice: 45, stock: 300, minStock: 50, isActive: true },
+  ], supplierId: 'sup-007', supplierName: 'Bosch Power Tools Lanka', isActive: true, createdAt: '2024-04-20', updatedAt: '2024-12-01' },
 ];
 
-// Invoices with enhanced items
+// Invoices (unchanged)
 export const mockInvoices: Invoice[] = [
-  {
-    id: 'inv-001',
-    invoiceNumber: 'INV-2024-0156',
-    customerId: 'cust-001',
-    customerName: 'Rajapaksha Builders & Co.',
-    items: [
-      { id: 'item-001', productId: 'prod-001', productName: 'INSEE Sanstha Cement', productNameSi: 'ඉන්සී සංස්ථා සිමෙන්ති', quantity: 50, unitPrice: 2100, total: 105000 },
-      { id: 'item-002', productId: 'prod-003', productName: 'Lanwa Steel Bar 10mm', productNameSi: 'ලන්වා වානේ කූරු', variantId: 'var-003-2', size: '10mm', quantity: 200, unitPrice: 350, total: 70000 },
-      { id: 'item-003', productId: 'prod-008', productName: 'National PVC Pipe 1"', productNameSi: 'නැෂනල් PVC නල', variantId: 'var-008-3', size: '1"', quantity: 20, unitPrice: 620, total: 12400 },
-    ],
-    subtotal: 187400,
-    tax: 9370,
-    total: 196770,
-    issueDate: '2024-12-01',
-    dueDate: '2024-12-15',
-    status: 'paid',
-    paymentMethod: 'bank_transfer',
-    notes: 'Bulk order for Gampaha housing project',
-  },
-  {
-    id: 'inv-002',
-    invoiceNumber: 'INV-2024-0157',
-    customerId: 'cust-003',
-    customerName: 'D.W. Electrical Solutions',
-    items: [
-      { id: 'item-004', productId: 'prod-005', productName: 'Kelani House Wire 2.5mm² Red', productNameSi: 'කෙළණි ගෘහ කේබල්', variantId: 'var-005-3', size: '2.5mm²', quantity: 500, unitPrice: 175, total: 87500 },
-      { id: 'item-005', productId: 'prod-007', productName: 'ACL MCB 32A', productNameSi: 'ACL MCB තනි ධ්‍රැවය', variantId: 'var-007-3', size: '32A', quantity: 20, unitPrice: 550, total: 11000 },
-      { id: 'item-006', productId: 'prod-006', productName: 'Orange 1-Way Switch White', productNameSi: 'ඔරේන්ජ් 1-මාර්ග ස්විචය', variantId: 'var-006-1', quantity: 50, unitPrice: 185, total: 9250 },
-    ],
-    subtotal: 107750,
-    tax: 5388,
-    total: 113138,
-    issueDate: '2024-12-05',
-    dueDate: '2024-12-20',
-    status: 'pending',
-    paymentMethod: 'credit',
-    notes: 'Electrical supplies for Galle apartment complex',
-  },
-  {
-    id: 'inv-003',
-    invoiceNumber: 'INV-2024-0158',
-    customerId: 'cust-005',
-    customerName: 'Bandara Industrial Supplies',
-    items: [
-      { id: 'item-007', productId: 'prod-002', productName: 'Tokyo Super Cement', productNameSi: 'ටෝකියෝ සුපර් සිමෙන්ති', quantity: 100, unitPrice: 2200, total: 220000 },
-      { id: 'item-008', productId: 'prod-003', productName: 'Lanwa Steel Bar 16mm', productNameSi: 'ලන්වා වානේ කූරු', variantId: 'var-003-4', size: '16mm', quantity: 500, unitPrice: 365, total: 182500 },
-      { id: 'item-009', productId: 'prod-015', productName: 'Amano Roofing Sheet 12ft Red', productNameSi: 'අමානෝ වහල පත්‍ර', variantId: 'var-015-3', size: '12ft', quantity: 50, unitPrice: 1350, total: 67500 },
-    ],
-    subtotal: 470000,
-    tax: 23500,
-    total: 493500,
-    issueDate: '2024-11-28',
-    dueDate: '2024-12-12',
-    status: 'overdue',
-    paymentMethod: 'credit',
-    notes: 'Large construction project supplies',
-  },
-  {
-    id: 'inv-004',
-    invoiceNumber: 'INV-2024-0159',
-    customerId: 'cust-002',
-    customerName: 'Silva Home Décor',
-    items: [
-      { id: 'item-010', productId: 'prod-009', productName: 'Nippon Weatherbond 10L White', productNameSi: 'නිපොන් වෙදර්බොන්ඩ්', variantId: 'var-009-3', size: '10L', quantity: 10, unitPrice: 5200, total: 52000 },
-      { id: 'item-011', productId: 'prod-010', productName: 'Dulux Super Gloss 4L White', productNameSi: 'ඩල්ක්ස් සුපර් ග්ලොස් එනමල්', variantId: 'var-010-3', size: '4L', quantity: 8, unitPrice: 6200, total: 49600 },
-    ],
-    subtotal: 101600,
-    tax: 5080,
-    total: 106680,
-    issueDate: '2024-12-10',
-    dueDate: '2024-12-25',
-    status: 'paid',
-    paymentMethod: 'cash',
-    notes: 'Paint supplies for renovation project',
-  },
-  {
-    id: 'inv-005',
-    invoiceNumber: 'INV-2024-0160',
-    customerId: 'cust-004',
-    customerName: 'Gunasekara Hardware Mart',
-    items: [
-      { id: 'item-012', productId: 'prod-011', productName: 'Bosch GSB 550 Impact Drill', productNameSi: 'බොෂ් GSB 550 ඉම්පැක්ට් ඩ්‍රිල්', quantity: 5, unitPrice: 15500, total: 77500 },
-      { id: 'item-013', productId: 'prod-012', productName: 'Stanley FatMax Tape 8m', productNameSi: 'ස්ටැන්ලි FatMax මීටර් පටිය', variantId: 'var-012-2', size: '8m', quantity: 20, unitPrice: 2400, total: 48000 },
-      { id: 'item-014', productId: 'prod-013', productName: 'Wire Nails 3"', productNameSi: 'වයර් ඇණ', variantId: 'var-013-3', size: '3"', quantity: 50, unitPrice: 260, total: 13000 },
-    ],
-    subtotal: 138500,
-    tax: 6925,
-    total: 145425,
-    issueDate: '2024-12-12',
-    dueDate: '2024-12-27',
-    status: 'pending',
-    paymentMethod: 'bank_transfer',
-  },
-  {
-    id: 'inv-006',
-    invoiceNumber: 'INV-2024-0161',
-    customerId: 'cust-006',
-    customerName: 'Herath Construction',
-    items: [
-      { id: 'item-015', productId: 'prod-001', productName: 'INSEE Sanstha Cement', productNameSi: 'ඉන්සී සංස්ථා සිමෙන්ති', quantity: 30, unitPrice: 2100, total: 63000 },
-      { id: 'item-016', productId: 'prod-016', productName: 'Safety Helmet Yellow', productNameSi: 'ආරක්ෂක හිස්වැසුම', variantId: 'var-016-2', quantity: 20, unitPrice: 650, total: 13000 },
-      { id: 'item-017', productId: 'prod-004', productName: 'Melwa GI Pipe 1"', productNameSi: 'මෙල්වා GI නල', variantId: 'var-004-3', size: '1"', quantity: 15, unitPrice: 1100, total: 16500 },
-    ],
-    subtotal: 92500,
-    tax: 4625,
-    total: 97125,
-    issueDate: '2024-12-14',
-    dueDate: '2024-12-29',
-    status: 'pending',
-    paymentMethod: 'cash',
-      notes: 'Construction materials for hill country project',
-    },
-  {
-    id: 'inv-007',
-    invoiceNumber: 'INV-2024-0162',
-    customerId: 'cust-007',
-    customerName: 'Fernando & Sons Hardware',
-    items: [
-      { id: 'item-018', productId: 'prod-017', productName: 'River Sand (Suduwella) 1 Cube', productNameSi: 'ගඟේ වැලි', variantId: 'var-017-2', size: '1 Cube', quantity: 10, unitPrice: 22000, total: 220000 },
-      { id: 'item-019', productId: 'prod-018', productName: '3/4" Metal (Crushed Stone) 1 Cube', productNameSi: '3/4 කළු ගල්', variantId: 'var-018-2', size: '1 Cube', quantity: 8, unitPrice: 19000, total: 152000 },
-      { id: 'item-020', productId: 'prod-019', productName: 'Red Clay Bricks', productNameSi: 'රතු ගඩොල්', quantity: 1000, unitPrice: 35, total: 35000 },
-    ],
-    subtotal: 407000,
-    tax: 0,
-    total: 407000,
-    issueDate: '2024-12-16',
-    dueDate: '2024-12-30',
-    status: 'paid',
-    paymentMethod: 'bank_transfer',
-    notes: 'Materials for Moratuwa house extension',
-  },
-  {
-    id: 'inv-008',
-    invoiceNumber: 'INV-2024-0163',
-    customerId: 'cust-001',
-    customerName: 'Rajapaksha Builders & Co.',
-    items: [
-      { id: 'item-021', productId: 'prod-002', productName: 'Tokyo Super Cement', productNameSi: 'ටෝකියෝ සුපර් සිමෙන්ති', quantity: 80, unitPrice: 2200, total: 176000 },
-      { id: 'item-022', productId: 'prod-003', productName: 'Lanwa Steel Bar 8mm', productNameSi: 'ලන්වා වානේ කූරු', variantId: 'var-003-1', size: '8mm', quantity: 300, unitPrice: 340, total: 102000 },
-      { id: 'item-023', productId: 'prod-004', productName: 'Melwa GI Pipe 3/4"', productNameSi: 'මෙල්වා GI නල', variantId: 'var-004-2', size: '3/4"', quantity: 25, unitPrice: 950, total: 23750 },
-      { id: 'item-024', productId: 'prod-020', productName: 'Cement Blocks 4 inch', productNameSi: 'සිමෙන්ති ගල්', variantId: 'var-020-1', size: '4 inch', quantity: 500, unitPrice: 90, total: 45000 },
-    ],
-    subtotal: 346750,
-    tax: 17338,
-    total: 364088,
-    issueDate: '2024-12-18',
-    dueDate: '2025-01-02',
-    status: 'pending',
-    paymentMethod: 'credit',
-    notes: 'Gampaha project phase 2 supplies',
-  },
-  {
-    id: 'inv-009',
-    invoiceNumber: 'INV-2024-0164',
-    customerId: 'cust-008',
-    customerName: 'Perera Paints & More',
-    items: [
-      { id: 'item-025', productId: 'prod-009', productName: 'Nippon Weatherbond 20L White', productNameSi: 'නිපොන් වෙදර්බොන්ඩ්', variantId: 'var-009-4', size: '20L', quantity: 5, unitPrice: 9500, total: 47500 },
-      { id: 'item-026', productId: 'prod-010', productName: 'Dulux Super Gloss 1L White', productNameSi: 'ඩල්ක්ස් සුපර් ග්ලොස් එනමල්', variantId: 'var-010-2', size: '1L', quantity: 24, unitPrice: 1750, total: 42000 },
-    ],
-    subtotal: 89500,
-    tax: 4475,
-    total: 93975,
-    issueDate: '2024-12-20',
-    dueDate: '2025-01-04',
-    status: 'overdue',
-    paymentMethod: 'credit',
-    notes: 'Restock for retail paint shop',
-  },
-  {
-    id: 'inv-010',
-    invoiceNumber: 'INV-2024-0165',
-    customerId: 'cust-003',
-    customerName: 'D.W. Electrical Solutions',
-    items: [
-      { id: 'item-027', productId: 'prod-005', productName: 'Kelani House Wire 4.0mm² Red', productNameSi: 'කෙළණි ගෘහ කේබල්', variantId: 'var-005-4', size: '4.0mm²', quantity: 300, unitPrice: 275, total: 82500 },
-      { id: 'item-028', productId: 'prod-007', productName: 'ACL MCB 63A', productNameSi: 'ACL MCB තනි ධ්‍රැවය', variantId: 'var-007-4', size: '63A', quantity: 15, unitPrice: 750, total: 11250 },
-      { id: 'item-029', productId: 'prod-006', productName: 'Orange 1-Way Switch Black', productNameSi: 'ඔරේන්ජ් 1-මාර්ග ස්විචය', variantId: 'var-006-2', quantity: 80, unitPrice: 195, total: 15600 },
-    ],
-    subtotal: 109350,
-    tax: 5468,
-    total: 114818,
-    issueDate: '2024-12-22',
-    dueDate: '2025-01-06',
-    status: 'paid',
-    paymentMethod: 'bank_transfer',
-    notes: 'Large order for commercial building wiring',
-  },
-  {
-    id: 'inv-011',
-    invoiceNumber: 'INV-2024-0166',
-    customerId: 'cust-005',
-    customerName: 'Bandara Industrial Supplies',
-    items: [
-      { id: 'item-030', productId: 'prod-014', productName: 'Wood Screws 2" x 8', productNameSi: 'ලී ඉස්කුරුප්පු', variantId: 'var-014-3', size: '2" x 8', quantity: 50, unitPrice: 480, total: 24000 },
-      { id: 'item-031', productId: 'prod-021', productName: 'Hex Bolt & Nut 1/2" x 3"', productNameSi: 'හෙක්ස් බෝල්ට් සහ නට්', variantId: 'var-021-4', size: '1/2" x 3"', quantity: 200, unitPrice: 130, total: 26000 },
-      { id: 'item-032', productId: 'prod-013', productName: 'Wire Nails 4"', productNameSi: 'වයර් ඇණ', variantId: 'var-013-4', size: '4"', quantity: 100, unitPrice: 255, total: 25500 },
-    ],
-    subtotal: 75500,
-    tax: 0,
-    total: 75500,
-    issueDate: '2024-12-23',
-    dueDate: '2025-01-07',
-    status: 'paid',
-    paymentMethod: 'cash',
-    notes: 'Fastener bulk purchase',
-  },
-  {
-    id: 'inv-012',
-    invoiceNumber: 'INV-2024-0167',
-    customerId: 'cust-006',
-    customerName: 'Herath Construction',
-    items: [
-      { id: 'item-033', productId: 'prod-001', productName: 'INSEE Sanstha Cement', productNameSi: 'ඉන්සී සංස්ථා සිමෙන්ති', quantity: 50, unitPrice: 2100, total: 105000 },
-      { id: 'item-034', productId: 'prod-008', productName: 'National PVC Pipe 1/2"', productNameSi: 'නැෂනල් PVC නල', variantId: 'var-008-1', size: '1/2"', quantity: 40, unitPrice: 380, total: 15200 },
-      { id: 'item-035', productId: 'prod-016', productName: 'Safety Helmet White', productNameSi: 'ආරක්ෂක හිස්වැසුම', variantId: 'var-016-1', quantity: 30, unitPrice: 650, total: 19500 },
-    ],
-    subtotal: 139700,
-    tax: 6985,
-    total: 146685,
-    issueDate: '2024-12-25',
-    dueDate: '2025-01-09',
-    status: 'pending',
-    paymentMethod: 'credit',
-    notes: 'Safety gear and materials for Nuwara Eliya project',
-  },
-  {
-    id: 'inv-013',
-    invoiceNumber: 'INV-2024-0168',
-    customerId: 'cust-004',
-    customerName: 'Gunasekara Hardware Mart',
-    items: [
-      { id: 'item-036', productId: 'prod-011', productName: 'Bosch GSB 550 Impact Drill', productNameSi: 'බොෂ් GSB 550 ඉම්පැක්ට් ඩ්‍රිල්', quantity: 3, unitPrice: 15500, total: 46500 },
-      { id: 'item-037', productId: 'prod-012', productName: 'Stanley FatMax Tape 5m', productNameSi: 'ස්ටැන්ලි FatMax මීටර් පටිය', variantId: 'var-012-1', size: '5m', quantity: 30, unitPrice: 2000, total: 60000 },
-      { id: 'item-038', productId: 'prod-005', productName: 'Kelani House Wire 1.5mm² Red', productNameSi: 'කෙළණි ගෘහ කේබල්', variantId: 'var-005-2', size: '1.5mm²', quantity: 200, unitPrice: 110, total: 22000 },
-    ],
-    subtotal: 128500,
-    tax: 6425,
-    total: 134925,
-    issueDate: '2024-12-27',
-    dueDate: '2025-01-11',
-    status: 'paid',
-    paymentMethod: 'cash',
-  },
-  {
-    id: 'inv-014',
-    invoiceNumber: 'INV-2024-0169',
-    customerId: 'cust-002',
-    customerName: 'Silva Home Décor',
-    items: [
-      { id: 'item-039', productId: 'prod-009', productName: 'Nippon Weatherbond 4L White', productNameSi: 'නිපොන් වෙදර්බොන්ඩ්', variantId: 'var-009-2', size: '4L', quantity: 15, unitPrice: 3600, total: 54000 },
-      { id: 'item-040', productId: 'prod-010', productName: 'Dulux Super Gloss 500ml White', productNameSi: 'ඩල්ක්ස් සුපර් ග්ලොස් එනමල්', variantId: 'var-010-1', size: '500ml', quantity: 40, unitPrice: 1000, total: 40000 },
-      { id: 'item-041', productId: 'prod-006', productName: 'Orange 1-Way Switch White', productNameSi: 'ඔරේන්ජ් 1-මාර්ග ස්විචය', variantId: 'var-006-1', quantity: 60, unitPrice: 185, total: 11100 },
-    ],
-    subtotal: 105100,
-    tax: 5255,
-    total: 110355,
-    issueDate: '2024-12-28',
-    dueDate: '2025-01-12',
-    status: 'pending',
-    paymentMethod: 'bank_transfer',
-    notes: 'Interior finishing for Kandy showroom',
-  },
-  {
-    id: 'inv-015',
-    invoiceNumber: 'INV-2024-0170',
-    customerId: 'cust-001',
-    customerName: 'Rajapaksha Builders & Co.',
-    items: [
-      { id: 'item-042', productId: 'prod-017', productName: 'River Sand (Suduwella) 0.5 Cube', productNameSi: 'ගඟේ වැලි', variantId: 'var-017-1', size: '0.5 Cube', quantity: 20, unitPrice: 11500, total: 230000 },
-      { id: 'item-043', productId: 'prod-018', productName: '3/4" Metal 0.5 Cube', productNameSi: '3/4 කළු ගල්', variantId: 'var-018-1', size: '0.5 Cube', quantity: 15, unitPrice: 10000, total: 150000 },
-      { id: 'item-044', productId: 'prod-001', productName: 'INSEE Sanstha Cement', productNameSi: 'ඉන්සී සංස්ථා සිමෙන්ති', quantity: 100, unitPrice: 2100, total: 210000 },
-      { id: 'item-045', productId: 'prod-003', productName: 'Lanwa Steel Bar 12mm', productNameSi: 'ලන්වා වානේ කූරු', variantId: 'var-003-3', size: '12mm', quantity: 400, unitPrice: 360, total: 144000 },
-    ],
-    subtotal: 734000,
-    tax: 36700,
-    total: 770700,
-    issueDate: '2024-12-30',
-    dueDate: '2025-01-14',
-    status: 'overdue',
-    paymentMethod: 'credit',
-    notes: 'Major delivery for Gampaha housing project foundation',
-  },
+  { id: 'inv-001', invoiceNumber: 'INV-2024-0156', customerId: 'cust-001', customerName: 'Rajapaksha Builders & Co.', items: [{ id: 'item-001', productId: 'prod-001', productName: 'INSEE Sanstha Cement', quantity: 50, unitPrice: 2100, total: 105000 }, { id: 'item-002', productId: 'prod-003', productName: 'Lanwa Steel Bar 10mm', variantId: 'var-003-2', size: '10mm', quantity: 200, unitPrice: 350, total: 70000 }, { id: 'item-003', productId: 'prod-008', productName: 'National PVC Pipe 1', variantId: 'var-008-3', size: '1', quantity: 20, unitPrice: 620, total: 12400 }], subtotal: 187400, tax: 9370, total: 196770, issueDate: '2024-12-01', dueDate: '2024-12-15', status: 'paid', paymentMethod: 'bank_transfer' },
+  { id: 'inv-002', invoiceNumber: 'INV-2024-0157', customerId: 'cust-003', customerName: 'D.W. Electrical Solutions', items: [{ id: 'item-004', productId: 'prod-005', productName: 'Kelani House Wire 2.5mm Red', variantId: 'var-005-3', size: '2.5mm', quantity: 500, unitPrice: 175, total: 87500 }, { id: 'item-005', productId: 'prod-007', productName: 'ACL MCB 32A', variantId: 'var-007-3', size: '32A', quantity: 20, unitPrice: 550, total: 11000 }], subtotal: 107750, tax: 5388, total: 113138, issueDate: '2024-12-05', dueDate: '2024-12-20', status: 'pending', paymentMethod: 'credit' },
+  { id: 'inv-003', invoiceNumber: 'INV-2024-0158', customerId: 'cust-005', customerName: 'Bandara Industrial Supplies', items: [{ id: 'item-007', productId: 'prod-002', productName: 'Tokyo Super Cement', quantity: 100, unitPrice: 2200, total: 220000 }, { id: 'item-008', productId: 'prod-003', productName: 'Lanwa Steel Bar 16mm', variantId: 'var-003-4', size: '16mm', quantity: 500, unitPrice: 365, total: 182500 }], subtotal: 470000, tax: 23500, total: 493500, issueDate: '2024-11-28', dueDate: '2024-12-12', status: 'overdue', paymentMethod: 'credit' },
+  { id: 'inv-004', invoiceNumber: 'INV-2024-0159', customerId: 'cust-002', customerName: 'Silva Home Décor', items: [{ id: 'item-010', productId: 'prod-009', productName: 'Nippon Weatherbond 10L White', variantId: 'var-009-3', size: '10L', quantity: 10, unitPrice: 5200, total: 52000 }], subtotal: 101600, tax: 5080, total: 106680, issueDate: '2024-12-10', dueDate: '2024-12-25', status: 'paid', paymentMethod: 'cash' },
+  { id: 'inv-005', invoiceNumber: 'INV-2024-0160', customerId: 'cust-004', customerName: 'Gunasekara Hardware Mart', items: [{ id: 'item-012', productId: 'prod-011', productName: 'Bosch GSB 550 Impact Drill', quantity: 5, unitPrice: 15500, total: 77500 }, { id: 'item-013', productId: 'prod-012', productName: 'Stanley FatMax Tape 8m', variantId: 'var-012-2', size: '8m', quantity: 20, unitPrice: 2400, total: 48000 }], subtotal: 138500, tax: 6925, total: 145425, issueDate: '2024-12-12', dueDate: '2024-12-27', status: 'pending', paymentMethod: 'bank_transfer' },
+  { id: 'inv-106', invoiceNumber: 'INV-2024-0161', customerId: 'cust-006', customerName: 'Herath Construction', items: [{ id: 'item-015', productId: 'prod-001', productName: 'INSEE Cement', quantity: 30, unitPrice: 2100, total: 63000 }], subtotal: 63000, tax: 3150, total: 66150, issueDate: '2024-12-14', dueDate: '2024-12-29', status: 'pending', paymentMethod: 'cash' },
+  { id: 'inv-107', invoiceNumber: 'INV-2024-0162', customerId: 'cust-007', customerName: 'Fernando & Sons Hardware', items: [{ id: 'item-018', productId: 'prod-019', productName: 'Red Clay Bricks', quantity: 1000, unitPrice: 35, total: 35000 }], subtotal: 35000, tax: 0, total: 35000, issueDate: '2024-12-16', dueDate: '2024-12-30', status: 'paid', paymentMethod: 'bank_transfer' },
 ];
+
+// ──────────────────────────────────────────────
+// POS Quick Categories
+// ──────────────────────────────────────────────
+export interface PosItem {
+  id: string;
+  sku: string;
+  name: string;
+  nameSi?: string;
+  unitRate: number;
+  stock: number;
+  unit: string;
+}
+export interface PosCategory {
+  id: string;
+  name: string;
+  nameSi?: string;
+  icon: string;
+  color: string;
+  items: PosItem[];
+}
+
+export const posCategories: PosCategory[] = [
+  { id: 'cat-pipes', name: 'PVC Pipes', nameSi: 'PVC නල', icon: '🔩', color: 'from-cyan-500 to-blue-600', items: [
+    { id: 'pipe-001', sku: 'PVC-1INCH', name: 'PVC Pipe 1 inch', unitRate: 620, stock: 200, unit: 'piece' },
+    { id: 'pipe-002', sku: 'PVC-2INCH', name: 'PVC Pipe 2 inch', unitRate: 1000, stock: 150, unit: 'piece' },
+    { id: 'pipe-003', sku: 'PVC-3INCH', name: 'PVC Pipe 3 inch', unitRate: 1600, stock: 80, unit: 'piece' },
+  ]},
+  { id: 'cat-electrical', name: 'Electrical', nameSi: 'විදුලි භාණ්ඩ', icon: '💡', color: 'from-amber-500 to-yellow-600', items: [
+    { id: 'elec-001', sku: 'CABLE-1.5', name: 'House Wire 1.5mm', unitRate: 110, stock: 2000, unit: 'meter' },
+    { id: 'elec-002', sku: 'SWITCH-1W', name: '1-Way Switch White', unitRate: 185, stock: 350, unit: 'piece' },
+    { id: 'elec-003', sku: 'SOCKET-13A', name: '13A Socket White', unitRate: 320, stock: 200, unit: 'piece' },
+  ]},
+  { id: 'cat-hand-tools', name: 'Hand Tools', nameSi: 'අත් මෙවලම්', icon: '🔨', color: 'from-orange-500 to-red-600', items: [
+    { id: 'tool-001', sku: 'HAMMER-CLAW', name: 'Claw Hammer 16oz', unitRate: 850, stock: 45, unit: 'piece' },
+    { id: 'tool-002', sku: 'PLIERS-COMB', name: 'Combination Pliers 8"', unitRate: 650, stock: 60, unit: 'piece' },
+  ]},
+  { id: 'cat-steel', name: 'Steel Bars', nameSi: 'වානේ කූරු', icon: '🏗️', color: 'from-slate-600 to-slate-800', items: [
+    { id: 'stl-001', sku: 'TMT-10MM', name: 'TMT Bar 10mm', unitRate: 350, stock: 500, unit: 'kg' },
+    { id: 'stl-002', sku: 'TMT-12MM', name: 'TMT Bar 12mm', unitRate: 360, stock: 450, unit: 'kg' },
+  ]},
+  { id: 'cat-paint', name: 'Paint', nameSi: 'තීන්ත', icon: '🎨', color: 'from-pink-500 to-purple-600', items: [
+    { id: 'pnt-001', sku: 'EMULSION-4L', name: 'Interior Emulsion 4L White', unitRate: 3200, stock: 85, unit: 'liter' },
+  ]},
+  { id: 'cat-cement', name: 'Cement', nameSi: 'සිමෙන්ති', icon: '🧱', color: 'from-slate-500 to-gray-700', items: [
+    { id: 'cem-001', sku: 'CEM-INSEE-50', name: 'INSEE Cement 50kg', unitRate: 2100, stock: 250, unit: 'bag' },
+  ]},
+  { id: 'cat-plumbing', name: 'Plumbing', nameSi: 'නල කටයුතු', icon: '🚰', color: 'from-teal-500 to-emerald-600', items: [
+    { id: 'plu-001', sku: 'TAP-KITCHEN', name: 'Kitchen Mixer Tap', unitRate: 3500, stock: 30, unit: 'piece' },
+  ]},
+  { id: 'cat-gardening', name: 'Gardening', nameSi: 'උද්‍යාන', icon: '🌿', color: 'from-green-500 to-emerald-700', items: [
+    { id: 'gar-001', sku: 'SHOVEL', name: 'Garden Shovel', unitRate: 850, stock: 40, unit: 'piece' },
+  ]},
+  { id: 'cat-hardware', name: 'Hardware', nameSi: 'දෘඪාංග', icon: '🔩', color: 'from-rose-500 to-pink-600', items: [
+    { id: 'hrd-001', sku: 'NAIL-2IN', name: 'Wire Nails 2" 1kg', unitRate: 270, stock: 300, unit: 'kg' },
+  ]},
+];
+
+// ──────────────────────────────────────────────
+// HELPERS
+// ──────────────────────────────────────────────
+export function deriveInventoryStatus(storeQty: number): InventoryProduct['status'] {
+  if (storeQty === 0) return 'Out of Stock';
+  if (storeQty <= 10) return 'Low Stock';
+  return 'Available';
+}

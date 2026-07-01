@@ -2,14 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Check, X } from 'lucide-react';
 
-// ── Shared category options ──
-const CATEGORY_OPTIONS = [
-  'MELWA BOX BAR', 'MELWA ANGLE BAR', 'MELWA CHANNEL', 'MELWA FLAT BAR',
-  'MELWA PIPE', 'MELWA SQUARE PIPE', 'MELWA RECTANGLE PIPE',
-  'LANWA STEEL', 'JSW STEEL', 'KYOCERA STEEL', 'CEMENT',
-  'ELECTRICAL', 'PLUMBING', 'PAINT', 'TOOLS', 'HARDWARE',
-  'ROOFING', 'PLYWOOD', 'PVC CEILING',
-];
+import { categoryNames } from '../data/mockData';
+// ── Shared category options — dynamically derived from mockData ──
+const CATEGORY_OPTIONS = categoryNames;
 
 // ── Searchable category combobox for inline popover ──
 interface CategoryComboboxProps {

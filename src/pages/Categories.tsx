@@ -1,118 +1,90 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { useIsMobile } from '../hooks/use-mobile';
-import { mockCategories, mockProducts } from '../data/mockData';
+import { useCatalog } from '../contexts/CatalogContext';
+import { mockCategories, inventoryItems, linkedCatalogItems } from '../data/mockData';
 import { Category } from '../types/index';
 import { CategoryFormModal } from '../components/modals/CategoryFormModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { SearchableSelect } from '../components/ui/searchable-select';
-import { Pagination } from '../components/ui/data-table';
+import { CellPopover } from '../components/CellPopover';
 import { 
-  Plus, Search, Edit2, Trash2, FolderTree, Package,
-  Grid3X3, List, MoreVertical, Building2, Layers,
-  ChevronRight, Tag, Filter, SortAsc, SortDesc, RefreshCw
+  Plus, Search, Edit2, Trash2, FolderTree, Package, Layers, Tag,
+  SortAsc, SortDesc, RefreshCw, Pencil,
+  ChevronLeft, ChevronRight as ChevronRightIcon,
+  ChevronsLeft, ChevronsRight
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
-// Category icons mapping
-const categoryIcons: Record<string, React.ReactNode> = {
-  'cat-001': <Building2 className="w-5 h-5" />,
-  'cat-002': <Layers className="w-5 h-5" />,
-  'cat-003': <Package className="w-5 h-5" />,
-  'cat-004': <Package className="w-5 h-5" />,
-  'cat-005': <Package className="w-5 h-5" />,
-  'cat-006': <Package className="w-5 h-5" />,
-  'cat-007': <Package className="w-5 h-5" />,
-  'cat-008': <Package className="w-5 h-5" />,
-  'cat-009': <Package className="w-5 h-5" />,
-  'cat-010': <Package className="w-5 h-5" />,
-};
-
-// Category colors for visual distinction
-const categoryColors = [
-  'from-blue-500 to-cyan-500',
-  'from-purple-500 to-pink-500',
-  'from-amber-500 to-orange-500',
-  'from-emerald-500 to-teal-500',
-  'from-rose-500 to-red-500',
-  'from-indigo-500 to-violet-500',
-  'from-lime-500 to-green-500',
-  'from-yellow-500 to-amber-500',
-  'from-cyan-500 to-blue-500',
-  'from-pink-500 to-rose-500',
-];
+const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 export const Categories: React.FC = () => {
   const { theme } = useTheme();
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  
+  const isDark = theme === 'dark';
+
   const [categories, setCategories] = useState<Category[]>(mockCategories);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'main' | 'sub'>('all');
-  const [parentFilter, setParentFilter] = useState<string>('all');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 12;
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
-  // Get main categories for parent filter
-  const mainCategories = useMemo(() => categories.filter(c => !c.parentId), [categories]);
+  // ── Cell Popover state — for text fields (name, nameAlt, description) ──
+  const [cellPopover, setCellPopover] = useState<{
+    category: Category;
+    field: 'name' | 'nameAlt' | 'description';
+    anchorRect: DOMRect;
+  } | null>(null);
 
-  // Get product count per category
-  const getProductCount = (categoryId: string) => {
-    return mockProducts.filter(p => p.categoryId === categoryId).length;
-  };
+  // ── DYNAMIC USAGE COUNTER: Counts inventoryItems by categoryId — single source of truth ──
+  const getUsageCount = useCallback((categoryId: string, categoryName: string) => {
+    // Strategy 1: Match by FK categoryId (all 150 inventory items have proper categoryId)
+    const countById = inventoryItems.filter(p => p.categoryId === categoryId).length;
+    if (countById > 0) return countById;
+    // Strategy 2: Fallback — match by productCategory name (case-insensitive, normalized)
+    const normalizedCatName = categoryName.trim().toLowerCase();
+    return inventoryItems.filter(p =>
+      p.productCategory.trim().toLowerCase() === normalizedCatName
+    ).length;
+  }, []);
 
   // Check if category has active filters
-  const hasActiveFilters = typeFilter !== 'all' || parentFilter !== 'all' || searchQuery;
+  const hasActiveFilters = searchQuery.length > 0;
 
-  // Filter and sort categories
-  const filteredCategories = categories
-    .filter(cat => {
-      const matchesSearch = cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (cat.nameAlt && cat.nameAlt.includes(searchQuery)) ||
-        (cat.description && cat.description.toLowerCase().includes(searchQuery.toLowerCase()));
-      
-      const matchesType = typeFilter === 'all' || 
-        (typeFilter === 'main' && !cat.parentId) ||
-        (typeFilter === 'sub' && cat.parentId);
-      
-      const matchesParent = parentFilter === 'all' || cat.parentId === parentFilter;
-      
-      return matchesSearch && matchesType && matchesParent;
-    })
-    .sort((a, b) => {
-      const comparison = a.name.localeCompare(b.name);
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
+  // Filter and sort categories (flat — no parent filter)
+  const filteredCategories = useMemo(() => {
+    return categories
+      .filter(cat => {
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        return cat.name.toLowerCase().includes(q) ||
+          (cat.nameAlt && cat.nameAlt.includes(q)) ||
+          (cat.description && cat.description.toLowerCase().includes(q));
+      })
+      .sort((a, b) => {
+        const comparison = a.name.localeCompare(b.name);
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+  }, [categories, searchQuery, sortOrder]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredCategories.length / pageSize);
+  const totalPages = Math.ceil(filteredCategories.length / rowsPerPage);
   const paginatedCategories = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredCategories.slice(startIndex, startIndex + pageSize);
-  }, [filteredCategories, currentPage, pageSize]);
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredCategories.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredCategories, currentPage, rowsPerPage]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, typeFilter, parentFilter, sortOrder]);
+  }, [searchQuery, sortOrder, rowsPerPage]);
 
   // Stats
   const totalCategories = categories.length;
-  const categoriesWithProducts = categories.filter(cat => cat.description).length; // Placeholder logic
+  const categoriesWithProducts = categories.filter(cat => getUsageCount(cat.id, cat.name) > 0).length;
 
   const handleAddCategory = () => {
     setSelectedCategory(null);
@@ -131,19 +103,16 @@ export const Categories: React.FC = () => {
 
   const handleSaveCategory = (categoryData: Partial<Category>) => {
     if (selectedCategory) {
-      // Update existing
       setCategories(prev => prev.map(cat => 
         cat.id === selectedCategory.id ? { ...cat, ...categoryData } : cat
       ));
     } else {
-      // Add new
       const newCategory: Category = {
         id: `cat-${String(categories.length + 1).padStart(3, '0')}`,
         name: categoryData.name || '',
         nameAlt: categoryData.nameAlt,
         icon: categoryData.icon,
         description: categoryData.description,
-        parentId: categoryData.parentId,
       };
       setCategories(prev => [...prev, newCategory]);
     }
@@ -158,428 +127,295 @@ export const Categories: React.FC = () => {
     setSelectedCategory(null);
   };
 
-  const getColorIndex = (index: number) => index % categoryColors.length;
+  // ── Popover cell save handler ──
+  const handleCellSave = useCallback((category: Category, field: string, value: string | number) => {
+    setCategories(prev => prev.map(cat => 
+      cat.id === category.id ? { ...cat, [field]: String(value) } : cat
+    ));
+    setCellPopover(null);
+  }, []);
+
+  // ── Open cell popover from click event ──
+  const openCellPopover = useCallback((
+    category: Category,
+    field: 'name' | 'nameAlt' | 'description',
+    e: React.MouseEvent
+  ) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setCellPopover({ category, field, anchorRect: rect });
+  }, []);
+
+  // Calculate pagination info
+  const startItem = (currentPage - 1) * rowsPerPage + 1;
+  const endItem = Math.min(currentPage * rowsPerPage, filteredCategories.length);
+
+  const SortIcon = sortOrder === 'asc' ? SortAsc : SortDesc;
 
   return (
-    <div className={`space-y-6 ${isMobile ? 'pb-20' : ''}`}>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-            {t('categories.title')}
-          </h1>
-          <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            {t('categories.subtitle')}
-          </p>
-        </div>
-        <Button 
-          onClick={handleAddCategory}
-          className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white shadow-lg shadow-orange-500/20"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          {t('categories.addCategory')}
-        </Button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className={`p-4 rounded-xl border ${
-          theme === 'dark' 
-            ? 'bg-slate-800/50 border-slate-700/50' 
-            : 'bg-white border-slate-200 shadow-sm'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
-              <FolderTree className="w-5 h-5 text-blue-500" />
-            </div>
-            <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('categories.totalCategories')}</p>
-              <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {totalCategories}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className={`p-4 rounded-xl border ${
-          theme === 'dark' 
-            ? 'bg-slate-800/50 border-slate-700/50' 
-            : 'bg-white border-slate-200 shadow-sm'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20">
-              <Package className="w-5 h-5 text-emerald-500" />
-            </div>
-            <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('categories.withProducts')}</p>
-              <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {categoriesWithProducts}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className={`p-4 rounded-xl border ${
-          theme === 'dark' 
-            ? 'bg-slate-800/50 border-slate-700/50' 
-            : 'bg-white border-slate-200 shadow-sm'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-              <Layers className="w-5 h-5 text-purple-500" />
-            </div>
-            <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('categories.mainCategories')}</p>
-              <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {categories.filter(c => !c.parentId).length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className={`p-4 rounded-xl border ${
-          theme === 'dark' 
-            ? 'bg-slate-800/50 border-slate-700/50' 
-            : 'bg-white border-slate-200 shadow-sm'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20">
-              <Tag className="w-5 h-5 text-amber-500" />
-            </div>
-            <div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{t('categories.subCategories')}</p>
-              <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {categories.filter(c => c.parentId).length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className={`p-4 rounded-xl border ${
-        theme === 'dark' 
-          ? 'bg-slate-800/50 border-slate-700/50' 
-          : 'bg-white border-slate-200 shadow-sm'
-      }`}>
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
-            <div className="relative flex-1 sm:max-w-xs">
-              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
-                theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-              }`} />
-              <Input
-                placeholder={t('categories.searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`pl-10 ${
-                  theme === 'dark' 
-                    ? 'bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500' 
-                    : 'bg-slate-50 border-slate-200'
-                }`}
-              />
-            </div>
-
-            <div className="w-full sm:w-44">
-              <SearchableSelect
-                value={typeFilter}
-                onValueChange={(v) => setTypeFilter(v as 'all' | 'main' | 'sub')}
-                placeholder={t('categories.allTypes')}
-                searchPlaceholder={t('common.search')}
-                emptyMessage="No options found"
-                theme={theme}
-                options={[
-                  { value: 'all', label: t('categories.allTypes'), count: totalCategories, icon: <FolderTree className="w-4 h-4" /> },
-                  { value: 'main', label: t('categories.mainCategories'), count: mainCategories.length, icon: <Layers className="w-4 h-4 text-blue-500" /> },
-                  { value: 'sub', label: t('categories.subCategories'), count: totalCategories - mainCategories.length, icon: <Tag className="w-4 h-4 text-purple-500" /> },
-                ]}
-              />
-            </div>
-
-            <div className="w-full sm:w-48">
-              <SearchableSelect
-                value={parentFilter}
-                onValueChange={setParentFilter}
-                placeholder={t('categories.allParents')}
-                searchPlaceholder={t('common.search')}
-                emptyMessage={t('categories.noCategoriesFound')}
-                theme={theme}
-                options={[
-                  { value: 'all', label: t('categories.allParents'), icon: <FolderTree className="w-4 h-4" /> },
-                  ...mainCategories.map(cat => ({
-                    value: cat.id,
-                    label: cat.name,
-                    count: categories.filter(c => c.parentId === cat.id).length,
-                    icon: <Layers className="w-4 h-4" />
-                  }))
-                ]}
-              />
-            </div>
-
-            {/* Clear Filters */}
-            {hasActiveFilters && (
-              <button
-                onClick={() => { setTypeFilter('all'); setParentFilter('all'); setSearchQuery(''); }}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  theme === 'dark' ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                {t('common.clear')}
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className={theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : ''}
-            >
-              {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
-            </Button>
-
-            <div className={`flex items-center rounded-lg border p-1 ${
-              theme === 'dark' ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'
-            }`}>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-md transition-colors ${
-                  viewMode === 'grid' 
-                    ? 'bg-orange-500 text-white' 
-                    : theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Grid3X3 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-md transition-colors ${
-                  viewMode === 'list' 
-                    ? 'bg-orange-500 text-white' 
-                    : theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <List className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Categories Grid/List */}
-      {viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {paginatedCategories.map((category, index) => (
-            <div
-              key={category.id}
-              className={`group p-4 rounded-xl border transition-all hover:shadow-lg ${
-                theme === 'dark' 
-                  ? 'bg-slate-800/50 border-slate-700/50 hover:border-slate-600' 
-                  : 'bg-white border-slate-200 shadow-sm hover:shadow-md'
-              }`}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className={`p-3 rounded-xl bg-gradient-to-br ${categoryColors[getColorIndex(index)]} shadow-lg`}>
-                  {categoryIcons[category.id] || <FolderTree className="w-5 h-5 text-white" />}
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${
-                      theme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
-                    }`}>
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-slate-800 border-slate-700' : ''}>
-                    <DropdownMenuItem onClick={() => handleEditCategory(category)}>
-                      <Edit2 className="w-4 h-4 mr-2" /> {t('tableHeaders.edit')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleDeleteCategory(category)}
-                      className="text-red-500 focus:text-red-500"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" /> {t('tableHeaders.delete')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              {/* Parent Category Badge for Subcategories */}
-              {category.parentId && (
-                <div className="mb-2">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                    theme === 'dark' 
-                      ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' 
-                      : 'bg-orange-100 text-orange-700 border border-orange-200'
-                  }`}>
-                    <Layers className="w-3 h-3" />
-                    {categories.find(c => c.id === category.parentId)?.name || t('common.unknown')}
-                  </span>
-                </div>
-              )}
-
-              <h3 className={`font-semibold mb-1 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {category.name}
-              </h3>
-              {category.nameAlt && (
-                <p className={`text-sm mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {category.nameAlt}
-                </p>
-              )}
-              {category.description && (
-                <p className={`text-xs line-clamp-2 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-600'}`}>
-                  {category.description}
-                </p>
-              )}
-
-              <div className={`flex items-center justify-between mt-4 pt-3 border-t ${
-                theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'
-              }`}>
-                <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                  ID: {category.id}
-                </span>
-                <ChevronRight className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className={`rounded-xl border overflow-hidden ${
-          theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
-        }`}>
-          <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px]">
-            <thead>
-              <tr className={theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50'}>
-                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
-                  theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>{t('tableHeaders.category')}</th>
-                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
-                  theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>{t('tableHeaders.sinhalaName')}</th>
-                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
-                  theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>{t('tableHeaders.parentCategory')}</th>
-                <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
-                  theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>{t('tableHeaders.description')}</th>
-                <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
-                  theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                }`}>{t('tableHeaders.actions')}</th>
-              </tr>
-            </thead>
-            <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-100'}`}>
-              {paginatedCategories.map((category, index) => (
-                <tr 
-                  key={category.id}
-                  className={`transition-colors ${
-                    theme === 'dark' ? 'hover:bg-slate-800/80' : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg bg-gradient-to-br ${categoryColors[getColorIndex(index)]}`}>
-                        {categoryIcons[category.id] || <FolderTree className="w-4 h-4 text-white" />}
-                      </div>
-                      <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                        {category.name}
-                      </span>
-                    </div>
-                  </td>
-                  <td className={`px-4 py-3 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                    {category.nameAlt || '-'}
-                  </td>
-                  <td className="px-4 py-3">
-                    {category.parentId ? (
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        theme === 'dark' 
-                          ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' 
-                          : 'bg-orange-100 text-orange-700 border border-orange-200'
-                      }`}>
-                        <Layers className="w-3 h-3" />
-                        {categories.find(c => c.id === category.parentId)?.name || t('common.unknown')}
-                      </span>
-                    ) : (
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        theme === 'dark' 
-                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
-                          : 'bg-blue-100 text-blue-700 border border-blue-200'
-                      }`}>
-                        <FolderTree className="w-3 h-3" />
-                        {t('categories.mainCategory')}
-                      </span>
-                    )}
-                  </td>
-                  <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                    <span className="line-clamp-1">{category.description || '-'}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => handleEditCategory(category)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          theme === 'dark' ? 'hover:bg-slate-700 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCategory(category)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          theme === 'dark' ? 'hover:bg-red-500/20 text-slate-400 hover:text-red-400' : 'hover:bg-red-50 text-slate-600 hover:text-red-500'
-                        }`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      )}
-
-      {/* Pagination */}
-      {filteredCategories.length > 0 && totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-          totalItems={filteredCategories.length}
-          pageSize={pageSize}
-          theme={theme}
+    <div className={`space-y-4 ${isMobile ? 'pb-20' : ''}`}>
+      {/* ── Floating Cell Popover (for text fields: name, nameAlt, description) ── */}
+      {cellPopover && (
+        <CellPopover
+          value={cellPopover.category[cellPopover.field] || ''}
+          fieldLabel={cellPopover.field === 'name' ? 'Category Name' : cellPopover.field === 'nameAlt' ? 'Alt Name' : 'Description'}
+          type="text"
+          anchorRect={cellPopover.anchorRect}
+          onSave={(val) => handleCellSave(cellPopover.category, cellPopover.field, val)}
+          onClose={() => setCellPopover(null)}
         />
       )}
 
-      {/* Empty State */}
-      {filteredCategories.length === 0 && (
-        <div className={`text-center py-12 rounded-xl border ${
-          theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
-        }`}>
-          <FolderTree className={`w-12 h-12 mx-auto mb-4 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
-          <h3 className={`text-lg font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-            {t('categories.noCategoriesFound')}
-          </h3>
-          <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            {searchQuery ? t('categories.adjustSearch') : t('categories.addFirstCategory')}
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            {t('categories.title')}
+          </h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+            {t('categories.subtitle')}
           </p>
-          {!searchQuery && (
-            <Button 
-              onClick={handleAddCategory}
-              className="mt-4 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              {t('categories.addCategory')}
-            </Button>
-          )}
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleAddCategory}
+            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white rounded-lg font-medium transition-all shadow shadow-orange-500/20 text-xs"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {t('categories.addCategory')}
+          </button>
+        </div>
+      </div>
 
-      {/* Category Form Modal */}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        {[
+          { icon: FolderTree, gradient: 'from-blue-500/20 to-cyan-500/20', color: 'text-blue-400', value: totalCategories, label: t('categories.totalCategories') },
+          { icon: Package, gradient: 'from-emerald-500/20 to-teal-500/20', color: 'text-emerald-400', value: categoriesWithProducts, label: t('categories.withProducts') },
+          { icon: Tag, gradient: 'from-amber-500/20 to-orange-500/20', color: 'text-amber-400', value: categories.reduce((s, c) => s + (c.usageCount || 0), 0), label: t('categories.totalUsage') },
+          { icon: Layers, gradient: 'from-purple-500/20 to-pink-500/20', color: 'text-purple-400', value: Math.round(categories.reduce((s, c) => s + (c.usageCount || 0), 0) / Math.max(totalCategories, 1)), label: t('categories.avgUsage') },
+        ].map((item, i) => {
+          const Icon = item.icon;
+          return (
+            <div key={i} className={`p-3 rounded-lg border ${isDark ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-lg bg-gradient-to-br ${item.gradient}`}>
+                  <Icon className={`w-4 h-4 ${item.color}`} />
+                </div>
+                <div>
+                  <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.value}</p>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{item.label}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Toolbar (flat — no type or parent filter, just search + sort) ── */}
+      <div className={`p-3 rounded-lg border ${isDark ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 max-w-xs">
+            <Search className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+            <input type="text"
+              placeholder={t('categories.searchPlaceholder')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={`w-full pl-8 pr-3 py-1.5 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${
+                isDark ? 'bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200'
+              }`}
+            />
+          </div>
+
+          {hasActiveFilters && (
+            <button onClick={() => setSearchQuery('')}
+              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>
+              <RefreshCw className="w-3 h-3" />
+            </button>
+          )}
+          <button onClick={() => setSortOrder(s => s === 'asc' ? 'desc' : 'asc')}
+            className={`p-1.5 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>
+            <SortIcon className="w-3 h-3" />
+          </button>
+          <span className={`text-[10px] font-medium ml-auto ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {filteredCategories.length} categories
+          </span>
+        </div>
+      </div>
+
+      {/* ── FLAT TABLE (no Parent Category column) ── */}
+      <div className={`rounded-lg border overflow-hidden ${isDark ? 'bg-slate-900/95 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px]">
+            <thead className={isDark ? 'bg-slate-800/80' : 'bg-slate-50'}>
+              <tr>
+                {[
+                  { label: t('tableHeaders.category'), align: 'left' as const },
+                  { label: t('categories.sinhalaName'), align: 'left' as const },
+                  { label: t('common.description'), align: 'left' as const },
+                  { label: t('categories.usage'), align: 'right' as const },
+                  { label: t('common.actions'), align: 'center' as const },
+                ].map((col, i) => (
+                  <th key={i}
+                    className={`px-2 py-2 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${
+                      col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                    } ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {col.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className={`divide-y ${isDark ? 'divide-slate-700/40' : 'divide-slate-200'}`}>
+              {paginatedCategories.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-12 text-center">
+                    <FolderTree className={`w-10 h-10 mx-auto mb-3 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                    <p className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      {searchQuery ? 'No categories match your search' : 'No categories yet'}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                paginatedCategories.map((category) => (
+                  <tr key={category.id} className={`transition-colors ${isDark ? 'hover:bg-slate-700/25' : 'hover:bg-slate-50'}`}>
+                    {/* Name */}
+                    <td
+                      className="px-2 py-1.5 relative group cursor-pointer"
+                      onClick={(e) => openCellPopover(category, 'name', e)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-gradient-to-br from-orange-500/20 to-rose-500/20 flex-shrink-0">
+                          <FolderTree className="w-3 h-3 text-orange-400" />
+                        </div>
+                        <span className={`text-[11px] font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          {category.name}
+                        </span>
+                      </div>
+                      <span className={`absolute -right-0.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 ${
+                        isDark ? 'text-slate-500' : 'text-slate-400'
+                      }`}>
+                        <Pencil className="w-3 h-3" />
+                      </span>
+                    </td>
+
+                    {/* Alt Name */}
+                    <td
+                      className="px-2 py-1.5 relative group cursor-pointer"
+                      onClick={(e) => openCellPopover(category, 'nameAlt', e)}
+                    >
+                      <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {category.nameAlt || '-'}
+                      </span>
+                      <span className={`absolute -right-0.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 ${
+                        isDark ? 'text-slate-500' : 'text-slate-400'
+                      }`}>
+                        <Pencil className="w-3 h-3" />
+                      </span>
+                    </td>
+
+                    {/* Description */}
+                    <td
+                      className="px-2 py-1.5 relative group cursor-pointer"
+                      onClick={(e) => openCellPopover(category, 'description', e)}
+                    >
+                      <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-600'} line-clamp-1`}>
+                        {category.description || '-'}
+                      </span>
+                      <span className={`absolute -right-0.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 ${
+                        isDark ? 'text-slate-500' : 'text-slate-400'
+                      }`}>
+                        <Pencil className="w-3 h-3" />
+                      </span>
+                    </td>
+
+                    {/* Usage Count */}
+                    <td className="px-2 py-1.5 text-right">
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium ${
+                        isDark
+                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                          : 'bg-blue-100 text-blue-700 border border-blue-200'
+                      }`}>
+                        <Package className="w-2.5 h-2.5" />
+                        {getUsageCount(category.id, category.name)}
+                      </span>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-2 py-1.5 text-center">
+                      <div className="flex items-center justify-center gap-0.5">
+                        <button onClick={() => handleEditCategory(category)}
+                          className={`p-1.5 rounded-lg transition-all hover:scale-110 active:scale-90 ${
+                            isDark ? 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/15' : 'text-slate-500 hover:text-orange-600 hover:bg-orange-50'
+                          }`} title="Edit">
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleDeleteCategory(category)}
+                          className={`p-1.5 rounded-lg transition-all hover:scale-110 active:scale-90 ${
+                            isDark ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-500/15' : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'
+                          }`} title="Delete">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ── ADVANCED PAGINATION ── */}
+        {filteredCategories.length > 0 && (
+          <div className={`flex items-center justify-between px-4 py-2.5 border-t ${isDark ? 'border-slate-700/40' : 'border-slate-200'}`}>
+            <div className="flex items-center gap-3">
+              <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Showing {startItem}-{endItem} of {filteredCategories.length}
+              </span>
+              <div className={`flex items-center gap-1.5 text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <span>Rows:</span>
+                <select value={rowsPerPage} onChange={(e) => setRowsPerPage(Number(e.target.value))}
+                  className={`px-1.5 py-0.5 text-[10px] border rounded transition-colors focus:outline-none focus:ring-1 focus:ring-orange-500/50 ${
+                    isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+                  }`}>
+                  {ROWS_PER_PAGE_OPTIONS.map((n) => (<option key={n} value={n}>{n}</option>))}
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
+                className={`p-1.5 rounded transition-colors disabled:opacity-30 ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`} title="First page">
+                <ChevronsLeft className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                className={`p-1.5 rounded transition-colors disabled:opacity-30 ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`} title="Previous page">
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+                const page = start + i;
+                if (page > totalPages) return null;
+                return (
+                  <button key={page} onClick={() => setCurrentPage(page)}
+                    className={`w-7 h-7 text-[10px] font-semibold rounded transition-all ${
+                      page === currentPage
+                        ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
+                        : isDark ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'
+                    }`}>{page}</button>
+                );
+              })}
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                className={`p-1.5 rounded transition-colors disabled:opacity-30 ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`} title="Next page">
+                <ChevronRightIcon className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}
+                className={`p-1.5 rounded transition-colors disabled:opacity-30 ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`} title="Last page">
+                <ChevronsRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
       <CategoryFormModal
         isOpen={isFormModalOpen}
         onClose={() => setIsFormModalOpen(false)}
@@ -587,8 +423,6 @@ export const Categories: React.FC = () => {
         category={selectedCategory}
         categories={categories}
       />
-
-      {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
         isOpen={isDeleteModalOpen}
         onCancel={() => setIsDeleteModalOpen(false)}
@@ -599,3 +433,5 @@ export const Categories: React.FC = () => {
     </div>
   );
 };
+
+export default Categories;

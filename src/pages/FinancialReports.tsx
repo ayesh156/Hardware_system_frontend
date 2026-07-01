@@ -18,7 +18,7 @@ import {
   expenseCategories,
   revenueCategories,
   FinancialTransaction 
-} from '../data/financialData';
+} from '../data/mockData';
 
 type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
