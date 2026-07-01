@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useDropdownPosition } from '../hooks/use-dropdown-position';
-import { mockProducts, mockInvoices, mockCustomers, inventoryItems } from '../data/mockData';
-import { Product, Invoice, InvoiceItem, FlattenedProduct, Customer, InventoryProduct } from '../types/index';
+import { useCatalog } from '../contexts/CatalogContext';
+import { mockProducts, mockInvoices, mockCustomers } from '../data/mockData';
+import { Product, Invoice, InvoiceItem, FlattenedProduct, Customer } from '../types/index';
 import { flattenProducts } from '../lib/utils';
 import { printInvoice } from '../components/modals/PrintInvoiceModal';
 import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
@@ -73,10 +74,10 @@ export const QuickCheckout: React.FC = () => {
   const isMobile = useIsMobile();
   
   const [products] = useState<Product[]>(mockProducts);
+  const { inventoryItems } = useCatalog();
   
   // Flatten products so each variant appears as a distinct line item
   const flattenedProducts = useMemo(() => flattenProducts(products), [products]);
-
   // ── In-place Edit mode via query param ──
   const editInvoiceId = searchParams.get('edit');
   const editingInvoice = useMemo(() => {
@@ -185,7 +186,7 @@ export const QuickCheckout: React.FC = () => {
   const [isPaymentFocused, setIsPaymentFocused] = useState(false);
   const [priceEditBuffer, setPriceEditBuffer] = useState<string>('');
   const [isPriceEditing, setIsPriceEditing] = useState(false);
-  const priceEditTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const priceEditTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Customer selection state
   const [customerSearch, setCustomerSearch] = useState('');
@@ -2040,7 +2041,7 @@ export const QuickCheckout: React.FC = () => {
                         </div>
                       ) : (
                         <p className={`w-14 text-right font-bold font-mono text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          Rs. {item.total.toLocaleString()}
+an                          Rs. {item.total.toLocaleString()}
                         </p>
                       )}
                       
