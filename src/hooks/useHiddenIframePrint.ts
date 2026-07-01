@@ -134,100 +134,121 @@ function buildPrintDocument(receiptHTML: string): string {
       margin: 0;
     }
 
-    /* ── Force exact color reproduction ── */
+    /* ════════════════════════════════════════════════════════
+       THERMAL RECEIPT PRINT MASTER RESET
+       Browser-defying strategy — three-layer defence:
+       1. print-color-adjust: exact on every element
+       2. background-image: linear-gradient(#000,#000) — NEVER
+          stripped by any browser, unlike background-color
+       3. Remove global color:#000 override so white text
+          inside black boxes is NEVER silently killed
+       ════════════════════════════════════════════════════════ */
+    @page {
+      size: 80mm auto;
+      margin: 0;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+
+    @media print {
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
     }
 
     html, body {
       width: 80mm;
       min-height: auto;
       margin: 0;
-      padding: 0;
+      padding: 2px;
       background: #ffffff;
       font-family: 'Segoe UI', Arial, sans-serif;
-      font-size: 11px;
-      color: #000;
-      line-height: 1.3;
-      -webkit-font-smoothing: antialiased;
+      font-size: 12px;
+      color: #000000;
+      font-weight: 700;
+      line-height: 1.4;
     }
 
-    body {
-      padding: 2px;
-    }
-
-    /* ── Receipt container ── */
     .receipt-print-root {
       width: 76mm;
       max-width: 100%;
       margin: 0 auto;
       background: #ffffff;
+      color: #000000;
+      font-weight: 700;
     }
 
-    /* ── Force black text, allow exceptions ── */
-    .receipt-print-root,
-    .receipt-print-root * {
-      color: #000 !important;
+    /* ── GRADIENT FALLBACK: black background that CANNOT be stripped ──
+       linear-gradient(#000,#000) renders identically to background:#000
+       but bypasses ALL browser background-stripping rules            */
+    .print-black-box {
+      background-color: #000000 !important;
+      background-image: linear-gradient(#000000, #000000) !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+      border: 2px solid #000000 !important;
+    }
+    /* White text inside black boxes — NOT overridden by any * rule */
+    .print-black-box,
+    .print-black-box span,
+    .print-black-box div,
+    .print-black-box * {
+      color: #ffffff !important;
     }
 
-    .total-box,
-    .total-box * {
-      color: #fff !important;
-      background: #000 !important;
+    /* ── PAID BADGE — gradient black bg + thick border matrix ── */
+    .print-badge-paid {
+      background-color: #000000 !important;
+      background-image: linear-gradient(#000000, #000000) !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+      border: 2px solid #000000 !important;
+      display: inline-block !important;
+    }
+    .print-badge-paid,
+    .print-badge-paid * {
+      color: #ffffff !important;
     }
 
-    .status-badge-pending,
-    .status-badge-pending * {
-      color: #000 !important;
-      background: #fff !important;
+    /* ── PENDING BADGE — white bg, black border ── */
+    .print-badge-pending {
+      background-color: #ffffff !important;
+      border: 2px solid #000000 !important;
+    }
+    .print-badge-pending,
+    .print-badge-pending * {
+      color: #000000 !important;
     }
 
-    .status-badge-paid,
-    .status-badge-paid * {
-      color: #fff !important;
-      background: #000 !important;
+    /* ── All other receipt text defaults to black ── */
+    .receipt-print-root > *,
+    .receipt-print-root div:not(.print-black-box):not(.print-badge-paid),
+    .receipt-print-root span:not(.print-black-box *):not(.print-badge-paid *) {
+      color: #000000;
     }
 
     .strikethrough-price {
-      color: #777 !important;
       text-decoration: line-through !important;
+      font-weight: 700 !important;
     }
 
-    .discounted-price {
-      color: #000 !important;
-      font-weight: 600 !important;
-    }
-
-    /* ── Monospace numeric alignment ── */
-    .mono-nums {
-      font-family: 'Courier New', 'Consolas', monospace;
-    }
-
-    /* ── Ensure no page breaks inside items ── */
     .receipt-item {
       page-break-inside: avoid;
       break-inside: avoid;
     }
 
-    /* ── SVG / Logo rendering ── */
-    svg {
-      shape-rendering: geometricPrecision;
-    }
-
-    /* ── Suppress any external link decoration in print ── */
-    a {
-      text-decoration: none;
-      color: inherit;
-    }
-
-    /* ── Ensure no extra padding/margins from parent influences ── */
-    :root {
-      --print-safe: 0;
-    }
+    a { text-decoration: none; }
   </style>
 </head>
 <body>

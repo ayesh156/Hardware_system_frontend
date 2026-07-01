@@ -6,11 +6,13 @@ import { useIsMobile } from '../hooks/use-mobile';
 import { useDropdownPosition } from '../hooks/use-dropdown-position';
 import { useCatalog } from '../contexts/CatalogContext';
 import { mockProducts, mockInvoices, mockCustomers } from '../data/mockData';
-import { Product, Invoice, InvoiceItem, FlattenedProduct, Customer } from '../types/index';
+import { Product, Invoice, InvoiceItem, FlattenedProduct, InventoryProduct, Customer } from '../types/index';
 import { flattenProducts } from '../lib/utils';
 import { printInvoice } from '../components/modals/PrintInvoiceModal';
+import ThermalReceiptPreview from '../components/ThermalReceiptPreview';
 import { ShortcutMapOverlay, ShortcutHintsBar, CheckoutMode, InvoiceStep } from '../components/ShortcutMapOverlay';
 import { CategoryGrid } from '../components/CategoryGrid';
+import { ProductFormModal } from '../components/ProductFormModal';
 import { PosItem, PosCategory } from '../data/mockData';
 import {
   Zap, Search, Plus, Trash2, ArrowLeft, Printer, ShoppingCart,
@@ -24,6 +26,12 @@ import { toast } from 'sonner';
 interface QuickInvoiceItem extends InvoiceItem {
   originalPrice: number;
   productNameSi?: string;
+  cost?: number;
+  lastPrice?: number;
+  salesPrice?: number;
+  displayPrice?: number;
+  ourPrice?: number;
+  storeQty?: number;
 }
 
 // Step configuration for Quick Checkout
@@ -73,11 +81,23 @@ export const QuickCheckout: React.FC = () => {
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
   
-  const [products] = useState<Product[]>(mockProducts);
-  const { inventoryItems } = useCatalog();
+  const { inventoryItems, addInventoryItem } = useCatalog();
   
-  // Flatten products so each variant appears as a distinct line item
+  // Derive flattenedProducts from mockProducts once for legacy product catalog
+  const [products] = useState<Product[]>(() => mockProducts);
   const flattenedProducts = useMemo(() => flattenProducts(products), [products]);
+  
+  // Build a live search index from inventoryItems for newly added products
+  const inventorySearchIndex = useMemo(() => {
+    const idx = new Map<string, InventoryProduct>();
+    inventoryItems.forEach(item => {
+      const key = item.searchKey.toLowerCase().trim();
+      if (key) idx.set(key, item);
+      const nameKey = item.name.toLowerCase().trim();
+      if (nameKey) idx.set(nameKey, item);
+    });
+    return idx;
+  }, [inventoryItems]);
   // ── In-place Edit mode via query param ──
   const editInvoiceId = searchParams.get('edit');
   const editingInvoice = useMemo(() => {
@@ -89,19 +109,34 @@ export const QuickCheckout: React.FC = () => {
   useEffect(() => {
     if (!editingInvoice) return;
 
-    // Map invoice items to QuickInvoiceItem format
-    const hydratedItems: QuickInvoiceItem[] = editingInvoice.items.map(item => ({
-      id: item.id,
-      productId: item.productId,
-      productName: item.productName,
-      productNameSi: (item as any).productNameSi,
-      variantId: item.variantId,
-      size: item.size,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      originalPrice: (item as any).originalPrice || item.unitPrice,
-      total: item.total,
-    }));
+    // Map invoice items → QuickInvoiceItem, preserving all pricing fields
+    // from the rich mock data (displayPrice, ourPrice, cost, etc.)
+    const hydratedItems: QuickInvoiceItem[] = editingInvoice.items.map(item => {
+      const ext = item as any;
+      const ourPrice   = Number(ext.ourPrice   || ext.salesPrice  || item.unitPrice || 0);
+      const dispPrice  = Number(ext.displayPrice|| ext.originalPrice || item.unitPrice || 0);
+      const costPrice  = Number(ext.cost        || 0);
+      const lastPrice  = Number(ext.lastPrice   || dispPrice);
+
+      return {
+        id: item.id,
+        productId: item.productId,
+        productName: item.productName,
+        productNameSi: ext.productNameSi || item.productName,
+        variantId: item.variantId,
+        size: item.size,
+        quantity: item.quantity,
+        // unitPrice drives the legacy subtotal calc — use ourPrice
+        unitPrice: ourPrice,
+        originalPrice: dispPrice,
+        displayPrice: dispPrice,
+        ourPrice: ourPrice,
+        cost: costPrice,
+        salesPrice: ourPrice,
+        lastPrice: lastPrice,
+        total: ourPrice * item.quantity,
+      };
+    });
     setItems(hydratedItems);
 
     // Populate customer
@@ -180,6 +215,7 @@ export const QuickCheckout: React.FC = () => {
   const [quickAddPrice, setQuickAddPrice] = useState<number>(0);
   const [quickAddQty, setQuickAddQty] = useState<number>(1);
   
+  const [showProductFormModal, setShowProductFormModal] = useState(false);
   const [selectedProductIndex, setSelectedProductIndex] = useState<number>(-1);
   const [selectedCartIndex, setSelectedCartIndex] = useState<number>(-1);
   const [isCartFocused, setIsCartFocused] = useState(false);
@@ -240,72 +276,37 @@ export const QuickCheckout: React.FC = () => {
     }
   }, [soundEnabled]);
 
-  // ── Build unified search map: searchKey → FlattenedProduct ──
-  // This syncs QuickCheckout with the master ProductTable data (inventoryItems)
-  const searchKeyToProductMap = useMemo(() => {
-    const map = new Map<string, FlattenedProduct>();
-    inventoryItems.forEach(inv => {
-      const key = inv.searchKey.toLowerCase().trim();
-      if (!key) return;
-      // Find matching FlattenedProduct by name similarity
-      const match = flattenedProducts.find(fp =>
-        fp.displayName.toLowerCase() === inv.name.toLowerCase() ||
-        fp.product.sku.toLowerCase() === key
-      );
-      if (match) map.set(key, match);
-    });
-    return map;
-  }, [flattenedProducts]);
-
-  // ── Direct search across both mockProducts (via flattenedProducts) and inventoryItems (via searchKey) ──
-  const filteredProducts = useMemo((): FlattenedProduct[] => {
+  // ── Search inventoryItems directly from live CatalogContext ──
+  const filteredProducts = useMemo((): any[] => {
     if (!productSearch.trim()) return [];
     
-    const searchTerm = productSearch.trim();
-    const searchLower = searchTerm.toLowerCase();
+    const query = productSearch.trim().toLowerCase();
     
-    // 1. Exact match by barcode or SKU from flattenedProducts
-    let exact = flattenedProducts.find(
-      (fp) =>
-        fp.displayBarcode === searchTerm ||
-        fp.displaySku.toLowerCase() === searchLower ||
-        fp.product.sku.toLowerCase() === searchLower
-    );
-    if (exact && exact.stock > 0) return [exact];
-    
-    // 2. Exact match by searchKey from inventoryItems (master ProductTable)
-    const searchKeyMatch = searchKeyToProductMap.get(searchLower);
-    if (searchKeyMatch && searchKeyMatch.stock > 0) return [searchKeyMatch];
-    
-    // 3. Partial match: check flattenedProducts AND inventoryItems searchKeys
-    const searchKeyPartialMatches: FlattenedProduct[] = [];
-    searchKeyToProductMap.forEach((fp, key) => {
-      if (fp.stock > 0 && (key.includes(searchLower) || searchLower.includes(key))) {
-        searchKeyPartialMatches.push(fp);
-      }
-    });
-    
-    // 4. Fuzzy match across everything
-    const fuzzyResults = flattenedProducts.filter(fp =>
-      fp.stock > 0 && (
-        fp.displayName.toLowerCase().includes(searchLower) ||
-        fp.displaySku.toLowerCase().includes(searchLower) ||
-        fp.product.sku.toLowerCase().includes(searchLower) ||
-        (fp.product.nameAlt && fp.product.nameAlt.includes(searchLower)) ||
-        (fp.displayBarcode && fp.displayBarcode.includes(searchLower)) ||
-        fp.product.category.toLowerCase().includes(searchLower) ||
-        (fp.variantLabel && fp.variantLabel.toLowerCase().includes(searchLower))
-      )
-    );
-    
-    // Merge: searchKey partial matches first (deduplicated), then fuzzy
-    const seen = new Set<string>();
-    const merged: FlattenedProduct[] = [];
-    searchKeyPartialMatches.forEach(fp => { if (!seen.has(fp.flatId)) { seen.add(fp.flatId); merged.push(fp); } });
-    fuzzyResults.forEach(fp => { if (!seen.has(fp.flatId)) { seen.add(fp.flatId); merged.push(fp); } });
-    
-    return merged.slice(0, 12);
-  }, [flattenedProducts, searchKeyToProductMap, productSearch]);
+    return inventoryItems.filter(item => {
+      if (!item.searchKey && !item.name) return false;
+      return (
+        item.searchKey?.toLowerCase() === query ||
+        item.name?.toLowerCase().includes(query) ||
+        item.searchKey?.toLowerCase().includes(query)
+      );
+    }).slice(0, 12).map(item => ({
+      flatId: item.id,
+      product: { nameAlt: item.name, sku: item.searchKey, category: item.productCategory } as any,
+      variant: undefined,
+      displayName: item.name,
+      displaySku: item.searchKey,
+      displayBarcode: item.searchKey,
+      costPrice: item.cost,
+      wholesalePrice: item.displayPrice,
+      retailPrice: item.salesPrice,
+      discountedPrice: undefined,
+      hasDiscount: false,
+      stock: item.storeQty,
+      minStock: 0,
+      isVariant: false,
+      variantLabel: undefined,
+    }));
+  }, [inventoryItems, productSearch]);
   const parseScanInput = (input: string): { code?: string; qty?: number } | null => {
     if (!input) return null;
     const trimmed = input.trim();
@@ -375,6 +376,10 @@ export const QuickCheckout: React.FC = () => {
         return;
       }
       
+      // Look up master product data from inventoryItems for distinct cost/lastPrice/salesPrice/storeQty
+      const masterProduct = inventoryItems.find(
+        inv => inv.id === flatProduct.flatId || inv.searchKey === flatProduct.displaySku
+      );
       const newItem: QuickInvoiceItem = {
         id: `item-${Date.now()}`,
         productId: flatProduct.flatId,
@@ -386,6 +391,12 @@ export const QuickCheckout: React.FC = () => {
         unitPrice: effectivePrice,
         originalPrice: normalPrice,
         total: addQty * effectivePrice,
+        cost: masterProduct ? Number(masterProduct.cost) || 0 : 0,
+        lastPrice: masterProduct ? Number(masterProduct.lastPrice) || 0 : 0,
+        salesPrice: masterProduct ? Number(masterProduct.salesPrice) || 0 : 0,
+        displayPrice: masterProduct ? Number(masterProduct.displayPrice || masterProduct.lastPrice) || 0 : 0,
+        ourPrice: masterProduct ? Number((masterProduct as any).ourPrice || masterProduct.salesPrice) || 0 : 0,
+        storeQty: masterProduct ? Number(masterProduct.storeQty) || 0 : 0,
       };
       setItems([...items, newItem]);
       
@@ -563,19 +574,32 @@ export const QuickCheckout: React.FC = () => {
     }, 50);
   }, [quickAddName, quickAddPrice, quickAddQty, playBeep, t]);
 
-  // Calculate totals
-  const originalSubtotal = items.reduce((sum, item) => sum + (item.originalPrice * item.quantity), 0);
+  // ── Computed totals (ourPrice-based) ──────────────────────────────────────
+  // These must be declared before any downstream `const` that references them.
+
+  const computedSubtotal = useMemo(() => {
+    return items.reduce((acc, item) => acc + (Number(item.ourPrice || 0) * item.quantity), 0);
+  }, [items]);
+
+  const computedDiscount = Number(discount) || 0;
+  const computedFinalTotal = Math.max(0, computedSubtotal - computedDiscount);
+
+  // Computed customer profit: Σ((displayPrice - ourPrice) × qty) + manual discount
+  const computedCustomerProfit = useMemo(() => {
+    const priceGapSavings = items.reduce((acc, item) => {
+      const display = Number(item.displayPrice || item.lastPrice || 0);
+      const our = Number(item.ourPrice || item.salesPrice || 0);
+      return acc + ((display - our) * item.quantity);
+    }, 0);
+    return priceGapSavings + (Number(discount) || 0);
+  }, [items, discount]);
+
+  // Legacy subtotal kept for applyDiscountToAll (uses item.unitPrice based totals)
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  const totalItemDiscounts = items.reduce((sum, item) => {
-    const itemDiscount = (item.originalPrice - item.unitPrice) * item.quantity;
-    return sum + (itemDiscount > 0 ? itemDiscount : 0);
-  }, 0);
-  const discountAmount = Math.min(discount, subtotal);
-  const total = subtotal - discountAmount;
-  
+
   const [receivedAmount, setReceivedAmount] = useState<number>(0);
   const receivedAmountInputRef = useRef<HTMLInputElement>(null);
-  const changeAmount = receivedAmount > 0 ? Math.max(0, receivedAmount - total) : 0;
+  const changeAmount = receivedAmount > 0 ? Math.max(0, receivedAmount - computedFinalTotal) : 0;
 
   // Clear cart
   const clearCart = useCallback(() => {
@@ -610,17 +634,27 @@ export const QuickCheckout: React.FC = () => {
     setIsProcessing(true);
     
     const invoiceNumber = generateNextInvoiceNumberSync();
-    const invoiceDiscount = Math.round(discountAmount * 100) / 100;
+    const invoiceDiscount = Math.round(computedDiscount * 100) / 100;
+    // Build invoice items preserving displayPrice / ourPrice for print template
+    const invoiceItems = items.map(item => ({
+      ...item,
+      unitPrice: Number(item.ourPrice || item.unitPrice),
+      total: Number(item.ourPrice || item.unitPrice) * item.quantity,
+      displayPrice: Number(item.displayPrice || item.lastPrice || item.unitPrice),
+      ourPrice: Number(item.ourPrice || item.salesPrice || item.unitPrice),
+    }));
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
       invoiceNumber,
-      customerId: 'walk-in',
-      customerName: t('invoice.walkInCustomer'),
-      items,
-      subtotal: Math.round(subtotal * 100) / 100,
+      customerId: selectedCustomerId || 'walk-in',
+      customerName: selectedCustomerId !== 'walk-in'
+        ? (mockCustomers.find(c => c.id === selectedCustomerId)?.name ?? t('invoice.walkInCustomer'))
+        : t('invoice.walkInCustomer'),
+      items: invoiceItems,
+      subtotal: Math.round(computedSubtotal * 100) / 100,
       tax: 0,
       discount: invoiceDiscount,
-      total: Math.round(total * 100) / 100,
+      total: Math.round(computedFinalTotal * 100) / 100,
       receivedAmount: receivedAmount > 0 ? Math.round(receivedAmount * 100) / 100 : undefined,
       changeAmount: changeAmount > 0 ? Math.round(changeAmount * 100) / 100 : undefined,
       issueDate: new Date().toISOString().split('T')[0],
@@ -634,6 +668,9 @@ export const QuickCheckout: React.FC = () => {
 
     playBeep('success');
 
+    const selectedCustomer = selectedCustomerId !== 'walk-in'
+      ? mockCustomers.find(c => c.id === selectedCustomerId) ?? null
+      : null;
     const walkInCustomer: Customer = {
       id: 'walk-in',
       name: t('invoice.walkInCustomer'),
@@ -648,7 +685,7 @@ export const QuickCheckout: React.FC = () => {
       loanBalance: 0
     };
 
-    printInvoice(invoice, walkInCustomer, isSinhala ? 'si' : 'en')
+    printInvoice(invoice, selectedCustomer ?? walkInCustomer, isSinhala ? 'si' : 'en')
       .then(() => {
         finalizeSale(invoice.invoiceNumber);
       })
@@ -656,7 +693,7 @@ export const QuickCheckout: React.FC = () => {
         toast.error(t('quickCheckout.printBlocked'));
         finalizeSale(invoice.invoiceNumber);
       });
-  }, [items, subtotal, total, discountAmount, totalItemDiscounts, paymentMethod, playBeep, t, finalizeSale, receivedAmount, changeAmount, isSinhala]);
+  }, [items, computedSubtotal, computedFinalTotal, computedDiscount, selectedCustomerId, paymentMethod, playBeep, t, finalizeSale, receivedAmount, changeAmount, isSinhala]);
 
   // Quick save
   const handleQuickSave = useCallback(() => {
@@ -665,17 +702,27 @@ export const QuickCheckout: React.FC = () => {
     setIsProcessing(true);
     
     const invoiceNumber = generateNextInvoiceNumberSync();
-    const invoiceDiscount = Math.round(discountAmount * 100) / 100;
+    const invoiceDiscount = Math.round(computedDiscount * 100) / 100;
+    // Build invoice items preserving displayPrice / ourPrice
+    const invoiceItems = items.map(item => ({
+      ...item,
+      unitPrice: Number(item.ourPrice || item.unitPrice),
+      total: Number(item.ourPrice || item.unitPrice) * item.quantity,
+      displayPrice: Number(item.displayPrice || item.lastPrice || item.unitPrice),
+      ourPrice: Number(item.ourPrice || item.salesPrice || item.unitPrice),
+    }));
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
       invoiceNumber,
-      customerId: 'walk-in',
-      customerName: t('invoice.walkInCustomer'),
-      items,
-      subtotal: Math.round(subtotal * 100) / 100,
+      customerId: selectedCustomerId || 'walk-in',
+      customerName: selectedCustomerId !== 'walk-in'
+        ? (mockCustomers.find(c => c.id === selectedCustomerId)?.name ?? t('invoice.walkInCustomer'))
+        : t('invoice.walkInCustomer'),
+      items: invoiceItems,
+      subtotal: Math.round(computedSubtotal * 100) / 100,
       tax: 0,
       discount: invoiceDiscount,
-      total: Math.round(total * 100) / 100,
+      total: Math.round(computedFinalTotal * 100) / 100,
       receivedAmount: receivedAmount > 0 ? Math.round(receivedAmount * 100) / 100 : undefined,
       changeAmount: changeAmount > 0 ? Math.round(changeAmount * 100) / 100 : undefined,
       issueDate: new Date().toISOString().split('T')[0],
@@ -698,7 +745,7 @@ export const QuickCheckout: React.FC = () => {
     setReceivedAmount(0);
     setIsProcessing(false);
     searchInputRef.current?.focus();
-  }, [items, subtotal, total, discountAmount, totalItemDiscounts, paymentMethod, playBeep, t, isProcessing, receivedAmount, changeAmount]);
+  }, [items, computedSubtotal, computedFinalTotal, computedDiscount, selectedCustomerId, paymentMethod, playBeep, t, isProcessing, receivedAmount, changeAmount]);
 
   // Keyboard event handler (full, preserved as-is)
   useEffect(() => {
@@ -1571,7 +1618,7 @@ export const QuickCheckout: React.FC = () => {
                   type="number"
                   inputMode="decimal"
                   min="0"
-                  max={subtotal}
+                  max={computedSubtotal}
                   value={discount || ''}
                   onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
                   placeholder={t('quickCheckout.discount')}
@@ -1637,8 +1684,8 @@ export const QuickCheckout: React.FC = () => {
       />
 
       {/* Compact toolbar - no top nav header, just a slim bar */}
-      <div className={`sticky top-0 z-40 px-3 py-1.5 ${isDark ? 'bg-slate-800/95 backdrop-blur border-b border-slate-700/50' : 'bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm'}`}>
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
+      <div className={`sticky top-0 z-10 px-3 py-1.5 ${isDark ? 'bg-slate-800/95 backdrop-blur border-b border-slate-700/50' : 'bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm'}`}>
+        <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/invoices')}
@@ -1681,10 +1728,13 @@ export const QuickCheckout: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-3">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          {/* Left Panel */}
-          <div className="lg:col-span-2 space-y-2">
+      <div className="w-full px-6 py-3">
+        <div className="flex gap-4 items-start">
+          {/* ── LEFT + CENTRE: existing 12-col grid ── */}
+          <div className="flex-1 min-w-0">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Left Panel - Main checkout area */}
+          <div className="lg:col-span-9 space-y-2">
             {/* Condensed Search Bar */}
             <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
               {pendingProduct && (
@@ -1777,6 +1827,14 @@ export const QuickCheckout: React.FC = () => {
                   </div>
                 </div>
                 
+                {/* + Add Product button */}
+                <button
+                  onClick={() => setShowProductFormModal(true)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium text-xs transition-all bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow shadow-amber-500/30`}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{t('products.addProduct')}</span>
+                </button>
                 {/* Condensed Quantity Input */}
                 <div className="flex items-center gap-1">
                   <label className={`text-[10px] font-medium mr-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Qty:</label>
@@ -1971,9 +2029,21 @@ export const QuickCheckout: React.FC = () => {
                   <p className="text-xs mt-0.5">{t('quickCheckout.scanOrSearch')}</p>
                 </div>
               ) : (
+                <>
+                {/* Cart table header — 12-column grid for strict vertical alignment */}
+                <div className={`grid grid-cols-12 gap-x-2 px-2 py-1.5 mb-1 rounded-lg text-[9px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500 bg-slate-800/50' : 'text-slate-500 bg-slate-100'}`}>
+                  <div className="col-span-3">Product</div>
+                  <div className="col-span-1 text-right">Cost</div>
+                  <div className="col-span-1 text-right">Last</div>
+                  <div className="col-span-1 text-right">Display</div>
+                  <div className="col-span-1 text-right">Our</div>
+                  <div className="col-span-1 text-center">Stock</div>
+                  <div className="col-span-2 text-center">Qty</div>
+                  <div className="col-span-2 text-right">Subtotal</div>
+                </div>
                 <div 
                   ref={cartItemsContainerRef}
-                  className="space-y-1 h-[180px] overflow-y-auto"
+                  className="space-y-0.5 h-[280px] overflow-y-auto"
                 >
                   {items.map((item, index) => (
                     <div
@@ -2003,7 +2073,7 @@ export const QuickCheckout: React.FC = () => {
                         setSelectedCartIndex(index);
                         setCurrentMode('cart');
                       }}
-                      className={`flex items-center gap-2 p-2 rounded-lg transition-all cursor-pointer outline-none ${
+                      className={`grid grid-cols-12 gap-x-2 items-center px-2 py-2 rounded-lg transition-all cursor-pointer outline-none relative group ${
                         isCartFocused && index === selectedCartIndex
                           ? isDark 
                             ? 'bg-amber-500/20 shadow ring-1 ring-amber-500/50' 
@@ -2011,46 +2081,88 @@ export const QuickCheckout: React.FC = () => {
                           : isDark ? 'bg-slate-700/50 hover:bg-slate-700' : 'bg-slate-50 hover:bg-slate-100'
                       }`}
                     >
-                      <span className={`w-4 text-center font-mono text-[10px] ${isCartFocused && index === selectedCartIndex ? 'text-amber-500 font-bold' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {index + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-xs font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      {/* col 1-3: Product name */}
+                      <div className="col-span-3 min-w-0">
+                        <p className={`text-[11px] font-medium truncate leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {isSinhala ? (item.productNameSi || item.productName) : item.productName}
                         </p>
-                        <div className={`text-[10px] flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {item.unitPrice !== item.originalPrice && (
-                            <span className="line-through">Rs. {item.originalPrice.toLocaleString()}</span>
-                          )}
-                          <span className={item.unitPrice !== item.originalPrice ? 'text-emerald-500 font-medium' : ''}>
-                            Rs. {item.unitPrice.toLocaleString()}
-                          </span>
-                          <span>× {item.quantity}</span>
-                        </div>
+                        {isPriceEditing && isCartFocused && index === selectedCartIndex && (
+                          <p className={`text-[9px] font-mono ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                            ✎ {priceEditBuffer || '…'}
+                          </p>
+                        )}
                       </div>
-                      
-                      <div className="flex items-center gap-0.5">
-                        <button onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, decrementQuantity(item.quantity, 0.01)); }} className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}`}>-</button>
-                        <span className={`w-7 text-center font-bold text-[11px] ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.quantity}</span>
-                        <button onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, incrementQuantity(item.quantity)); }} className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}`}>+</button>
+                      {/* col 4: Cost */}
+                      <div className="col-span-1 text-right">
+                        <span className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {Number(item.cost || 0).toLocaleString()}
+                        </span>
                       </div>
-                      
-                      {isCartFocused && index === selectedCartIndex && isPriceEditing ? (
-                        <div className={`px-1.5 py-0.5 rounded border ${isDark ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-emerald-50 border-emerald-400 text-emerald-700'}`}>
-                          <p className="font-bold font-mono text-[10px]">Rs. {priceEditBuffer || '0'}</p>
-                        </div>
-                      ) : (
-                        <p className={`w-14 text-right font-bold font-mono text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
-an                          Rs. {item.total.toLocaleString()}
-                        </p>
-                      )}
-                      
-                      <button onClick={(e) => { e.stopPropagation(); removeItem(item.id); }} className="p-1 rounded-md text-red-500 hover:bg-red-500/10">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      {/* col 5: Last Price */}
+                      <div className="col-span-1 text-right">
+                        <span className={`text-[10px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {Number(item.lastPrice || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      {/* col 6: Display Price */}
+                      <div className="col-span-1 text-right">
+                        <span className={`text-[10px] font-semibold font-mono ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                          {Number(item.displayPrice || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      {/* col 7: Our Price */}
+                      <div className="col-span-1 text-right">
+                        <span className={`text-[10px] font-bold font-mono ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>
+                          {Number(item.ourPrice || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      {/* col 8: Stock */}
+                      <div className="col-span-1 text-center">
+                        <span className={`text-[10px] font-mono ${
+                          item.storeQty !== undefined && item.storeQty < 10
+                            ? 'text-amber-500 font-bold animate-pulse'
+                            : isDark ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
+                          {item.storeQty ?? '—'}
+                        </span>
+                      </div>
+                      {/* col 9-10: Qty stepper */}
+                      <div className="col-span-2 flex justify-center items-center gap-0.5">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, decrementQuantity(item.quantity, 0.01)); }}
+                          className={`w-5 h-5 rounded flex items-center justify-center transition-colors flex-shrink-0 ${isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}`}
+                        >
+                          <Minus className="w-2.5 h-2.5" />
+                        </button>
+                        <span className={`w-6 text-center font-bold text-[10px] tabular-nums ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, incrementQuantity(item.quantity)); }}
+                          className={`w-5 h-5 rounded flex items-center justify-center transition-colors flex-shrink-0 ${isDark ? 'bg-slate-600 hover:bg-slate-500 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}`}
+                        >
+                          <Plus className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                      {/* col 11-12: Line total (ourPrice × qty) */}
+                      <div className="col-span-2 text-right pr-4">
+                        <span className={`text-[11px] font-bold font-mono tabular-nums ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          {(Number(item.ourPrice || 0) * item.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      {/* Hover remove button */}
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                          className="p-0.5 rounded text-red-500 hover:bg-red-500/10"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
+                </>
               )}
             </div>
 
@@ -2063,31 +2175,40 @@ an                          Rs. {item.total.toLocaleString()}
                 </h3>
               </div>
               <CategoryGrid onItemSelect={(item, category) => {
-                const qty = Math.max(1, quantity);
-                const newItem: QuickInvoiceItem = {
-                  id: `pos-${Date.now()}`,
-                  productId: `pos-${category.id}-${item.id}`,
-                  productName: item.name,
-                  productNameSi: item.nameSi || item.name,
-                  quantity: qty,
-                  unitPrice: item.unitRate,
-                  originalPrice: item.unitRate,
-                  total: qty * item.unitRate,
-                };
-                setItems(prev => [...prev, newItem]);
-                playBeep('add');
-                toast.success(`${item.name} ${t('quickCheckout.addedToCart')}`);
+                // Set pending product to show quantity input inline
+                const fp: FlattenedProduct = {
+                  flatId: `pos-${category.id}-${item.id}`,
+                  product: { nameAlt: item.nameSi || item.name, sku: item.sku, category: category.name } as any,
+                  displayName: item.name,
+                  displaySku: item.sku,
+                  retailPrice: item.unitRate,
+                  stock: item.stock,
+                  costPrice: item.unitRate,
+                  wholesalePrice: item.unitRate,
+                  hasDiscount: false,
+                  discountedPrice: undefined,
+                  minStock: 0,
+                  isVariant: false,
+                } as FlattenedProduct;
+                setPendingProduct(fp);
+                setProductSearch('');
+                setSelectedProductIndex(-1);
+                setQuantity(1);
+                setIsQuantityFocused(true);
+                setIsCartFocused(false);
+                setCurrentMode('quantity');
                 setTimeout(() => {
-                  if (cartItemsContainerRef.current) {
-                    cartItemsContainerRef.current.scrollTop = cartItemsContainerRef.current.scrollHeight;
-                  }
+                  quantityInputRef.current?.focus();
+                  quantityInputRef.current?.select();
                 }, 50);
+                playBeep('add');
+                toast.info(`${item.name} - ${t('quickCheckout.enterQuantity')}`);
               }} />
             </div>
           </div>
 
           {/* Right Panel - Checkout Summary */}
-          <div className="space-y-2">
+          <div className="lg:col-span-3 space-y-2">
             {/* Discount */}
             <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
               <div className="flex items-center justify-between mb-1.5">
@@ -2099,7 +2220,7 @@ an                          Rs. {item.total.toLocaleString()}
               </div>
               <div className="relative">
                 <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Rs.</span>
-                <input ref={discountInputRef} type="number" min="0" max={subtotal} value={discount || ''} onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} onFocus={() => { setIsCartFocused(false); setSelectedCartIndex(-1); setIsPaymentFocused(false); setPriceEditBuffer(''); setIsPriceEditing(false); setCurrentMode('discount'); }} onBlur={() => setCurrentMode('search')} placeholder="0" className={`w-full pl-9 pr-3 py-2 text-sm text-right font-bold border-2 rounded-lg focus:outline-none transition-all ${isDark ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-amber-500' : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-amber-500'}`} />
+                <input ref={discountInputRef} type="number" min="0" max={computedSubtotal} value={discount || ''} onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} onFocus={() => { setIsCartFocused(false); setSelectedCartIndex(-1); setIsPaymentFocused(false); setPriceEditBuffer(''); setIsPriceEditing(false); setCurrentMode('discount'); }} onBlur={() => setCurrentMode('search')} placeholder="0" className={`w-full pl-9 pr-3 py-2 text-sm text-right font-bold border-2 rounded-lg focus:outline-none transition-all ${isDark ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-amber-500' : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-amber-500'}`} />
               </div>
             </div>
 
@@ -2107,7 +2228,7 @@ an                          Rs. {item.total.toLocaleString()}
             <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
               <div className="flex items-center justify-between mb-1.5">
                 <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  <Banknote className={`w-3 h-3 ${receivedAmount > 0 && receivedAmount >= total ? 'text-emerald-500' : ''}`} />
+                  <Banknote className={`w-3 h-3 ${receivedAmount > 0 && receivedAmount >= computedFinalTotal ? 'text-emerald-500' : ''}`} />
                   {t('invoice.receivedAmount')}
                 </h3>
                 <kbd className={`px-1 py-0.5 rounded text-[9px] font-mono ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>F7</kbd>
@@ -2117,7 +2238,7 @@ an                          Rs. {item.total.toLocaleString()}
                 <input ref={receivedAmountInputRef} type="number" min="0" value={receivedAmount || ''} onChange={(e) => setReceivedAmount(Math.max(0, parseFloat(e.target.value) || 0))} onFocus={() => { setIsCartFocused(false); setSelectedCartIndex(-1); setIsPaymentFocused(false); setPriceEditBuffer(''); setIsPriceEditing(false); setCurrentMode('payment'); }} onBlur={() => setCurrentMode('search')} placeholder="0" className={`w-full pl-9 pr-3 py-2 text-sm text-right font-bold border-2 rounded-lg focus:outline-none transition-all ${isDark ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-emerald-500' : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-emerald-500'}`} />
               </div>
               <div className="mt-1.5 grid grid-cols-4 gap-1">
-                {[{ label: 'Exact', value: total, isExact: true }, { label: '+100', value: Math.ceil(total / 100) * 100 }, { label: '+500', value: Math.ceil(total / 500) * 500 }, { label: '+1K', value: Math.ceil(total / 1000) * 1000 }].map((btn) => (
+                {[{ label: 'Exact', value: computedFinalTotal, isExact: true }, { label: '+100', value: Math.ceil(computedFinalTotal / 100) * 100 }, { label: '+500', value: Math.ceil(computedFinalTotal / 500) * 500 }, { label: '+1K', value: Math.ceil(computedFinalTotal / 1000) * 1000 }].map((btn) => (
                   <button key={btn.label} onClick={() => { setReceivedAmount(btn.value); playBeep('add'); }} className={`px-1 py-1 rounded text-[9px] font-medium transition-all ${btn.isExact ? isDark ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-200' : isDark ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}>{btn.isExact ? '= ' + btn.value.toLocaleString() : btn.label}</button>
                 ))}
               </div>
@@ -2133,31 +2254,55 @@ an                          Rs. {item.total.toLocaleString()}
 
             {/* Summary */}
             <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
-              <h3 className={`text-xs font-semibold mb-2 flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <h3 className={`text-xs font-semibold mb-2.5 flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 <Calculator className="w-3 h-3" />
                 {t('quickCheckout.summary')}
               </h3>
-              
-              <div className="space-y-1.5 text-[11px]">
+
+              <div className="space-y-2 text-[11px]">
+                {/* Total items */}
                 <div className={`flex justify-between ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                   <span>{t('quickCheckout.itemCount')}</span>
-                  <span className="font-medium">{items.reduce((sum, i) => sum + i.quantity, 0)} {t('invoice.units')}</span>
+                  <span className="font-medium tabular-nums">
+                    {items.reduce((sum, i) => sum + i.quantity, 0)} {t('invoice.units')}
+                  </span>
                 </div>
+
+                {/* Subtotal */}
                 <div className={`flex justify-between ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                   <span>{t('invoice.subtotal')}</span>
-                  <span className="font-mono">Rs. {subtotal.toLocaleString()}</span>
+                  <span className="font-mono tabular-nums">
+                    Rs. {computedSubtotal.toFixed(2)}
+                  </span>
                 </div>
-                {discountAmount > 0 && (
-                  <div className={`flex justify-between items-center text-red-500`}>
-                    <span className="flex items-center gap-1">{t('quickCheckout.discount')}</span>
-                    <span className="font-mono">- Rs. {discountAmount.toLocaleString()}</span>
+
+                {/* Manual discount — conditional */}
+                {computedDiscount > 0 && (
+                  <div className="flex justify-between items-center text-red-500">
+                    <span>{t('quickCheckout.discount')}</span>
+                    <span className="font-mono tabular-nums">- Rs. {computedDiscount.toFixed(2)}</span>
                   </div>
                 )}
-                
-                <div className={`pt-1.5 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+
+                {/* ඔබ ලැබූ ලාභය — always shown when savings > 0 */}
+                {computedCustomerProfit > 0 && (
+                  <div className={`flex justify-between items-center ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                    <span className="font-semibold">ඔබ ලැබූ ලාභය</span>
+                    <span className="font-mono font-bold tabular-nums">
+                      Rs. {computedCustomerProfit.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Grand total */}
+                <div className={`pt-2 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                   <div className="flex justify-between items-center">
-                    <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{t('invoice.totalAmount')}</span>
-                    <span className="text-lg font-bold text-emerald-500">Rs. {total.toLocaleString()}</span>
+                    <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      {t('invoice.totalAmount')}
+                    </span>
+                    <span className="text-base font-bold text-emerald-500 tabular-nums font-mono">
+                      Rs. {computedFinalTotal.toFixed(2)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -2278,7 +2423,28 @@ an                          Rs. {item.total.toLocaleString()}
             </div>
           </div>
         </div>
-      </div>
+          </div>{/* end flex-1 inner grid wrapper */}
+
+          {/* ── RECEIPT PREVIEW COLUMN — visible on xl+ ── */}
+          <div className="hidden xl:block w-[320px] flex-shrink-0 sticky top-[52px] self-start max-h-[calc(100vh-68px)] overflow-y-auto">
+            <ThermalReceiptPreview
+              items={items}
+              discount={computedDiscount}
+              receivedAmount={receivedAmount}
+              paymentMethod={paymentMethod}
+              subtotal={computedSubtotal}
+              total={computedFinalTotal}
+              customer={
+                selectedCustomerId !== 'walk-in'
+                  ? (mockCustomers.find(c => c.id === selectedCustomerId) ?? null)
+                  : null
+              }
+              invoiceNumber="PREVIEW"
+              language={isSinhala ? 'si' : 'en'}
+            />
+          </div>
+        </div>{/* end outer flex gap-4 */}
+      </div>{/* end w-full px-6 py-3 */}
 
       {!isMobile && (
         <ShortcutHintsBar
@@ -2288,6 +2454,14 @@ an                          Rs. {item.total.toLocaleString()}
           onShowFullMap={() => setShowShortcutMap(true)}
         />
       )}
+
+      {/* ── Unified Product Form Modal ── */}
+      <ProductFormModal
+        isOpen={showProductFormModal}
+        onClose={() => setShowProductFormModal(false)}
+        mode="create"
+        initialData={null}
+      />
     </div>
   );
 };

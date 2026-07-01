@@ -494,15 +494,207 @@ export const mockProducts: Product[] = [
   ], supplierId: 'sup-007', supplierName: 'Bosch Power Tools Lanka', isActive: true, createdAt: '2024-04-20', updatedAt: '2024-12-01' },
 ];
 
-// Invoices (unchanged)
+// ──────────────────────────────────────────────
+// MOCK INVOICES — 15 rich records with full pricing fields
+// Each item carries: displayPrice, ourPrice, originalPrice, cost
+// These fields hydrate the QuickCheckout cart on Edit
+// ──────────────────────────────────────────────
 export const mockInvoices: Invoice[] = [
-  { id: 'inv-001', invoiceNumber: 'INV-2024-0156', customerId: 'cust-001', customerName: 'Rajapaksha Builders & Co.', items: [{ id: 'item-001', productId: 'prod-001', productName: 'INSEE Sanstha Cement', quantity: 50, unitPrice: 2100, total: 105000 }, { id: 'item-002', productId: 'prod-003', productName: 'Lanwa Steel Bar 10mm', variantId: 'var-003-2', size: '10mm', quantity: 200, unitPrice: 350, total: 70000 }, { id: 'item-003', productId: 'prod-008', productName: 'National PVC Pipe 1', variantId: 'var-008-3', size: '1', quantity: 20, unitPrice: 620, total: 12400 }], subtotal: 187400, tax: 9370, total: 196770, issueDate: '2024-12-01', dueDate: '2024-12-15', status: 'paid', paymentMethod: 'bank_transfer' },
-  { id: 'inv-002', invoiceNumber: 'INV-2024-0157', customerId: 'cust-003', customerName: 'D.W. Electrical Solutions', items: [{ id: 'item-004', productId: 'prod-005', productName: 'Kelani House Wire 2.5mm Red', variantId: 'var-005-3', size: '2.5mm', quantity: 500, unitPrice: 175, total: 87500 }, { id: 'item-005', productId: 'prod-007', productName: 'ACL MCB 32A', variantId: 'var-007-3', size: '32A', quantity: 20, unitPrice: 550, total: 11000 }], subtotal: 107750, tax: 5388, total: 113138, issueDate: '2024-12-05', dueDate: '2024-12-20', status: 'pending', paymentMethod: 'credit' },
-  { id: 'inv-003', invoiceNumber: 'INV-2024-0158', customerId: 'cust-005', customerName: 'Bandara Industrial Supplies', items: [{ id: 'item-007', productId: 'prod-002', productName: 'Tokyo Super Cement', quantity: 100, unitPrice: 2200, total: 220000 }, { id: 'item-008', productId: 'prod-003', productName: 'Lanwa Steel Bar 16mm', variantId: 'var-003-4', size: '16mm', quantity: 500, unitPrice: 365, total: 182500 }], subtotal: 470000, tax: 23500, total: 493500, issueDate: '2024-11-28', dueDate: '2024-12-12', status: 'overdue', paymentMethod: 'credit' },
-  { id: 'inv-004', invoiceNumber: 'INV-2024-0159', customerId: 'cust-002', customerName: 'Silva Home Décor', items: [{ id: 'item-010', productId: 'prod-009', productName: 'Nippon Weatherbond 10L White', variantId: 'var-009-3', size: '10L', quantity: 10, unitPrice: 5200, total: 52000 }], subtotal: 101600, tax: 5080, total: 106680, issueDate: '2024-12-10', dueDate: '2024-12-25', status: 'paid', paymentMethod: 'cash' },
-  { id: 'inv-005', invoiceNumber: 'INV-2024-0160', customerId: 'cust-004', customerName: 'Gunasekara Hardware Mart', items: [{ id: 'item-012', productId: 'prod-011', productName: 'Bosch GSB 550 Impact Drill', quantity: 5, unitPrice: 15500, total: 77500 }, { id: 'item-013', productId: 'prod-012', productName: 'Stanley FatMax Tape 8m', variantId: 'var-012-2', size: '8m', quantity: 20, unitPrice: 2400, total: 48000 }], subtotal: 138500, tax: 6925, total: 145425, issueDate: '2024-12-12', dueDate: '2024-12-27', status: 'pending', paymentMethod: 'bank_transfer' },
-  { id: 'inv-106', invoiceNumber: 'INV-2024-0161', customerId: 'cust-006', customerName: 'Herath Construction', items: [{ id: 'item-015', productId: 'prod-001', productName: 'INSEE Cement', quantity: 30, unitPrice: 2100, total: 63000 }], subtotal: 63000, tax: 3150, total: 66150, issueDate: '2024-12-14', dueDate: '2024-12-29', status: 'pending', paymentMethod: 'cash' },
-  { id: 'inv-107', invoiceNumber: 'INV-2024-0162', customerId: 'cust-007', customerName: 'Fernando & Sons Hardware', items: [{ id: 'item-018', productId: 'prod-019', productName: 'Red Clay Bricks', quantity: 1000, unitPrice: 35, total: 35000 }], subtotal: 35000, tax: 0, total: 35000, issueDate: '2024-12-16', dueDate: '2024-12-30', status: 'paid', paymentMethod: 'bank_transfer' },
+  {
+    id: 'inv-001', invoiceNumber: '146720',
+    customerId: 'cust-001', customerName: 'Nimal Rajapaksha',
+    items: [
+      { id: 'i001a', productId: 'prod-001', productName: 'INSEE Sanstha Cement 50kg', productNameSi: 'ඉන්සී සංස්ථා සිමෙන්ති 50kg', quantity: 50, unitPrice: 2100, originalPrice: 2200, displayPrice: 2200, ourPrice: 2100, cost: 1900, total: 105000 } as any,
+      { id: 'i001b', productId: 'prod-003', productName: 'Lanwa Steel Bar 10mm', productNameSi: 'ලන්වා වානේ කූරු 10mm', variantId: 'var-003-2', size: '10mm', quantity: 200, unitPrice: 350, originalPrice: 380, displayPrice: 380, ourPrice: 350, cost: 310, total: 70000 } as any,
+      { id: 'i001c', productId: 'prod-008', productName: 'National PVC Pipe 1"', productNameSi: 'නැෂනල් PVC නල 1"', quantity: 20, unitPrice: 620, originalPrice: 650, displayPrice: 650, ourPrice: 620, cost: 550, total: 12400 } as any,
+      { id: 'i001d', productId: 'prod-021', productName: 'Harris Paint Brush 3"', productNameSi: 'හැරිස් තීන්ත බුරුසු 3"', quantity: 5, unitPrice: 380, originalPrice: 420, displayPrice: 420, ourPrice: 380, cost: 310, total: 1900 } as any,
+    ],
+    subtotal: 189300, discount: 500, tax: 0, total: 188800,
+    receivedAmount: 200000, changeAmount: 11200,
+    issueDate: '2026-06-15', dueDate: '2026-06-15', status: 'paid', paymentMethod: 'cash',
+  },
+  {
+    id: 'inv-002', invoiceNumber: '146721',
+    customerId: 'cust-003', customerName: 'Dinesh Wickramasinghe',
+    items: [
+      { id: 'i002a', productId: 'prod-005', productName: 'Kelani Twin Earth Cable 2.5mm²', productNameSi: 'කැලණි ට්වින් කේබල් 2.5mm²', quantity: 500, unitPrice: 150, originalPrice: 165, displayPrice: 165, ourPrice: 150, cost: 135, total: 75000 } as any,
+      { id: 'i002b', productId: 'prod-007', productName: 'ACL Multi-strand Cable 4.0mm²', productNameSi: 'ACL බහු-වයර් කේබල් 4.0mm²', quantity: 200, unitPrice: 235, originalPrice: 260, displayPrice: 260, ourPrice: 235, cost: 210, total: 47000 } as any,
+      { id: 'i002c', productId: 'prod-006', productName: 'Orange 2 Gang Light Switch', productNameSi: 'ඔරේන්ජ් 2 ගෑං ස්විච', quantity: 30, unitPrice: 270, originalPrice: 300, displayPrice: 300, ourPrice: 270, cost: 250, total: 8100 } as any,
+      { id: 'i002d', productId: 'prod-010', productName: 'Orange 13A Switched Socket', productNameSi: 'ඔරේන්ජ් 13A සොකට්', quantity: 20, unitPrice: 350, originalPrice: 380, displayPrice: 380, ourPrice: 350, cost: 320, total: 7000 } as any,
+    ],
+    subtotal: 137100, discount: 1000, tax: 0, total: 136100,
+    receivedAmount: 136100, changeAmount: 0,
+    issueDate: '2026-06-14', dueDate: '2026-07-14', status: 'pending', paymentMethod: 'credit',
+  },
+  {
+    id: 'inv-003', invoiceNumber: '146722',
+    customerId: 'cust-005', customerName: 'Kasun Bandara',
+    items: [
+      { id: 'i003a', productId: 'prod-002', productName: 'Tokyo Super Cement 50kg', productNameSi: 'ටෝකියෝ සුපර් සිමෙන්ති 50kg', quantity: 100, unitPrice: 1900, originalPrice: 2000, displayPrice: 2000, ourPrice: 1900, cost: 1750, total: 190000 } as any,
+      { id: 'i003b', productId: 'prod-003', productName: 'Lanwa Steel Bar 12mm', productNameSi: 'ලන්වා වානේ කූරු 12mm', variantId: 'var-003-3', size: '12mm', quantity: 300, unitPrice: 360, originalPrice: 400, displayPrice: 400, ourPrice: 360, cost: 285, total: 108000 } as any,
+      { id: 'i003c', productId: 'prod-013', productName: 'GI Binding Wire 5kg Roll', productNameSi: 'GI බැඳුම් කම්බි 5kg', quantity: 20, unitPrice: 1200, originalPrice: 1300, displayPrice: 1300, ourPrice: 1200, cost: 1100, total: 24000 } as any,
+      { id: 'i003d', productId: 'prod-021', productName: 'Local River Sand 1 Cube', productNameSi: 'දේශීය ගංගා වැලි 1 කිව්බ්', quantity: 5, unitPrice: 20000, originalPrice: 21500, displayPrice: 21500, ourPrice: 20000, cost: 18000, total: 100000 } as any,
+    ],
+    subtotal: 422000, discount: 2000, tax: 0, total: 420000,
+    receivedAmount: 420000, changeAmount: 0,
+    issueDate: '2026-06-13', dueDate: '2026-07-13', status: 'overdue', paymentMethod: 'credit',
+  },
+  {
+    id: 'inv-004', invoiceNumber: '146723',
+    customerId: 'cust-002', customerName: 'Chamari Silva',
+    items: [
+      { id: 'i004a', productId: 'prod-009', productName: 'Nippon Paint 3-in-1 4L White', productNameSi: 'නිපොන් 3-in-1 4L සුදු', quantity: 10, unitPrice: 4600, originalPrice: 5000, displayPrice: 5000, ourPrice: 4600, cost: 4200, total: 46000 } as any,
+      { id: 'i004b', productId: 'prod-010', productName: 'Dulux WeatherShield 10L White', productNameSi: 'ඩුලක්ස් වෙදර්ශීල්ඩ් 10L සුදු', quantity: 5, unitPrice: 11500, originalPrice: 12500, displayPrice: 12500, ourPrice: 11500, cost: 10500, total: 57500 } as any,
+      { id: 'i004c', productId: 'prod-012', productName: 'Harris Paint Brush 2"', productNameSi: 'හැරිස් තීන්ත බුරුසු 2"', quantity: 12, unitPrice: 310, originalPrice: 340, displayPrice: 340, ourPrice: 310, cost: 280, total: 3720 } as any,
+      { id: 'i004d', productId: 'prod-011', productName: 'JAT Sanding Sealer 1L', productNameSi: 'JAT සැන්ඩින් සීලර් 1L', quantity: 8, unitPrice: 920, originalPrice: 1000, displayPrice: 1000, ourPrice: 920, cost: 850, total: 7360 } as any,
+    ],
+    subtotal: 114580, discount: 580, tax: 0, total: 114000,
+    receivedAmount: 114000, changeAmount: 0,
+    issueDate: '2026-06-12', dueDate: '2026-06-12', status: 'paid', paymentMethod: 'cash',
+  },
+  {
+    id: 'inv-005', invoiceNumber: '146724',
+    customerId: 'cust-004', customerName: 'Amali Gunasekara',
+    items: [
+      { id: 'i005a', productId: 'prod-011', productName: 'Bosch GSB 550 Impact Drill', productNameSi: 'බොෂ් GSB 550 ඉම්පැක්ට් ඩ්‍රිල්', quantity: 3, unitPrice: 13500, originalPrice: 14500, displayPrice: 14500, ourPrice: 13500, cost: 12500, total: 40500 } as any,
+      { id: 'i005b', productId: 'prod-012', productName: 'Makita 9557HN Angle Grinder 4"', productNameSi: 'මකිටා 9557HN ඇංගල් ග්‍රයින්ඩර් 4"', quantity: 2, unitPrice: 10500, originalPrice: 11500, displayPrice: 11500, ourPrice: 10500, cost: 9500, total: 21000 } as any,
+      { id: 'i005c', productId: 'prod-017', productName: 'Stanley Hammer 16oz', productNameSi: 'ස්ටැන්ලි හැමර් 16oz', quantity: 10, unitPrice: 1350, originalPrice: 1500, displayPrice: 1500, ourPrice: 1350, cost: 1200, total: 13500 } as any,
+      { id: 'i005d', productId: 'prod-018', productName: 'Stanley Pliers 8"', productNameSi: 'ස්ටැන්ලි ප්ලයර්ස් 8"', quantity: 10, unitPrice: 1700, originalPrice: 1900, displayPrice: 1900, ourPrice: 1700, cost: 1500, total: 17000 } as any,
+    ],
+    subtotal: 92000, discount: 0, tax: 0, total: 92000,
+    receivedAmount: 100000, changeAmount: 8000,
+    issueDate: '2026-06-11', dueDate: '2026-06-11', status: 'paid', paymentMethod: 'cash',
+  },
+  {
+    id: 'inv-006', invoiceNumber: '146725',
+    customerId: 'cust-006', customerName: 'Sanduni Herath',
+    items: [
+      { id: 'i006a', productId: 'prod-001', productName: 'INSEE Sanstha Cement 50kg', productNameSi: 'ඉන්සී සංස්ථා සිමෙන්ති 50kg', quantity: 30, unitPrice: 2100, originalPrice: 2200, displayPrice: 2200, ourPrice: 2100, cost: 1900, total: 63000 } as any,
+      { id: 'i006b', productId: 'prod-026', productName: 'Local Red Brick Standard', productNameSi: 'දේශීය රතු ගඩොල්', quantity: 500, unitPrice: 28, originalPrice: 33, displayPrice: 33, ourPrice: 28, cost: 25, total: 14000 } as any,
+      { id: 'i006c', productId: 'prod-027', productName: 'Local River Sand 1/2 Cube', productNameSi: 'ගංගා වැලි 1/2 කිව්බ්', quantity: 3, unitPrice: 10500, originalPrice: 11500, displayPrice: 11500, ourPrice: 10500, cost: 9500, total: 31500 } as any,
+      { id: 'i006d', productId: 'prod-025', productName: 'GI Binding Wire 2kg Roll', productNameSi: 'GI බැඳුම් කම්බි 2kg', quantity: 10, unitPrice: 520, originalPrice: 560, displayPrice: 560, ourPrice: 520, cost: 480, total: 5200 } as any,
+    ],
+    subtotal: 113700, discount: 700, tax: 0, total: 113000,
+    receivedAmount: 113000, changeAmount: 0,
+    issueDate: '2026-06-10', dueDate: '2026-06-10', status: 'paid', paymentMethod: 'cash',
+  },
+  {
+    id: 'inv-007', invoiceNumber: '146726',
+    customerId: 'cust-007', customerName: 'Pradeep Fernando',
+    items: [
+      { id: 'i007a', productId: 'prod-008', productName: 'S-lon PVC Pipe 40mm Commercial', productNameSi: 'S-lon PVC නල 40mm', quantity: 40, unitPrice: 680, originalPrice: 750, displayPrice: 750, ourPrice: 680, cost: 620, total: 27200 } as any,
+      { id: 'i007b', productId: 'prod-009', productName: 'S-lon PVC Elbow 1"', productNameSi: 'S-lon PVC කොනු 1"', quantity: 80, unitPrice: 55, originalPrice: 65, displayPrice: 65, ourPrice: 55, cost: 45, total: 4400 } as any,
+      { id: 'i007c', productId: 'prod-004', productName: 'Lanwa GI Pipe 1" (6m)', productNameSi: 'ලන්වා GI නල 1" (6m)', quantity: 15, unitPrice: 950, originalPrice: 1050, displayPrice: 1050, ourPrice: 950, cost: 850, total: 14250 } as any,
+      { id: 'i007d', productId: 'prod-024', productName: 'AMW Rubber Hose 3/4" Per Meter', productNameSi: 'AMW රබර් හෝස් 3/4"', quantity: 50, unitPrice: 310, originalPrice: 340, displayPrice: 340, ourPrice: 310, cost: 280, total: 15500 } as any,
+    ],
+    subtotal: 61350, discount: 350, tax: 0, total: 61000,
+    receivedAmount: 65000, changeAmount: 4000,
+    issueDate: '2026-06-09', dueDate: '2026-06-09', status: 'paid', paymentMethod: 'cash',
+  },
+  {
+    id: 'inv-008', invoiceNumber: '146727',
+    customerId: 'walk-in', customerName: 'සාමාන්‍ය පාරිභෝගිකයා',
+    items: [
+      { id: 'i008a', productId: 'prod-005', productName: 'Kelani Twin Earth Cable 1.5mm²', productNameSi: 'කැලණි ට්වින් කේබල් 1.5mm²', quantity: 100, unitPrice: 95, originalPrice: 105, displayPrice: 105, ourPrice: 95, cost: 85, total: 9500 } as any,
+      { id: 'i008b', productId: 'prod-006', productName: 'Orange 1 Gang Light Switch', productNameSi: 'ඔරේන්ජ් 1 ගෑං ස්විච', quantity: 15, unitPrice: 200, originalPrice: 220, displayPrice: 220, ourPrice: 200, cost: 185, total: 3000 } as any,
+      { id: 'i008c', productId: 'prod-022', productName: 'Union Mortice Lock 5 Lever', productNameSi: 'යුනියන් 5 ලීවර් අගුල', quantity: 3, unitPrice: 3100, originalPrice: 3400, displayPrice: 3400, ourPrice: 3100, cost: 2800, total: 9300 } as any,
+      { id: 'i008d', productId: 'prod-023', productName: 'Yale Padlock 50mm', productNameSi: 'යේල් පැඩ්ලොක් 50mm', quantity: 5, unitPrice: 950, originalPrice: 1050, displayPrice: 1050, ourPrice: 950, cost: 850, total: 4750 } as any,
+    ],
+    subtotal: 26550, discount: 0, tax: 0, total: 26550,
+    receivedAmount: 30000, changeAmount: 3450,
+    issueDate: '2026-06-08', dueDate: '2026-06-08', status: 'paid', paymentMethod: 'cash',
+  },
+  {
+    id: 'inv-009', invoiceNumber: '146728',
+    customerId: 'cust-008', customerName: 'Malika Perera',
+    items: [
+      { id: 'i009a', productId: 'prod-012', productName: 'Dulux WeatherShield 4L Cream', productNameSi: 'ඩුලක්ස් වෙදර්ශීල්ඩ් 4L ක්‍රීම්', quantity: 8, unitPrice: 5300, originalPrice: 5800, displayPrice: 5800, ourPrice: 5300, cost: 4800, total: 42400 } as any,
+      { id: 'i009b', productId: 'prod-013', productName: 'Nippon Paint 3-in-1 1L Ivory', productNameSi: 'නිපොන් 3-in-1 1L අයිවරි', quantity: 12, unitPrice: 1350, originalPrice: 1500, displayPrice: 1500, ourPrice: 1350, cost: 1200, total: 16200 } as any,
+      { id: 'i009c', productId: 'prod-021', productName: 'Harris Paint Brush Set 5pc', productNameSi: 'හැරිස් බුරුසු සෙට් 5pc', quantity: 6, unitPrice: 1350, originalPrice: 1500, displayPrice: 1500, ourPrice: 1350, cost: 1200, total: 8100 } as any,
+      { id: 'i009d', productId: 'prod-011', productName: 'JAT Sanding Sealer 2.5L', productNameSi: 'JAT සැන්ඩින් සීලර් 2.5L', quantity: 4, unitPrice: 1950, originalPrice: 2100, displayPrice: 2100, ourPrice: 1950, cost: 1800, total: 7800 } as any,
+    ],
+    subtotal: 74500, discount: 500, tax: 0, total: 74000,
+    receivedAmount: 74000, changeAmount: 0,
+    issueDate: '2026-06-07', dueDate: '2026-06-07', status: 'paid', paymentMethod: 'cash',
+  },
+  {
+    id: 'inv-010', invoiceNumber: '146729',
+    customerId: 'cust-001', customerName: 'Nimal Rajapaksha',
+    items: [
+      { id: 'i010a', productId: 'prod-015', productName: 'Anton PVC Water Tank 1000L', productNameSi: 'ඇන්ටන් PVC ජල ටැංකිය 1000L', quantity: 4, unitPrice: 15800, originalPrice: 17000, displayPrice: 17000, ourPrice: 15800, cost: 14500, total: 63200 } as any,
+      { id: 'i010b', productId: 'prod-016', productName: 'Arpico Water Tank 500L', productNameSi: 'ආර්පිකෝ ජල ටැංකිය 500L', quantity: 2, unitPrice: 10200, originalPrice: 11000, displayPrice: 11000, ourPrice: 10200, cost: 9500, total: 20400 } as any,
+      { id: 'i010c', productId: 'prod-009', productName: 'S-lon PVC Coupling 1"', productNameSi: 'S-lon PVC කප්ලිං 1"', quantity: 30, unitPrice: 45, originalPrice: 55, displayPrice: 55, ourPrice: 45, cost: 35, total: 1350 } as any,
+      { id: 'i010d', productId: 'prod-024', productName: 'AMW Rubber Hose 1" Per Meter', productNameSi: 'AMW රබර් හෝස් 1"', quantity: 20, unitPrice: 460, originalPrice: 500, displayPrice: 500, ourPrice: 460, cost: 420, total: 9200 } as any,
+    ],
+    subtotal: 94150, discount: 150, tax: 0, total: 94000,
+    receivedAmount: 94000, changeAmount: 0,
+    issueDate: '2026-06-06', dueDate: '2026-07-06', status: 'pending', paymentMethod: 'bank_transfer',
+  },
+  {
+    id: 'inv-011', invoiceNumber: '146730',
+    customerId: 'cust-005', customerName: 'Kasun Bandara',
+    items: [
+      { id: 'i011a', productId: 'prod-018', productName: 'Bosch GBH 2-26 Rotary Hammer', productNameSi: 'බොෂ් GBH 2-26 රොටරි හැමර්', quantity: 2, unitPrice: 35000, originalPrice: 38000, displayPrice: 38000, ourPrice: 35000, cost: 32000, total: 70000 } as any,
+      { id: 'i011b', productId: 'prod-019', productName: 'Makita GA7020 Angle Grinder 7"', productNameSi: 'මකිටා GA7020 7" ග්‍රයින්ඩර්', quantity: 3, unitPrice: 20000, originalPrice: 22000, displayPrice: 22000, ourPrice: 20000, cost: 18500, total: 60000 } as any,
+      { id: 'i011c', productId: 'prod-017', productName: 'Stanley Screwdriver Set 6pc', productNameSi: 'ස්ටැන්ලි ස්ක්‍රූ ඩ්‍රයිවර් සෙට් 6pc', quantity: 5, unitPrice: 2000, originalPrice: 2200, displayPrice: 2200, ourPrice: 2000, cost: 1800, total: 10000 } as any,
+      { id: 'i011d', productId: 'prod-020', productName: 'DSI Safety Boots Size 9', productNameSi: 'DSI ආරක්ෂණ බූට් 9 සයිස්', quantity: 10, unitPrice: 3800, originalPrice: 4200, displayPrice: 4200, ourPrice: 3800, cost: 3500, total: 38000 } as any,
+    ],
+    subtotal: 178000, discount: 3000, tax: 0, total: 175000,
+    receivedAmount: 175000, changeAmount: 0,
+    issueDate: '2026-06-05', dueDate: '2026-07-05', status: 'pending', paymentMethod: 'bank_transfer',
+  },
+  {
+    id: 'inv-012', invoiceNumber: '146731',
+    customerId: 'cust-003', customerName: 'Dinesh Wickramasinghe',
+    items: [
+      { id: 'i012a', productId: 'prod-010', productName: 'National PVC Conduit 25mm', productNameSi: 'නැෂනල් PVC කොන්ඩියුට් 25mm', quantity: 100, unitPrice: 180, originalPrice: 200, displayPrice: 200, ourPrice: 180, cost: 160, total: 18000 } as any,
+      { id: 'i012b', productId: 'prod-007', productName: 'ACL Multi-strand Cable 2.5mm²', productNameSi: 'ACL බහු-වයර් කේබල් 2.5mm²', quantity: 300, unitPrice: 150, originalPrice: 165, displayPrice: 165, ourPrice: 150, cost: 135, total: 45000 } as any,
+      { id: 'i012c', productId: 'prod-006', productName: 'Orange Fan Speed Controller', productNameSi: 'ඔරේන්ජ් ෆෑන් ස්පීඩ් කන්ට්‍රෝලර්', quantity: 15, unitPrice: 700, originalPrice: 780, displayPrice: 780, ourPrice: 700, cost: 650, total: 10500 } as any,
+      { id: 'i012d', productId: 'prod-006', productName: 'Orange 15A Round Pin Socket', productNameSi: 'ඔරේන්ජ් 15A රවුන්ඩ් සොකට්', quantity: 20, unitPrice: 520, originalPrice: 580, displayPrice: 580, ourPrice: 520, cost: 480, total: 10400 } as any,
+    ],
+    subtotal: 83900, discount: 900, tax: 0, total: 83000,
+    receivedAmount: 83000, changeAmount: 0,
+    issueDate: '2026-06-04', dueDate: '2026-06-04', status: 'paid', paymentMethod: 'cash',
+  },
+  {
+    id: 'inv-013', invoiceNumber: '146732',
+    customerId: 'walk-in', customerName: 'සාමාන්‍ය පාරිභෝගිකයා',
+    items: [
+      { id: 'i013a', productId: 'prod-002', productName: 'Tokyo Super Cement 50kg', productNameSi: 'ටෝකියෝ සුපර් සිමෙන්ති 50kg', quantity: 20, unitPrice: 1900, originalPrice: 2000, displayPrice: 2000, ourPrice: 1900, cost: 1750, total: 38000 } as any,
+      { id: 'i013b', productId: 'prod-028', productName: 'Local Red Brick Wire Cut', productNameSi: 'දේශීය රතු ගඩොල් (වයර් කට්)', quantity: 300, unitPrice: 33, originalPrice: 38, displayPrice: 38, ourPrice: 33, cost: 30, total: 9900 } as any,
+      { id: 'i013c', productId: 'prod-027', productName: 'Metal Crushed Stone 1/4 Cube 3/4"', productNameSi: 'ලෝහ ගල් 1/4 කිව්බ් 3/4"', quantity: 4, unitPrice: 5000, originalPrice: 5500, displayPrice: 5500, ourPrice: 5000, cost: 4500, total: 20000 } as any,
+      { id: 'i013d', productId: 'prod-030', productName: 'SS Wood Screws 2" Box 100pc', productNameSi: 'SS ලී ඉස්කුරුප්පු 2" 100pc', quantity: 10, unitPrice: 720, originalPrice: 800, displayPrice: 800, ourPrice: 720, cost: 650, total: 7200 } as any,
+    ],
+    subtotal: 75100, discount: 100, tax: 0, total: 75000,
+    receivedAmount: 75000, changeAmount: 0,
+    issueDate: '2026-06-03', dueDate: '2026-06-03', status: 'paid', paymentMethod: 'cash',
+  },
+  {
+    id: 'inv-014', invoiceNumber: '146733',
+    customerId: 'cust-004', customerName: 'Amali Gunasekara',
+    items: [
+      { id: 'i014a', productId: 'prod-014', productName: 'Rhino Asbestos Sheet 10ft', productNameSi: 'රයිනෝ ඇස්බැස්ටෝස් 10ft', quantity: 30, unitPrice: 1150, originalPrice: 1280, displayPrice: 1280, ourPrice: 1150, cost: 1050, total: 34500 } as any,
+      { id: 'i014b', productId: 'prod-001', productName: 'INSEE Sanstha Cement 50kg', productNameSi: 'ඉන්සී සංස්ථා සිමෙන්ති 50kg', quantity: 20, unitPrice: 2100, originalPrice: 2200, displayPrice: 2200, ourPrice: 2100, cost: 1900, total: 42000 } as any,
+      { id: 'i014c', productId: 'prod-025', productName: 'GI Binding Wire 1kg Roll', productNameSi: 'GI බැඳුම් කම්බි 1kg', quantity: 15, unitPrice: 280, originalPrice: 310, displayPrice: 310, ourPrice: 280, cost: 250, total: 4200 } as any,
+      { id: 'i014d', productId: 'prod-030', productName: 'SS Wood Screws 1.5" Box 100pc', productNameSi: 'SS ලී ඉස්කුරුප්පු 1.5" 100pc', quantity: 8, unitPrice: 600, originalPrice: 660, displayPrice: 660, ourPrice: 600, cost: 550, total: 4800 } as any,
+    ],
+    subtotal: 85500, discount: 500, tax: 0, total: 85000,
+    receivedAmount: 85000, changeAmount: 0,
+    issueDate: '2026-06-02', dueDate: '2026-06-02', status: 'paid', paymentMethod: 'cash',
+  },
+  {
+    id: 'inv-015', invoiceNumber: '146734',
+    customerId: 'cust-002', customerName: 'Chamari Silva',
+    items: [
+      { id: 'i015a', productId: 'prod-016', productName: 'Arpico Water Tank 1000L', productNameSi: 'ආර්පිකෝ ජල ටැංකිය 1000L', quantity: 1, unitPrice: 16800, originalPrice: 18000, displayPrice: 18000, ourPrice: 16800, cost: 15500, total: 16800 } as any,
+      { id: 'i015b', productId: 'prod-022', productName: 'Union Mortice Lock 3 Lever', productNameSi: 'යුනියන් 3 ලීවර් දොර අගුල', quantity: 4, unitPrice: 2000, originalPrice: 2200, displayPrice: 2200, ourPrice: 2000, cost: 1800, total: 8000 } as any,
+      { id: 'i015c', productId: 'prod-023', productName: 'Yale Padlock 40mm', productNameSi: 'යේල් පැඩ්ලොක් 40mm', quantity: 6, unitPrice: 720, originalPrice: 800, displayPrice: 800, ourPrice: 720, cost: 650, total: 4320 } as any,
+      { id: 'i015d', productId: 'prod-013', productName: 'Wire Nails 2" 1kg', productNameSi: 'වයර් ඇණ 2" 1kg', quantity: 20, unitPrice: 240, originalPrice: 265, displayPrice: 265, ourPrice: 240, cost: 190, total: 4800 } as any,
+    ],
+    subtotal: 33920, discount: 0, tax: 0, total: 33920,
+    receivedAmount: 35000, changeAmount: 1080,
+    issueDate: '2026-06-01', dueDate: '2026-06-01', status: 'paid', paymentMethod: 'cash',
+  },
 ];
 
 // ──────────────────────────────────────────────

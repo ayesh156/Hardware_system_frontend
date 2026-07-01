@@ -1,6 +1,6 @@
-import { useTranslation } from 'react-i18next';
 import { Invoice, Customer, InvoiceItem } from '../../types/index';
 import { translateToSinhala, getInvoiceHeaderSinhala } from '../../lib/sinhalaTranslator';
+import { generateReceiptHTML } from '../../lib/receiptGenerator';
 
 // Extended invoice item type for discounts and quick add
 interface ExtendedInvoiceItem extends InvoiceItem {
@@ -203,48 +203,57 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
   const receivedAmount = invoice.receivedAmount || 0;
   const changeAmount = invoice.changeAmount || (receivedAmount > 0 ? receivedAmount - invoice.total : 0);
   
-  // Calculate total item-level discounts (sum of per-item discounts) - this is the customer's savings
+  // Calculate total customer savings: price gap (displayPrice - ourPrice) × qty + manual invoice discount
   const totalItemDiscounts = invoice.items.reduce((sum, item) => {
-    const extItem = item as ExtendedInvoiceItem;
-    if (extItem.originalPrice && extItem.originalPrice > item.unitPrice) {
-      return sum + (extItem.originalPrice - item.unitPrice) * item.quantity;
-    }
-    return sum;
+    const ext = item as any;
+    const displayPrice = Number(ext.displayPrice || ext.originalPrice || item.unitPrice || 0);
+    const ourPrice = Number(ext.ourPrice || ext.salesPrice || item.unitPrice || 0);
+    const gap = (displayPrice - ourPrice) * item.quantity;
+    return sum + (gap > 0 ? gap : 0);
   }, 0);
 
   // Get Sinhala headers if needed
   const headers = isSinhala ? getInvoiceHeaderSinhala() : {};
 
   // Generate items rows - compact format for 80mm with columnar layout
-  // Layout: Item Name on top, then columns: Qty | Unit Price | Our Price | Total
+  // Layout: Item Name on top, then columns: Qty | සදහන් මිල (displayPrice) | අපේ මිල (ourPrice) | Total
   const itemsHtml = invoice.items.map((item, idx) => {
-    const extItem = item as ExtendedInvoiceItem;
+    const extItem = item as any; // cast to access QuickInvoiceItem extended fields
     // Always use Sinhala name - translate if needed
     const displayName = item.productNameSi || translateToSinhala(item.productName);
-    
-    // Calculate item-level discount (difference between original and unit price)
-    const hasItemDiscount = extItem.originalPrice && extItem.originalPrice > item.unitPrice;
-    const itemDiscount = hasItemDiscount 
-      ? (extItem.originalPrice - item.unitPrice) * item.quantity 
-      : 0;
-    
-    // Original price (market price / unit price)
-    const originalPrice = hasItemDiscount ? extItem.originalPrice : item.unitPrice;
-    // Our price (discounted price)
-    const ourPrice = item.unitPrice;
-    
+
+    // සදහන් මිල: the publicly advertised/display price
+    const displayPrice = Number(
+      extItem.displayPrice ||
+      extItem.originalPrice ||
+      item.unitPrice ||
+      0
+    );
+
+    // අපේ මිල: our actual selling price
+    const ourPrice = Number(
+      extItem.ourPrice ||
+      extItem.salesPrice ||
+      item.unitPrice ||
+      0
+    );
+
+    // Line total: ourPrice × qty
+    const lineTotal = ourPrice * item.quantity;
+
+    // Show strikethrough on displayPrice only when it differs from ourPrice
+    const hasPriceGap = displayPrice > ourPrice;
+
     return `
-      <div style="border-bottom: 1px dotted #ccc; padding: 3px 0;">
-        <!-- Item Name Row -->
-        <div style="font-weight: 600; font-size: 12px; color: #000; margin-bottom: 2px;">
+      <div style="border-bottom: 1px solid #000000; padding: 4px 0;">
+        <div style="font-weight: 800; font-size: 12px; color: #000000; margin-bottom: 2px;">
           ${displayName}
         </div>
-        <!-- Columnar Data Row: Qty | Unit Price | Our Price | Total -->
-        <div style="display: flex; justify-content: space-between; font-size: 11px; font-family: 'Courier New', monospace;">
+        <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; font-family: 'Courier New', monospace; color: #000000;">
           <span style="width: 15%; text-align: center;">${item.quantity}</span>
-          <span class="${hasItemDiscount ? 'strikethrough-price' : ''}" style="width: 25%; text-align: right;">${originalPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-          <span class="${hasItemDiscount ? 'discounted-price' : ''}" style="width: 25%; text-align: right;">${ourPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-          <span style="width: 30%; text-align: right; font-weight: 700;">${item.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+          <span class="${hasPriceGap ? 'strikethrough-price' : ''}" style="width: 25%; text-align: right; color: #000000;">${displayPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+          <span class="${hasPriceGap ? 'discounted-price' : ''}" style="width: 25%; text-align: right; color: #000000; font-weight: 800;">${ourPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+          <span style="width: 30%; text-align: right; font-weight: 900;">${lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
         </div>
       </div>
     `;
@@ -268,6 +277,12 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
       <head>
         <title>Receipt ${invoice.invoiceNumber}</title>
         <style>
+          @import url('https://fonts.googleapis.com/css2?family=FM+Abhaya&display=swap');
+          .true-fm-font-branding {
+            font-family: 'FM Abhaya', serif !important;
+            font-weight: 800 !important;
+            font-style: normal !important;
+          }
           @page { 
             size: 80mm auto; 
             margin: 0 2px; 
@@ -281,37 +296,80 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
             body, .receipt-container { padding-left: 2px !important; padding-right: 2px !important; }
           }
 
-          /* Force all text to black, but allow exceptions for specific components */
-          .receipt-container, .receipt-container * { color: #000 !important; }
-          .total-box, .total-box * { color: #fff !important; }
-          .status-badge, .status-badge * { color: ${isPaid ? "#fff" : "#000"} !important; }
-          .strikethrough-price { color: #777 !important; text-decoration: line-through !important; }
-          .discounted-price { color: #000 !important; font-weight: 600 !important; }
-
-          * { 
-            box-sizing: border-box; 
-            margin: 0; 
-            padding: 0; 
-            -webkit-print-color-adjust: exact !important; 
-            print-color-adjust: exact !important; 
+          /* ════════════════════════════════════════════════════════
+             THERMAL RECEIPT PRINT MASTER RESET — PrintInvoiceModal
+             Gradient fallback: background-image:linear-gradient
+             NEVER stripped. * color override REMOVED.
+             ════════════════════════════════════════════════════════ */
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
           }
-          body { 
-            font-family: 'Segoe UI', Arial, sans-serif; 
-            background: white; 
-            color: #000; 
-            font-size: 11px; 
-            line-height: 1.3; 
+          @media print {
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+          }
+          /* ── Grand Total black box — gradient cannot be stripped ── */
+          .total-box {
+            background-color: #000000 !important;
+            background-image: linear-gradient(#000000, #000000) !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+            border: 2px solid #000000 !important;
+          }
+          .total-box, .total-box *, .total-box span, .total-box div {
+            color: #ffffff !important;
+          }
+          /* ── Paid badge — gradient black bg ── */
+          .status-paid {
+            background-color: #000000 !important;
+            background-image: linear-gradient(#000000, #000000) !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+            border: 2px solid #000000 !important;
+          }
+          .status-paid, .status-paid * { color: #ffffff !important; }
+          .strikethrough-price {
+            text-decoration: line-through !important;
+            font-weight: 700 !important;
+          }
+          .discounted-price { font-weight: 800 !important; }
+          hr { border: none !important; border-top: 1px dashed #000000 !important; }
+          body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #ffffff;
+            color: #000000;
+            font-weight: 700;
+            font-size: 12px;
+            line-height: 1.4;
             width: 80mm;
           }
         </style>
       </head>
       <body>
-        <div class="receipt-container" style="width: 76mm; max-width: 100%; padding: 2px; margin: 0 auto; background: white; font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #000;">
+        <div class="receipt-container" style="width: 76mm; max-width: 100%; padding: 2px; margin: 0 auto; background: #ffffff; font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; font-weight: 700; color: #000000;">
           
-          <!-- ═══ HEADER - Centered inv_logo.png only ═══ -->
+          <!-- ═══ HEADER - Centered inv_logo.png + Sinhala Brand Title ═══ -->
           <div style="text-align: center; padding-bottom: 2px; border-bottom: 2px double #000;">
             <img src="/inv_logo.png" alt="" style="width: 100px; height: auto; display: block; margin: 0 auto;" />
-            <div style="font-size: 10px; color: #333; margin-top: 3px; line-height: 1.2;">
+            <div style="text-align: center; margin: 6px 0 4px 0; border-bottom: 1px solid #000000; padding-bottom: 4px;">
+              <h1 
+                class="true-fm-font-branding"
+                style="font-size: 28px; letter-spacing: 0.1px; color: #000000; line-height: 1.1; margin: 0; padding: 2px 0;"
+              >
+                ලියනගේ හාඩ්වෙයාර්
+              </h1>
+            </div>
+            <div style="font-size: 11px; font-weight: 700; color: #000000; margin-top: 3px; line-height: 1.4;">
               හක්මන පාර, දෙයියන්දර<br/>
               දුරකථන: 0773751805 / 0412268217<br/>
               Email: liyanagehardware1986@gmail.com
@@ -319,41 +377,41 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
           </div>
 
           <!-- ═══ INVOICE INFO BAR ═══ -->
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed #999;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 2px dashed #000000;">
             <div>
-              <div style="font-size: 9px; color: #666;">බිල්පත</div>
-              <div style="font-size: 13px; font-weight: 700; font-family: 'Courier New', monospace;">${invoice.invoiceNumber}</div>
+              <div style="font-size: 10px; font-weight: 700; color: #000000;">බිල්පත</div>
+              <div style="font-size: 13px; font-weight: 800; font-family: 'Courier New', monospace; color: #000000;">${invoice.invoiceNumber}</div>
             </div>
             <div style="text-align: center;">
-              <div class="status-badge" style="display: inline-block; padding: 2px 6px; border: 1.5px solid #000; border-radius: 3px; font-size: 10px; font-weight: 700; background: ${isPaid ? '#000' : 'white'}; color: ${isPaid ? 'white' : '#000'};">
-                ${isPaid ? '✓ ගෙවා ඇත' : '○ ගෙවිය යුතු'}
+              <div class="${isPaid ? 'status-paid' : ''}" style="display: inline-block; padding: 2px 6px; border: 2px solid #000000; border-radius: 3px; font-size: 10px; font-weight: 800; background-color: ${isPaid ? '#000000' : '#ffffff'} !important; background-image: ${isPaid ? 'linear-gradient(#000000,#000000)' : 'none'} !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact;">
+                <span style="color: ${isPaid ? '#ffffff' : '#000000'} !important; font-weight: 800;">${isPaid ? '✓ ගෙවා ඇත' : '○ ගෙවිය යුතු'}</span>
               </div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 9px; color: #666;">දිනය</div>
-              <div style="font-size: 10px; font-weight: 600;">${new Date(invoice.issueDate).toLocaleDateString('si-LK', { day: '2-digit', month: 'short', year: '2-digit' })}</div>
+              <div style="font-size: 10px; font-weight: 700; color: #000000;">දිනය</div>
+              <div style="font-size: 11px; font-weight: 800; color: #000000;">${new Date(invoice.issueDate).toLocaleDateString('si-LK', { day: '2-digit', month: 'short', year: '2-digit' })}</div>
             </div>
           </div>
 
           <!-- ═══ CUSTOMER (only if not walk-in) ═══ -->
           ${!isWalkIn ? `
-          <div style="padding: 3px 0; border-bottom: 1px dashed #999;">
+          <div style="padding: 3px 0; border-bottom: 2px dashed #000000;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
-                <span style="font-size: 9px; color: #666;">පාරිභෝගිකයා: </span>
-                <span style="font-size: 11px; font-weight: 600;">${customerName}</span>
+                <span style="font-size: 10px; font-weight: 700; color: #000000;">පාරිභෝගිකයා: </span>
+                <span style="font-size: 12px; font-weight: 800; color: #000000;">${customerName}</span>
               </div>
-              ${customerPhone ? `<span style="font-size: 10px; color: #666;">${customerPhone}</span>` : ''}
+              ${customerPhone ? `<span style="font-size: 11px; font-weight: 700; color: #000000;">${customerPhone}</span>` : ''}
             </div>
           </div>
           ` : ''}
 
           <!-- ═══ ITEMS HEADER ═══ -->
-          <div style="padding: 3px 0 2px 0; border-bottom: 1px solid #000;">
-            <div style="font-size: 10px; font-weight: 700; color: #000; margin-bottom: 2px;">
+          <div style="padding: 3px 0 2px 0; border-bottom: 2px solid #000000;">
+            <div style="font-size: 11px; font-weight: 800; color: #000000; margin-bottom: 3px;">
               භාණ්ඩය
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666;">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: 800; color: #000000;">
               <span style="width: 15%; text-align: center;">ප්‍රමාණය</span>
               <span style="width: 25%; text-align: right;">සදහන් මිල</span>
               <span style="width: 25%; text-align: right;">අපේ මිල</span>
@@ -367,71 +425,72 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
           </div>
 
           <!-- ═══ TOTALS SECTION ═══ -->
-          <div style="border-top: 1px solid #000; padding-top: 4px; margin-top: 2px;">
-            <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 12px;">
-              <span>උප එකතුව</span>
-              <span style="font-family: 'Courier New', monospace;">${invoice.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            ${invoice.tax > 0 ? `
-            <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; color: #666;">
-              <span>බදු</span>
-              <span style="font-family: 'Courier New', monospace;">${invoice.tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <div style="border-top: 2px solid #000000; padding-top: 4px; margin-top: 2px;">
+            ${totalFinalDiscount > 0 ? `
+            <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 12px; font-weight: 700; color: #000000;">
+              <span>වට්ටම්</span>
+              <span style="font-family: 'Courier New', monospace; font-weight: 800;">-${totalFinalDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
             ` : ''}
-            
+            ${invoice.tax > 0 ? `
+            <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 12px; font-weight: 700; color: #000000;">
+              <span>බදු</span>
+              <span style="font-family: 'Courier New', monospace; font-weight: 800;">${invoice.tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            ` : ''}
+
             <!-- ═══ GRAND TOTAL BOX ═══ -->
-            <div class="total-box" style="background: #000; color: white; padding: 6px; margin-top: 4px; border-radius: 3px;">
+            <div class="total-box" style="background-color: #000000 !important; background-image: linear-gradient(#000000, #000000) !important; color: #ffffff !important; padding: 6px; margin-top: 4px; border-radius: 3px; border: 2px solid #000000; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 12px; font-weight: 700;">මුළු එකතුව</span>
-                <span style="font-size: 16px; font-weight: 900; font-family: 'Courier New', monospace; letter-spacing: 1px;">${invoice.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span style="font-size: 15px; font-weight: 800; color: #ffffff !important;">මුළු එකතුව</span>
+                <span style="font-size: 19px; font-weight: 900; font-family: 'Courier New', monospace; letter-spacing: 1px; color: #ffffff !important;">${invoice.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
+
+            <!-- Item count -->
+            <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; font-weight: 700; color: #000000; margin-top: 2px;">
+              <span>භාණ්ඩ සංඛ්‍යාව</span>
+              <span style="font-weight: 800;">[${invoice.items.reduce((acc, i) => acc + i.quantity, 0)}]</span>
+            </div>
+
+            <!-- ═══ ඔබ ලැබූ ලාභය — always rendered when savings > 0 ═══ -->
+            ${(totalItemDiscounts + totalFinalDiscount) > 0 ? `
+            <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; font-weight: 800; color: #000000; border-top: 2px dashed #000000; margin-top: 4px; padding-top: 4px;">
+              <span>ඔබ ලැබූ ලාභය</span>
+              <span style="font-family: 'Courier New', monospace; font-weight: 900;">${(totalItemDiscounts + totalFinalDiscount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            </div>
+            ` : ''}
           </div>
 
           <!-- ═══ PAYMENT INFO SECTION ═══ -->
-          <div style="border-top: 1px dashed #999; margin-top: 4px; padding-top: 4px;">
+          <div style="border-top: 2px dashed #000000; margin-top: 4px; padding-top: 4px;">
             ${receivedAmount > 0 ? `
-            <div style="background: #f5f5f5; padding: 4px 6px; border-radius: 3px;">
-              <div style="text-align: center; font-size: 11px; color: #666; margin-bottom: 2px;">
-                (ගෙවූ මුදල : ${receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })})
-              </div>
-              <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px;">
+            <div style="border: 1px solid #000000; padding: 4px 6px; border-radius: 3px;">
+              <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 12px; font-weight: 700; color: #000000;">
                 <span>ගෙවූ මුදල</span>
-                <span style="font-family: 'Courier New', monospace; font-weight: 600;">${receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                <span style="font-family: 'Courier New', monospace; font-weight: 800;">${receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
               </div>
-              <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px;">
+              <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 12px; font-weight: 700; color: #000000;">
                 <span>ඉතිරි මුදල</span>
-                <span style="font-family: 'Courier New', monospace; font-weight: 600;">${changeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                <span style="font-family: 'Courier New', monospace; font-weight: 800;">${changeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
               </div>
-            </div>
-            ` : ''}
-            <!-- Item count -->
-            <div style="display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; color: #666; ${receivedAmount > 0 ? 'border-top: 1px dotted #ccc; margin-top: 3px;' : ''}">
-              <span>තාණ්ඩ සංඛ්‍යාව</span>
-              <span style="font-weight: 600;">[${invoice.items.length}]</span>
-            </div>
-            <!-- Your savings -->
-            ${(totalItemDiscounts + totalFinalDiscount) > 0 ? `
-            <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; color: #d63384; font-weight: 600;">
-              <span>ඔබ ලැබූ ලාභය</span>
-              <span style="font-family: 'Courier New', monospace;">${(totalItemDiscounts + totalFinalDiscount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
             ` : ''}
           </div>
 
           <!-- ═══ CASHIER ═══ -->
-          <div style="padding: 3px 0; border-top: 1px dashed #999; margin-top: 3px;">
-            <div style="font-size: 10px; color: #666;">
+          <div style="padding: 3px 0; border-top: 1px dashed #000000; margin-top: 3px;">
+            <div style="font-size: 11px; font-weight: 700; color: #000000;">
               <span>කැෂියර්: </span>
-              <span style="font-weight: 600;">Admin</span>
+              <span style="font-weight: 800;">Admin</span>
             </div>
           </div>
 
           <!-- ═══ FOOTER ═══ -->
-          <div style="text-align: center; padding-top: 6px; border-top: 1px dashed #999;">
-            <div style="font-size: 12px; font-weight: 700; color: #000;">ස්තූතියි නැවත එන්න !</div>
-            <div style="margin: 4px 0; border-top: 1px dotted #ccc;"></div>
-            <div style="font-size: 10px; color: #666; letter-spacing: 0.5px;">Software by nebulainfinite - 078 3233 760</div>
+          <div style="text-align: center; padding-top: 6px; border-top: 2px dashed #000000;">
+            <div style="font-size: 13px; font-weight: 800; color: #000000;">ස්තූතියි නැවත එන්න !</div>
+            <div style="margin: 4px 0; border-top: 1px solid #000000;"></div>
+            <div style="font-size: 11px; font-weight: 700; color: #000000; letter-spacing: 0.3px;">Software by nebulainfinite - 078 3233 760</div>
           </div>
 
         </div>
@@ -443,37 +502,60 @@ const generate80mmReceiptContent = (invoice: Invoice, customer?: Customer | null
 export const printInvoice = (invoice: Invoice, customer?: Customer | null, language: 'en' | 'si' = 'en'): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
-      // Using 80mm Xprinter thermal receipt design with language support
-      const printContent = generate80mmReceiptContent(invoice, customer, language);
-      const printWindow = window.open('', '_blank', 'width=320,height=600');
+      const printContent = generateReceiptHTML(invoice, customer, language);
 
-      if (!printWindow) {
-        alert('Please allow pop-ups to print the invoice');
-        reject(new Error('Pop-ups blocked'));
+      // Remove any stale print iframe from a prior job
+      const existing = document.getElementById('pos-print-iframe');
+      if (existing) existing.remove();
+
+      // Create a hidden, zero-dimension iframe — no popup, no new tab
+      const iframe = document.createElement('iframe');
+      iframe.id = 'pos-print-iframe';
+      iframe.style.cssText = [
+        'position:fixed',
+        'top:0',
+        'left:0',
+        'width:0',
+        'height:0',
+        'border:none',
+        'opacity:0',
+        'pointer-events:none',
+        'z-index:-9999',
+      ].join(';');
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document ?? iframe.contentDocument;
+      if (!doc) {
+        iframe.remove();
+        reject(new Error('Cannot access iframe document'));
         return;
       }
 
-      printWindow.document.write(printContent);
-      printWindow.document.close();
+      doc.open();
+      doc.write(printContent);
+      doc.close();
 
-      const onLoadHandler = () => {
+      const dispatchPrint = () => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (err) {
+          // Browser may suppress focus — print still fires in most cases
+        }
+        // Clean up after the print dialog closes (1.5 s grace period)
         setTimeout(() => {
-          try {
-            printWindow.focus();
-            printWindow.print();
-          } catch (err) {
-            // ignore print errors
-          }
-          try { printWindow.close(); } catch (e) {}
+          try { iframe.remove(); } catch (_) {}
           resolve();
-        }, 250);
+        }, 1500);
       };
 
-      // If document already loaded
-      if (printWindow.document.readyState === 'complete') {
-        onLoadHandler();
+      if (
+        iframe.contentDocument?.readyState === 'complete' ||
+        iframe.contentWindow?.document?.readyState === 'complete'
+      ) {
+        setTimeout(dispatchPrint, 300);
       } else {
-        printWindow.onload = onLoadHandler;
+        iframe.onload = () => setTimeout(dispatchPrint, 300);
       }
     } catch (err) {
       reject(err);

@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { InventoryProduct } from '../types';
 import { inventoryItems } from '../data/mockData';
 import { ProductTable } from '../components/ProductTable';
-import { AddProductModal } from '../components/AddProductModal';
+import { ProductFormModal } from '../components/ProductFormModal';
 
 export const Products: React.FC = () => {
   const { t } = useTranslation();
@@ -32,10 +32,10 @@ export const Products: React.FC = () => {
     return { total, lowStock, outOfStock, totalValue };
   }, [inventoryItemsState]);
 
-  const handleAddProduct = (newProduct: InventoryProduct) => {
-    setInventoryItemsState((prev) => [newProduct, ...prev]);
+  const handleAddProduct = (product: InventoryProduct) => {
+    setInventoryItemsState(prev => [product, ...prev]);
+    toast.success(`${t('addProductModal.title')}: ${product.searchKey}`);
     setShowAddModal(false);
-    toast.success(`Product "${newProduct.searchKey}" added successfully`);
   };
 
   return (
@@ -43,8 +43,12 @@ export const Products: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{t('products.title')}</h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{t('products.description')}</p>
+          <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            {t('products.title')}
+          </h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+            {t('products.description')}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => navigate('/products/barcode-labels')} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium transition-all border text-xs ${isDark ? 'bg-slate-800 border-slate-700 text-indigo-400 hover:bg-slate-700' : 'bg-white border-slate-200 text-indigo-600 hover:bg-indigo-50 shadow-sm'}`}>
@@ -89,13 +93,13 @@ export const Products: React.FC = () => {
         setItems={setInventoryItemsState}
       />
 
-      {/* ── ADD PRODUCT MODAL ── */}
-      {showAddModal && (
-        <AddProductModal
-          onSave={handleAddProduct}
-          onClose={() => setShowAddModal(false)}
-        />
-      )}
+      {/* ── UNIFIED PRODUCT FORM MODAL ── */}
+      <ProductFormModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        mode="create"
+        initialData={null}
+      />
     </div>
   );
 };

@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { mockCategories, linkedCatalogItems, getItemsByCategory } from '../data/mockData';
+import { mockCategories } from '../data/mockData';
 import { Category, InventoryProduct } from '../types/index';
 import { useTheme } from '../contexts/ThemeContext';
+import { useCatalog } from '../contexts/CatalogContext';
 import { Search, Package, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 
 interface CategoryGridProps {
   onItemSelect: (item: { id: string; sku: string; name: string; nameSi?: string; unitRate: number; stock: number; unit: string }, category: Category) => void;
+  inventoryItems?: InventoryProduct[];
 }
 
 /** Number of categories to show before "Show More" */
@@ -47,29 +49,43 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({ onItemSelect }) => {
 
   const [expanded, setExpanded] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
+  const [modalFilter, setModalFilter] = useState('');
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
+  const modalSearchRef = useRef<HTMLInputElement>(null);
+
+  // Autofocus modal search input when popover opens
+  useEffect(() => {
+    if (activeCategory && anchorRect) {
+      const timer = setTimeout(() => {
+        modalSearchRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [activeCategory, anchorRect]);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
 
-  // ── Compute usage counts from master inventory items ──
+  const { inventoryItems } = useCatalog();
+
+  // ── Compute usage counts from live inventory items ──
   const usageCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    // Count directly from the linked catalog items (derived from inventoryItems)
-    linkedCatalogItems.forEach(item => {
-      counts[item.categoryId] = (counts[item.categoryId] || 0) + 1;
+    inventoryItems.forEach(item => {
+      const cid = item.categoryId || item.productCategory;
+      if (cid) counts[cid] = (counts[cid] || 0) + 1;
     });
     mockCategories.forEach(cat => {
       if (!counts[cat.id]) counts[cat.id] = cat.usageCount || 0;
     });
     return counts;
-  }, []);
+  }, [inventoryItems]);
 
   // ── Sort categories by usage frequency (highest first) ──
   const sortedCategories = useMemo(() => {
@@ -96,12 +112,16 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({ onItemSelect }) => {
 
   const hasMore = filteredCategories.length > DEFAULT_VISIBLE;
 
-  // ── Get linked products for the active category ──
+  // ── Get linked products for the active category from live inventoryItems ──
   const activeCategoryItems = useMemo((): CatalogDisplayItem[] => {
     if (!activeCategory) return [];
-    const items = getItemsByCategory(activeCategory.id);
+    const catName = activeCategory.name.toLowerCase();
+    const items = inventoryItems.filter(item =>
+      (item.productCategory && item.productCategory.toLowerCase() === catName) ||
+      (item.categoryId && item.categoryId === activeCategory.id)
+    );
     return items.map(toDisplayItem);
-  }, [activeCategory]);
+  }, [activeCategory, inventoryItems]);
 
   const closePopover = useCallback(() => {
     if (mountedRef.current) {
@@ -253,9 +273,12 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({ onItemSelect }) => {
               }`}>
                 <Search className={`w-3 h-3 flex-shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                 <input
+                  ref={modalSearchRef}
                   type="text"
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
+                  value={modalFilter}
+                  onChange={(e) => { e.stopPropagation(); setModalFilter(e.target.value); }}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
                   placeholder={`Filter ${activeCategoryItems.length} items...`}
                   className={`flex-1 bg-transparent text-xs outline-none ${
                     isDark ? 'text-white placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'
@@ -267,8 +290,8 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({ onItemSelect }) => {
             <div className="overflow-y-auto" style={{ maxHeight: Math.min(240, anchorRect.top - 80) }}>
               {activeCategoryItems.length > 0 ? (
                 activeCategoryItems.filter(item => {
-                  if (!searchFilter.trim()) return true;
-                  const q = searchFilter.toLowerCase();
+                  if (!modalFilter.trim()) return true;
+                  const q = modalFilter.toLowerCase();
                   return item.name.toLowerCase().includes(q) ||
                     item.sku.toLowerCase().includes(q) ||
                     (item.nameSi && item.nameSi.includes(q));
@@ -305,7 +328,7 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({ onItemSelect }) => {
                   <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-xs font-medium">No items found</p>
                   <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-500'}`}>
-                    {searchFilter ? `"${searchFilter}" didn't match any items` : 'This category has no linked products'}
+                    {modalFilter ? `"${modalFilter}" didn't match any items` : 'This category has no linked products'}
                   </p>
                 </div>
               )}

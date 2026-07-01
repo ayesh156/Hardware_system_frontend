@@ -1,5 +1,6 @@
 /** @import must precede all other statements */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Abhaya+Libre:wght@600;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -189,6 +190,15 @@
 }
 
 @layer components {
+  /* Receipt brand title using Abhaya Libre */
+  .receipt-brand-title {
+    font-family: 'Abhaya Libre', serif;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+  }
+
   /* Glass morphism effect */
   .dark .glass {
     @apply bg-slate-900/80 backdrop-blur-xl border border-slate-700/50;

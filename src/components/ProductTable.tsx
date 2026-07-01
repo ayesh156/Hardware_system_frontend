@@ -8,8 +8,8 @@ import {
   ChevronsLeft, ChevronsRight, ChevronDown, X,
 } from 'lucide-react';
 import { InventoryProduct } from '../types';
-import { EditProductModal } from './EditProductModal';
 import { CellPopover } from './CellPopover';
+import { ProductFormModal } from './ProductFormModal';
 
 function deriveStatus(storeQty: number): InventoryProduct['status'] {
   if (storeQty === 0) return 'Out of Stock';
@@ -626,7 +626,12 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
       </div>
 
       {rowEditItem && (
-        <EditProductModal item={rowEditItem} onSave={handleRowSave} onClose={() => setRowEditItem(null)} />
+        <ProductFormModal
+          isOpen={!!rowEditItem}
+          onClose={() => setRowEditItem(null)}
+          mode="edit"
+          initialData={rowEditItem}
+        />
       )}
     </div>
   );
