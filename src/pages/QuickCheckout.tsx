@@ -5,7 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import { useDropdownPosition } from '../hooks/use-dropdown-position';
 import { useCatalog } from '../contexts/CatalogContext';
-import { mockProducts, mockInvoices, mockCustomers, mockCategories } from '../data/mockData';
+import { mockProducts, mockInvoices, mockCustomers, mockCategories, categoryNames } from '../data/mockData';
 import { Product, Invoice, InvoiceItem, FlattenedProduct, InventoryProduct, Customer } from '../types/index';
 import { flattenProducts } from '../lib/utils';
 import { printInvoice } from '../components/modals/PrintInvoiceModal';
@@ -224,6 +224,44 @@ export const QuickCheckout: React.FC = () => {
   const [isPriceEditing, setIsPriceEditing] = useState(false);
   const priceEditTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Quick Categories Drag-and-Drop State ──
+  const allCategoryNames = useMemo(() => {
+    return categoryNames.filter(c => c !== "සියල්ල");
+  }, []);
+  const [quickCategories, setQuickCategories] = useState<string[]>(() => {
+    return allCategoryNames.slice(0, 18);
+  });
+  const [isEditingCategories, setIsEditingCategories] = useState(false);
+  const [isAddDropdownOpen, setIsAddDropdownOpen] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [activeCategoryPopover, setActiveCategoryPopover] = useState<string | null>(null);
+  const [categoryPopoverFilter, setCategoryPopoverFilter] = useState('');
+  const [categoryPopoverAnchor, setCategoryPopoverAnchor] = useState<DOMRect | null>(null);
+  const categoryPopoverRef = useRef<HTMLDivElement>(null);
+  const categoryPopoverInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Category Popover Keyboard Navigation State ──
+  const [activeCategoryItemIndex, setActiveCategoryItemIndex] = useState<number>(0);
+  const [quantityPromptProduct, setQuantityPromptProduct] = useState<any | null>(null);
+  const [categoryPromptQty, setCategoryPromptQty] = useState<string>("1");
+  const categoryListContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Memoized map of category → products for the Quick Categories grid
+  const categoryProductMap = useMemo(() => {
+    const map = new Map<string, typeof inventoryItems>();
+    inventoryItems.forEach(item => {
+      if (item.productCategory) {
+        const existing = map.get(item.productCategory);
+        if (existing) {
+          existing.push(item);
+        } else {
+          map.set(item.productCategory, [item]);
+        }
+      }
+    });
+    return map;
+  }, [inventoryItems]);
+
   // Customer selection state
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerOpen, setCustomerOpen] = useState(false);
@@ -403,7 +441,7 @@ export const QuickCheckout: React.FC = () => {
       setItems(
         items.map((i) =>
           i.productId === flatProduct.flatId
-            ? { ...i, quantity: i.quantity + addQty, total: (i.quantity + addQty) * lastPriceVal }
+            ? { ...i, quantity: i.quantity + addQty, total: (i.quantity + addQty) * ourPriceVal }
             : i
         )
       );
@@ -421,9 +459,9 @@ export const QuickCheckout: React.FC = () => {
         variantId:     flatProduct.variant?.id,
         size:          flatProduct.variant?.size,
         quantity:      addQty,
-        unitPrice:     lastPriceVal,    // lastPrice is the billing rate
+        unitPrice:     ourPriceVal,     // salesPrice is the billing rate
         originalPrice: displayPriceVal, // displayPrice — shown struck-through on receipt
-        total:         addQty * lastPriceVal,
+        total:         addQty * ourPriceVal,
         cost:          costVal,
         lastPrice:     lastPriceVal,
         salesPrice:    ourPriceVal,
@@ -556,6 +594,24 @@ export const QuickCheckout: React.FC = () => {
     playBeep('add');
   }, [items, t, playBeep]);
 
+  // In-cart editable price override: mutates ALL pricing keys in sync
+  const handleUpdateCartItemPrice = useCallback((itemId: string, newPrice: number) => {
+    const sanitizedPrice = Number(newPrice || 0);
+    setItems((prevItems) =>
+      prevItems.map((item) =>
+        item.id === itemId
+          ? { 
+              ...item, 
+              salesPrice: sanitizedPrice, 
+              ourPrice: sanitizedPrice,
+              unitPrice: sanitizedPrice,
+              total: sanitizedPrice * item.quantity,
+            }
+          : item
+      )
+    );
+  }, []);
+
   // Update item quantity
   const updateItemQuantity = useCallback((itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -575,7 +631,7 @@ export const QuickCheckout: React.FC = () => {
     
     setItems(items.map(i => 
       i.id === itemId 
-        ? { ...i, quantity: newQuantity, total: newQuantity * Number(i.lastPrice || i.unitPrice) }
+        ? { ...i, quantity: newQuantity, total: newQuantity * Number(i.salesPrice || i.ourPrice || i.unitPrice) }
         : i
     ));
   }, [items, flattenedProducts, removeItem, playBeep, t]);
@@ -653,29 +709,29 @@ export const QuickCheckout: React.FC = () => {
   }, [quickAddName, quickAddPrice, quickAddQty, playBeep, t]);
 
   // ── Computed totals (lastPrice-based) ────────────────────────────────────
-  // lastPrice is the definitive transaction rate used for all billing maths.
+  // salesPrice is the definitive transaction rate used for all billing maths.
   // displayPrice is shown on receipt column 2 (struck-through reference price).
-  // salesPrice / ourPrice are preserved on the item for internal reference only.
+  // lastPrice / ourPrice are preserved on the item for internal reference only.
 
   const computedSubtotal = useMemo(() => {
-    return items.reduce((acc, item) => acc + (Number(item.lastPrice || 0) * item.quantity), 0);
+    return items.reduce((acc, item) => acc + (Number(item.salesPrice || item.ourPrice || 0) * item.quantity), 0);
   }, [items]);
 
   const computedDiscount = Number(discount) || 0;
   const computedFinalTotal = Math.max(0, computedSubtotal - computedDiscount);
 
-  // Gross profit: Σ((lastPrice - cost) × qty) + manual discount
+  // Customer savings: Σ((displayPrice - salesPrice) × qty) + manual discount
   const computedCustomerProfit = useMemo(() => {
-    const grossProfit = items.reduce((acc, item) => {
-      const last = Number(item.lastPrice || 0);
-      const cost = Number(item.cost || 0);
-      return acc + ((last - cost) * item.quantity);
+    const priceGapSavings = items.reduce((acc, item) => {
+      const display = Number(item.displayPrice || 0);
+      const sales = Number(item.salesPrice || item.ourPrice || 0);
+      return acc + ((display - sales) * item.quantity);
     }, 0);
-    return grossProfit + (Number(discount) || 0);
+    return priceGapSavings + (Number(discount) || 0);
   }, [items, discount]);
 
   // Legacy subtotal kept for applyDiscountToAll (uses item.unitPrice based totals)
-  const subtotal = items.reduce((sum, item) => sum + (Number(item.lastPrice || 0) * item.quantity), 0);
+  const subtotal = items.reduce((sum, item) => sum + (Number(item.salesPrice || item.ourPrice || 0) * item.quantity), 0);
 
   const [receivedAmount, setReceivedAmount] = useState<number>(0);
   const receivedAmountInputRef = useRef<HTMLInputElement>(null);
@@ -715,13 +771,13 @@ export const QuickCheckout: React.FC = () => {
     
     const invoiceNumber = generateNextInvoiceNumberSync();
     const invoiceDiscount = Math.round(computedDiscount * 100) / 100;
-    // Build invoice items — lastPrice drives all line totals
+    // Build invoice items — salesPrice drives all line totals
     const invoiceItems = items.map(item => ({
       ...item,
-      unitPrice: Number(item.lastPrice || item.unitPrice),
-      total: Number(item.lastPrice || item.unitPrice) * item.quantity,
+      unitPrice: Number(item.salesPrice || item.ourPrice || item.unitPrice),
+      total: Number(item.salesPrice || item.ourPrice || item.unitPrice) * item.quantity,
       displayPrice: Number(item.displayPrice || item.lastPrice || item.unitPrice),
-      ourPrice: Number(item.lastPrice || item.salesPrice || item.unitPrice),
+      ourPrice: Number(item.salesPrice || item.ourPrice || item.unitPrice),
     }));
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
@@ -783,13 +839,13 @@ export const QuickCheckout: React.FC = () => {
     
     const invoiceNumber = generateNextInvoiceNumberSync();
     const invoiceDiscount = Math.round(computedDiscount * 100) / 100;
-    // Build invoice items — lastPrice drives all line totals
+    // Build invoice items — salesPrice drives all line totals
     const invoiceItems = items.map(item => ({
       ...item,
-      unitPrice: Number(item.lastPrice || item.unitPrice),
-      total: Number(item.lastPrice || item.unitPrice) * item.quantity,
+      unitPrice: Number(item.salesPrice || item.ourPrice || item.unitPrice),
+      total: Number(item.salesPrice || item.ourPrice || item.unitPrice) * item.quantity,
       displayPrice: Number(item.displayPrice || item.lastPrice || item.unitPrice),
-      ourPrice: Number(item.lastPrice || item.salesPrice || item.unitPrice),
+      ourPrice: Number(item.salesPrice || item.ourPrice || item.unitPrice),
     }));
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
@@ -1100,7 +1156,13 @@ export const QuickCheckout: React.FC = () => {
             if (item && newPrice >= 0) {
               setItems(prevItems => prevItems.map(i => 
                 i.id === item.id 
-                  ? { ...i, unitPrice: newPrice, total: i.quantity * newPrice }
+                  ? { 
+                      ...i, 
+                      unitPrice: newPrice, 
+                      salesPrice: newPrice, 
+                      ourPrice: newPrice,
+                      total: i.quantity * newPrice 
+                    }
                   : i
               ));
             }
@@ -1135,9 +1197,16 @@ export const QuickCheckout: React.FC = () => {
             const newPrice = parseFloat(newBuffer) || 0;
             const item = items[selectedCartIndex];
             if (item) {
+              const effectivePrice = newPrice || item.originalPrice;
               setItems(prevItems => prevItems.map(i => 
                 i.id === item.id 
-                  ? { ...i, unitPrice: newPrice || i.originalPrice, total: i.quantity * (newPrice || i.originalPrice) }
+                  ? { 
+                      ...i, 
+                      unitPrice: effectivePrice, 
+                      salesPrice: effectivePrice,
+                      ourPrice: effectivePrice,
+                      total: i.quantity * effectivePrice 
+                    }
                   : i
               ));
             }
@@ -1853,7 +1922,7 @@ export const QuickCheckout: React.FC = () => {
               )}
               
               <div className="flex gap-2">
-                <div className="flex-1">
+                <div className="flex-1 relative">
                   <div className="relative">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2">
                       <Barcode className={`w-4 h-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
@@ -1920,6 +1989,80 @@ export const QuickCheckout: React.FC = () => {
                       </button>
                     )}
                   </div>
+                  
+                  {/* ── ABSOLUTE FLOATING OVERLAY DROPDOWN ── */}
+                  {(filteredProducts.length > 0 || (productSearch && filteredProducts.length === 0)) && (
+                    <div className="absolute left-0 right-0 z-50 mt-1 w-full bg-slate-900/95 backdrop-blur-md border border-slate-800 rounded-xl shadow-2xl overflow-y-auto max-h-[65vh] custom-scrollbar">
+                      {filteredProducts.length > 0 ? (
+                        <div className="p-1">
+                          {filteredProducts.map((flatProduct, index) => (
+                            <button
+                              key={flatProduct.flatId}
+                              ref={(el) => {
+                                if (el) productItemRefs.current.set(index, el);
+                                else productItemRefs.current.delete(index);
+                              }}
+                              onClick={() => {
+                                setPendingProduct(flatProduct);
+                                setProductSearch('');
+                                setSelectedProductIndex(-1);
+                                setQuantity(1);
+                                setIsQuantityFocused(true);
+                                setCurrentMode('quantity');
+                                setTimeout(() => {
+                                  quantityInputRef.current?.focus();
+                                  quantityInputRef.current?.select();
+                                }, 50);
+                                playBeep('add');
+                                toast.info(`${flatProduct.displayName} - ${t('quickCheckout.enterQuantity')}`);
+                              }}
+                              className={`w-full flex items-center gap-2 p-2 text-left transition-colors border-b last:border-b-0 rounded-lg ${
+                                index === selectedProductIndex
+                                  ? isDark ? 'bg-amber-500/20 border-amber-500/30' : 'bg-amber-50 border-amber-200'
+                                  : isDark ? 'hover:bg-slate-700/50 border-slate-700' : 'hover:bg-white border-slate-200'
+                              }`}
+                            >
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-white'}`}>
+                                <Package className={`w-4 h-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-xs font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                  {isSinhala ? (flatProduct.product.nameAlt || flatProduct.displayName) : flatProduct.displayName}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className={`text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                    {flatProduct.displaySku}
+                                  </span>
+                                  <span className={`text-[9px] px-1 py-0.5 rounded ${
+                                    flatProduct.stock > 10 
+                                      ? 'bg-emerald-500/10 text-emerald-500' 
+                                      : flatProduct.stock > 0 
+                                        ? 'bg-amber-500/10 text-amber-500' 
+                                        : 'bg-red-500/10 text-red-500'
+                                  }`}>
+                                    {flatProduct.stock}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                  Rs. {flatProduct.retailPrice.toLocaleString()}
+                                </p>
+                              </div>
+                              <Plus className={`w-3.5 h-3.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center">
+                          <Package className={`w-8 h-8 mx-auto mb-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`} />
+                          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {t('quickCheckout.noProductsFound')}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 {/* + Add Product button */}
@@ -1991,80 +2134,7 @@ export const QuickCheckout: React.FC = () => {
                 </div>
               </div>
               
-              {/* Product Results - compact */}
-              {filteredProducts.length > 0 && (
-                <div 
-                  ref={productListRef}
-                  className={`mt-2 max-h-48 overflow-y-auto rounded-lg border ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}
-                >
-                  {filteredProducts.map((flatProduct, index) => (
-                    <button
-                      key={flatProduct.flatId}
-                      ref={(el) => {
-                        if (el) productItemRefs.current.set(index, el);
-                        else productItemRefs.current.delete(index);
-                      }}
-                      onClick={() => {
-                        setPendingProduct(flatProduct);
-                        setProductSearch('');
-                        setSelectedProductIndex(-1);
-                        setQuantity(1);
-                        setIsQuantityFocused(true);
-                        setCurrentMode('quantity');
-                        setTimeout(() => {
-                          quantityInputRef.current?.focus();
-                          quantityInputRef.current?.select();
-                        }, 50);
-                        playBeep('add');
-                        toast.info(`${flatProduct.displayName} - ${t('quickCheckout.enterQuantity')}`);
-                      }}
-                      className={`w-full flex items-center gap-2 p-2 text-left transition-colors border-b last:border-b-0 ${
-                        index === selectedProductIndex
-                          ? isDark ? 'bg-amber-500/20 border-amber-500/30' : 'bg-amber-50 border-amber-200'
-                          : isDark ? 'hover:bg-slate-700/50 border-slate-700' : 'hover:bg-white border-slate-200'
-                      }`}
-                    >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-white'}`}>
-                        <Package className={`w-4 h-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-xs font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {isSinhala ? (flatProduct.product.nameAlt || flatProduct.displayName) : flatProduct.displayName}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={`text-[9px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                            {flatProduct.displaySku}
-                          </span>
-                          <span className={`text-[9px] px-1 py-0.5 rounded ${
-                            flatProduct.stock > 10 
-                              ? 'bg-emerald-500/10 text-emerald-500' 
-                              : flatProduct.stock > 0 
-                                ? 'bg-amber-500/10 text-amber-500' 
-                                : 'bg-red-500/10 text-red-500'
-                          }`}>
-                            {flatProduct.stock}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          Rs. {flatProduct.retailPrice.toLocaleString()}
-                        </p>
-                      </div>
-                      <Plus className={`w-3.5 h-3.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
-                    </button>
-                  ))}
-                </div>
-              )}
               
-              {productSearch && filteredProducts.length === 0 && (
-                <div className={`mt-2 p-4 text-center rounded-lg border ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}>
-                  <Package className={`w-8 h-8 mx-auto mb-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`} />
-                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {t('quickCheckout.noProductsFound')}
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Compact Cart Items - shows ~3 rows */}
@@ -2206,11 +2276,20 @@ export const QuickCheckout: React.FC = () => {
                           {Number(item.lastPrice || 0).toFixed(2)}
                         </span>
                       </div>
-                      {/* col 6: Sales Price (Sales) */}
+                      {/* col 6: Sales Price (Sales) — inline editable override */}
                       <div className="col-span-1 text-right">
-                        <span className={`text-[10px] font-semibold font-mono ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
-                          {Number(item.salesPrice || 0).toFixed(2)}
-                        </span>
+                        <input
+                          type="number"
+                          value={Number(item.salesPrice || item.ourPrice || 0)}
+                          onChange={(e) => handleUpdateCartItemPrice(item.id, Number(e.target.value))}
+                          onFocus={(e) => e.target.select()}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`w-full max-w-[80px] ml-auto px-1 py-0.5 text-[10px] font-semibold font-mono text-center rounded-lg border focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                            isDark 
+                              ? 'bg-slate-800 border-slate-700 text-amber-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30' 
+                              : 'bg-white border-slate-200 text-amber-600 focus:border-amber-500 focus:ring-1 focus:ring-amber-200'
+                          }`}
+                        />
                       </div>
                       {/* col 7: DISPLAY — displayPrice (reference price shown on receipt) */}
                       <div className="col-span-1 text-right">
@@ -2246,10 +2325,10 @@ export const QuickCheckout: React.FC = () => {
                           <Plus className="w-2.5 h-2.5" />
                         </button>
                       </div>
-                      {/* col 11-12: Line total (lastPrice × qty) */}
+                      {/* col 11-12: Line total (salesPrice × qty) */}
                       <div className="col-span-2 text-right pr-4">
                         <span className={`text-[11px] font-bold font-mono tabular-nums ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {(Number(item.lastPrice || 0) * item.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          {(Number(item.salesPrice || item.ourPrice || 0) * item.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                       {/* Hover remove button */}
@@ -2268,53 +2347,468 @@ export const QuickCheckout: React.FC = () => {
               )}
             </div>
 
-            {/* Compact Category Grid */}
-            <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
-              <div className="flex items-center justify-between mb-1.5">
-                <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  <Package className="w-3.5 h-3.5" />
-                  {t('quickCheckout.quickCategories')}
-                </h3>
+            {/* ── FULL REFACTORED QUICK CATEGORIES CONTAINER ── */}
+            <div className={`rounded-xl border ${isDark ? 'bg-slate-950/40 border-slate-900' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <div className="p-3 pb-0">
+                {/* Header Section */}
+                <div className="flex justify-between items-center mb-3 border-b border-slate-900 pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                    <h3 className={`text-xs font-bold tracking-wide uppercase ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
+                      Quick Categories
+                    </h3>
+                  </div>
+                  
+                  {/* Premium Toggle Mode Button */}
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setIsEditingCategories(!isEditingCategories);
+                      setIsAddDropdownOpen(false);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all duration-200 flex items-center gap-1 ${
+                      isEditingCategories 
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                        : isDark 
+                          ? 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800' 
+                          : 'bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    {isEditingCategories ? "Done" : "Edit"}
+                  </button>
+                </div>
               </div>
-              <CategoryGrid onItemSelect={(item, category) => {
-                // Resolve the master inventory row for exact price fidelity.
-                // Lookup is strictly by unique `id` — never by sku/searchKey string
-                // to prevent price cloning across products that share a search key.
-                const masterInv = inventoryItems.find(
-                  inv => inv.id === item.id
-                );
-                const fp: FlattenedProduct = {
-                  // Use item.id as flatId so addProductToCart master-lookup hits by inv.id
-                  flatId:        item.id,
-                  product: { nameAlt: item.nameSi || item.name, sku: item.sku, category: category.name } as any,
-                  displayName:   item.name,
-                  displaySku:    item.sku,
-                  // retailPrice  = salesPrice  (our charge)
-                  // wholesalePrice = displayPrice (marked/RRP, struck-through on receipt)
-                  retailPrice:   masterInv ? Number(masterInv.salesPrice)   : item.unitRate,
-                  wholesalePrice: masterInv ? Number(masterInv.displayPrice) : item.unitRate,
-                  costPrice:     masterInv ? Number(masterInv.cost)         : 0,
-                  stock:         masterInv ? Number(masterInv.storeQty)     : item.stock,
-                  hasDiscount:   false,
-                  discountedPrice: undefined,
-                  minStock:      0,
-                  isVariant:     false,
-                } as FlattenedProduct;
-                setPendingProduct(fp);
-                setProductSearch('');
-                setSelectedProductIndex(-1);
-                setQuantity(1);
-                setIsQuantityFocused(true);
-                setIsCartFocused(false);
-                setCurrentMode('quantity');
-                setTimeout(() => {
-                  quantityInputRef.current?.focus();
-                  quantityInputRef.current?.select();
-                }, 50);
-                playBeep('add');
-                toast.info(`${item.name} - ${t('quickCheckout.enterQuantity')}`);
-              }} />
+
+              {/* FIXED MAX 3 ROWS CONTAINER WITH INDEPENDENT VIEWPORT SCROLL */}
+              <div className={`px-3 pb-3 max-h-[305px] overflow-y-auto pr-2 ${isDark ? 'scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900' : 'scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100'}`}>
+                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                  {quickCategories.map((category, index) => {
+                    const categoryProducts = categoryProductMap.get(category) || [];
+                    return (
+                    <div 
+                      key={category}
+                      draggable={isEditingCategories}
+                      onDragStart={(e) => {
+                        if (!isEditingCategories) return;
+                        setDraggedIndex(index);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragOver={(e) => {
+                        if (!isEditingCategories || draggedIndex === null) return;
+                        e.preventDefault();
+                      }}
+                      onDrop={(e) => {
+                        if (!isEditingCategories || draggedIndex === null) return;
+                        e.preventDefault();
+                        const updated = [...quickCategories];
+                        const [removed] = updated.splice(draggedIndex, 1);
+                        updated.splice(index, 0, removed);
+                        setQuickCategories(updated);
+                        setDraggedIndex(null);
+                      }}
+                      onDragEnd={() => setDraggedIndex(null)}
+
+                      className={`relative group rounded-xl flex flex-col items-center justify-between text-center min-h-[85px] transition-all duration-200 ${
+                        isEditingCategories 
+                          ? 'border-2 border-dashed border-amber-500/30 bg-slate-950/60 cursor-grab active:cursor-grabbing hover:border-amber-500/60' 
+                          : isDark
+                            ? 'bg-slate-800/50 border border-slate-700/80 hover:border-slate-600 hover:bg-slate-800/60 cursor-pointer active:scale-95'
+                            : 'bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 cursor-pointer active:scale-95 shadow-sm'
+                      } ${draggedIndex === index ? 'opacity-40 border-amber-500 bg-amber-500/5' : ''}`}
+                      onClick={(e) => {
+                        if (!isEditingCategories) {
+                          if (categoryProducts.length > 0) {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setCategoryPopoverAnchor(rect);
+                            setActiveCategoryPopover(category);
+                            setCategoryPopoverFilter('');
+                            setTimeout(() => categoryPopoverInputRef.current?.focus(), 100);
+                          } else {
+                            toast.info(`${category} - ${t('quickCheckout.noProductsFound')}`);
+                          }
+                        }
+                      }}
+                    >
+                      {/* Top Control Layer for Drag Handle / Badge indication */}
+                      {isEditingCategories && (
+                        <div className="absolute top-1 left-1 right-1 flex justify-between items-center w-[calc(100%-8px)] opacity-80 group-hover:opacity-100 transition-opacity">
+                          <span className="text-[10px] text-slate-600 font-bold select-none leading-none">⠿</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setQuickCategories(quickCategories.filter(c => c !== category));
+                              toast.success(`Removed "${category}" from grid`);
+                            }}
+                            className="w-4 h-4 rounded-md bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 text-rose-400 hover:text-white flex items-center justify-center text-[9px] font-black transition-all"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Centralized Label Display Area */}
+                      <div className="w-full flex flex-col items-center justify-center my-auto pt-2">
+                        <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${
+                          index % 2 === 0 ? 'from-cyan-500 to-blue-600' : 'from-amber-500 to-orange-500'
+                        } flex items-center justify-center mb-1 shadow-lg`}>
+                          <Package className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <span className={`text-[10px] font-bold tracking-wide uppercase leading-tight line-clamp-2 px-1 ${
+                          isDark ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          {category}
+                        </span>
+                      </div>
+
+                      {/* Visual Dot Identity Base */}
+                      {!isEditingCategories && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-glow mt-1 mb-0.5"></div>
+                      )}
+                    </div>
+                    );
+                  })}
+
+                  {/* ── ADD ITEM CARD TRIGGER (Edit Mode only) ── */}
+                  {isEditingCategories && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddDropdownOpen(!isAddDropdownOpen)}
+                        className={`w-full min-h-[85px] border-2 border-dashed border-slate-800 hover:border-emerald-500/40 bg-slate-950/20 hover:bg-emerald-950/5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all group ${
+                          isDark ? '' : 'bg-slate-50/50 border-slate-300 hover:border-emerald-400/40 hover:bg-emerald-50/30'
+                        }`}
+                      >
+                        <span className="text-emerald-500 text-lg font-bold group-hover:scale-125 transition-transform">+</span>
+                        <span className="text-[9px] font-bold text-slate-500 group-hover:text-emerald-400 uppercase tracking-wider">Add Box</span>
+                      </button>
+
+                      {/* ── CUSTOM FLOATING DARK DROPDOWN - ADD CATEGORY ── */}
+                      {isAddDropdownOpen && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setIsAddDropdownOpen(false)} />
+                          <div className={`absolute bottom-full left-0 mb-2 w-64 max-h-60 overflow-y-auto rounded-xl shadow-2xl p-2 z-50 animate-fade-in ${
+                            isDark 
+                              ? 'bg-slate-950 border border-slate-800' 
+                              : 'bg-white border border-slate-200 shadow-lg'
+                          }`}>
+                            <div className={`px-2 py-1.5 text-[9px] font-black tracking-wider uppercase border-b mb-1 ${
+                              isDark ? 'text-slate-500 border-slate-800' : 'text-slate-400 border-slate-200'
+                            }`}>
+                              Select Category to Append
+                            </div>
+                            {allCategoryNames
+                              .filter(c => !quickCategories.includes(c))
+                              .map((cat) => (
+                                <button
+                                  key={cat}
+                                  type="button"
+                                  onClick={() => {
+                                    setQuickCategories([...quickCategories, cat]);
+                                    setIsAddDropdownOpen(false);
+                                    toast.success(`Added "${cat}" to grid`);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 text-xs font-medium rounded-lg transition-all flex items-center gap-2 ${
+                                    isDark 
+                                      ? 'text-slate-300 hover:text-white hover:bg-slate-900/60' 
+                                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                  {cat}
+                                </button>
+                              ))}
+                            {allCategoryNames.filter(c => !quickCategories.includes(c)).length === 0 && (
+                              <div className="text-center py-4 text-xs text-slate-600 font-bold">
+                                All items are already on layout grid!
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+
+                    {/* ── CATEGORY PRODUCT POPOVER ── */}
+            {activeCategoryPopover && categoryPopoverAnchor && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => { setActiveCategoryPopover(null); setQuantityPromptProduct(null); setActiveCategoryItemIndex(0); }} />
+                <div 
+                  ref={categoryPopoverRef}
+                  className="fixed z-50 rounded-xl border shadow-2xl overflow-hidden animate-fade-in"
+                  style={{
+                    top: Math.max(8, categoryPopoverAnchor.top - 360),
+                    left: Math.max(8, Math.min(categoryPopoverAnchor.left, window.innerWidth - 360)),
+                    width: 350,
+                    maxHeight: 340,
+                  }}
+                >
+                  {/* ── RESOLVED FILTERED PRODUCTS LIST ── */}
+                  {(() => {
+                    const catProducts = inventoryItems
+                      .filter(inv => inv.productCategory === activeCategoryPopover)
+                      .filter(item => {
+                        if (!categoryPopoverFilter.trim()) return true;
+                        const q = categoryPopoverFilter.toLowerCase();
+                        return item.name.toLowerCase().includes(q) || 
+                               (item.searchKey && item.searchKey.toLowerCase().includes(q));
+                      });
+                    const filteredCategoryProducts = catProducts;
+
+                    // Auto-scroll effect when activeCategoryItemIndex changes
+                    const scrollActiveIntoView = (idx: number) => {
+                      setTimeout(() => {
+                        const container = categoryListContainerRef.current;
+                        if (!container) return;
+                        const activeEl = container.querySelector(`[data-cat-index="${idx}"]`);
+                        if (activeEl) {
+                          activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                      }, 10);
+                    };
+
+                    return (
+                      <div className={`${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border relative`}>
+                        {/* Conditionally render quantity overlay OR the standard popover content */}
+                        {quantityPromptProduct ? (
+                          /* ── EMBEDDED QUANTITY PROMPT OVERLAY ── */
+                          <div className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center p-6 animate-fade-in">
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full text-center shadow-2xl">
+                              <span className="text-[10px] text-amber-500 font-black tracking-widest uppercase block mb-1">අවශ්‍ය ප්‍රමාණය ඇතුළත් කරන්න</span>
+                              <h3 className="text-xs font-black text-slate-200 mb-4 line-clamp-2">{quantityPromptProduct.name}</h3>
+                              <input
+                                type="number"
+                                autoFocus
+                                value={categoryPromptQty}
+                                onChange={(e) => setCategoryPromptQty(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const finalQty = Math.max(1, parseInt(categoryPromptQty) || 1);
+                                    // Build the FlattenedProduct shell and add to cart with custom qty
+                                    const fp: FlattenedProduct = {
+                                      flatId: quantityPromptProduct.id,
+                                      product: { nameAlt: quantityPromptProduct.name, sku: quantityPromptProduct.searchKey, category: activeCategoryPopover } as any,
+                                      displayName: quantityPromptProduct.name,
+                                      displaySku: quantityPromptProduct.searchKey,
+                                      retailPrice: Number(quantityPromptProduct.salesPrice),
+                                      wholesalePrice: Number(quantityPromptProduct.displayPrice),
+                                      costPrice: Number(quantityPromptProduct.cost),
+                                      stock: Number(quantityPromptProduct.storeQty),
+                                      hasDiscount: false,
+                                    } as FlattenedProduct;
+                                    addProductToCart(fp, finalQty);
+                                    toast.success(`${quantityPromptProduct.name} × ${finalQty} ${t('quickCheckout.addedToCart')}`);
+                                    // Reset all category popover states
+                                    setQuantityPromptProduct(null);
+                                    setActiveCategoryPopover(null);
+                                    setCategoryPopoverFilter('');
+                                    setActiveCategoryItemIndex(0);
+                                    // Re-focus main search input
+                                    setTimeout(() => searchInputRef.current?.focus(), 50);
+                                  } else if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    setQuantityPromptProduct(null);
+                                    // Re-focus the category search input
+                                    setTimeout(() => categoryPopoverInputRef.current?.focus(), 50);
+                                  }
+                                }}
+                                className="w-full bg-slate-950 border-2 border-slate-800 focus:border-amber-500 rounded-xl p-3 text-center text-lg font-black text-white focus:outline-none tracking-widest mb-4"
+                              />
+                              <div className="text-[10px] font-bold text-slate-500">
+                                Press <kbd className="bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-700">Enter</kbd> to Add • <kbd className="bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-700">Esc</kbd> to Cancel
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {/* Popover Header */}
+                            <div className={`flex items-center justify-between px-3 py-2 border-b ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                              <div className="flex items-center gap-2">
+                                <div className={`w-6 h-6 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center`}>
+                                  <Package className="w-3 h-3 text-white" />
+                                </div>
+                                <span className={`text-xs font-bold uppercase tracking-wide ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                  {activeCategoryPopover}
+                                </span>
+                                <span className={`text-[9px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  {filteredCategoryProducts.length} items
+                                </span>
+                              </div>
+                              <button 
+                                onClick={() => { setActiveCategoryPopover(null); setActiveCategoryItemIndex(0); }}
+                                className={`p-0.5 rounded transition-colors ${isDark ? 'hover:bg-slate-800 text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {/* Search Input with Full Keyboard Navigation */}
+                            <div className={`px-3 py-1.5 border-b ${isDark ? 'border-slate-800/50' : 'border-slate-100'}`}>
+                              <div className="relative">
+                                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+                                <input
+                                  ref={categoryPopoverInputRef}
+                                  type="text"
+                                  value={categoryPopoverFilter}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    setCategoryPopoverFilter(e.target.value);
+                                    setActiveCategoryItemIndex(0); // Reset index on every keystroke
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  placeholder={`Filter ${activeCategoryPopover} items...`}
+                                  /* ── CRITICAL: Inner keydown interceptor for mouseless navigation ── */
+                                  onKeyDown={(e) => {
+                                    if (filteredCategoryProducts.length === 0) return;
+
+                                    if (e.key === 'ArrowDown') {
+                                      e.preventDefault();
+                                      setActiveCategoryItemIndex((prev) => 
+                                        prev < filteredCategoryProducts.length - 1 ? prev + 1 : prev
+                                      );
+                                    } else if (e.key === 'ArrowUp') {
+                                      e.preventDefault();
+                                      setActiveCategoryItemIndex((prev) => (prev > 0 ? prev - 1 : 0));
+                                    } else if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      const targetedProduct = filteredCategoryProducts[activeCategoryItemIndex];
+                                      if (targetedProduct) {
+                                        // Build FlattenedProduct and stage as pendingProduct (matches main search selection flow)
+                                        const fp: FlattenedProduct = {
+                                          flatId: targetedProduct.id,
+                                          product: { nameAlt: targetedProduct.name, sku: targetedProduct.searchKey, category: activeCategoryPopover } as any,
+                                          displayName: targetedProduct.name,
+                                          displaySku: targetedProduct.searchKey,
+                                          retailPrice: Number(targetedProduct.salesPrice),
+                                          wholesalePrice: Number(targetedProduct.displayPrice),
+                                          costPrice: Number(targetedProduct.cost),
+                                          stock: Number(targetedProduct.storeQty),
+                                          hasDiscount: false,
+                                        } as FlattenedProduct;
+                                        setPendingProduct(fp);
+                                        setProductSearch(targetedProduct.name);
+                                        // Close the category popover cleanly
+                                        setActiveCategoryPopover(null);
+                                        setCategoryPopoverFilter('');
+                                        setActiveCategoryItemIndex(0);
+                                        setQuantity(1);
+                                        setIsQuantityFocused(true);
+                                        setCurrentMode('quantity');
+                                        // Focus the top main qty input (id="main-checkout-qty-input") for instant quantity confirmation
+                                        setTimeout(() => {
+                                          quantityInputRef.current?.focus();
+                                          quantityInputRef.current?.select();
+                                        }, 50);
+                                        playBeep('add');
+                                        toast.info(`${targetedProduct.name} - ${t('quickCheckout.enterQuantity')}`);
+                                      }
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      setActiveCategoryPopover(null);
+                                      setActiveCategoryItemIndex(0);
+                                      setCategoryPopoverFilter('');
+                                      searchInputRef.current?.focus();
+                                    }
+                                  }}
+                                  className={`w-full bg-slate-950 border border-slate-800 focus:border-amber-500/50 rounded-xl p-3 pl-10 text-xs font-bold text-white focus:outline-none mb-0 ${
+                                    isDark 
+                                      ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500' 
+                                      : 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-400'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Product List with Visual Highlighting and Auto-Scroll */}
+                            <div 
+                              ref={categoryListContainerRef}
+                              className="overflow-y-auto custom-scrollbar" 
+                              style={{ maxHeight: 220 }}
+                            >
+                              {filteredCategoryProducts.length > 0 ? (
+                                <div className="flex flex-col gap-0.5 p-1">
+                                  {filteredCategoryProducts.map((item, idx) => {
+                                    const isFocusedRow = idx === activeCategoryItemIndex;
+                                    return (
+                                      <div
+                                        key={item.id}
+                                        data-cat-index={idx}
+                                        onClick={() => {
+                                          setActiveCategoryItemIndex(idx);
+                                          setQuantityPromptProduct(item);
+                                          setCategoryPromptQty("1");
+                                        }}
+                                        className={`p-2.5 rounded-xl flex items-center gap-2 transition-all duration-150 cursor-pointer border-l-4 ${
+                                          isFocusedRow 
+                                            ? 'bg-slate-800 border-l-4 border-amber-500 shadow-lg translate-x-0.5 scale-[1.01] z-10' 
+                                            : 'bg-slate-900/40 hover:bg-slate-900/80 border-l-4 border-transparent hover:border-slate-700'
+                                        }`}
+                                      >
+                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                          isFocusedRow 
+                                            ? 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-lg shadow-amber-500/20' 
+                                            : 'bg-slate-800'
+                                        }`}>
+                                          <Package className={`w-3.5 h-3.5 ${isFocusedRow ? 'text-white' : 'text-slate-400'}`} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className={`text-[11px] font-semibold truncate ${isFocusedRow ? 'text-white' : 'text-slate-200'}`}>
+                                            {item.name}
+                                          </p>
+                                          <div className="flex items-center gap-1.5 mt-0.5">
+                                            <span className={`text-[8px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                              {item.searchKey}
+                                            </span>
+                                            <span className={`text-[8px] px-1 py-0.5 rounded-full ${
+                                              item.storeQty > 10 
+                                                ? 'bg-emerald-500/10 text-emerald-500' 
+                                                : item.storeQty > 0 
+                                                  ? 'bg-amber-500/10 text-amber-500' 
+                                                  : 'bg-red-500/10 text-red-500'
+                                            }`}>
+                                              {item.storeQty}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="text-right flex-shrink-0 flex items-center gap-2">
+                                          <p className={`text-[11px] font-black ${isFocusedRow ? 'text-amber-400' : 'text-slate-300'}`}>
+                                            Rs. {Number(item.salesPrice).toFixed(2)}
+                                          </p>
+                                          <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black transition-all ${
+                                            isFocusedRow 
+                                              ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 scale-110' 
+                                              : 'bg-slate-800 text-slate-400'
+                                          }`}>
+                                            +
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className={`p-4 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                  <p className="text-xs font-medium">No items found</p>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Right Panel - Checkout Summary */}
@@ -2511,26 +3005,6 @@ export const QuickCheckout: React.FC = () => {
               </div>
             </div>
 
-            {/* Shortcuts Panel */}
-            <div className={`p-3 rounded-xl border ${isDark ? 'bg-gradient-to-br from-slate-800 via-slate-800/90 to-indigo-900/30 border-slate-700' : 'bg-gradient-to-br from-white via-indigo-50/30 to-blue-50 border-indigo-200 shadow-sm'}`}>
-              <div className="flex items-center justify-between mb-1.5">
-                <h3 className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-indigo-900'}`}>
-                  <Keyboard className="w-3 h-3" />
-                  Shortcuts
-                </h3>
-                <button onClick={() => setShowShortcutMap(true)} className={`text-[9px] px-1.5 py-0.5 rounded transition-colors flex items-center gap-0.5 ${isDark ? 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400' : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-700'}`}>
-                  <span>?</span>
-                </button>
-              </div>
-              <div className="grid grid-cols-4 gap-1">
-                {[{ key: 'F2', icon: '🔍' }, { key: 'F3', icon: '📊' }, { key: 'F4', icon: '🛒' }, { key: 'F5', icon: '💳' }, { key: 'F6', icon: '🏷️' }, { key: 'F7', icon: '💰' }, { key: 'F9', icon: '💾' }, { key: 'F12', icon: '🖨️' }].map((s) => (
-                  <div key={s.key} className={`flex flex-col items-center p-1 rounded-lg transition-all hover:scale-105 cursor-default ${isDark ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
-                    <span className="text-xs mb-0.5">{s.icon}</span>
-                    <kbd className={`px-1 py-0.5 rounded font-mono text-[9px] font-bold ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>{s.key}</kbd>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
           </div>{/* end flex-1 inner grid wrapper */}
