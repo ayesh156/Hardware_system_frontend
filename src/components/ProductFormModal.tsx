@@ -3,7 +3,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { useCatalog } from '../contexts/CatalogContext';
 import { CategoryFormModal } from './modals/CategoryFormModal';
-import { X, Save, AlertTriangle, DollarSign, Package, Hash, Layers, Tag, BarChart3, ShoppingCart, Plus } from 'lucide-react';
+import { X, Save, AlertTriangle, DollarSign, Package, Hash, Layers, Tag, BarChart3, ShoppingCart, Plus, ScanLine } from 'lucide-react';
 import { InventoryProduct, FlattenedProduct, Product, Category } from '../types';
 
 interface ProductFormModalProps {
@@ -159,6 +159,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
         searchKey: '',
         name: '',
         productCategory: prefillCategory || '',
+        barcode: '',
         cost: 0,
         lastPrice: 0,
         salesPrice: 0,
@@ -174,6 +175,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
       searchKey: d?.searchKey || d?.product?.sku || d?.displaySku || '',
       name: d?.name || d?.displayName || '',
       productCategory: prefillCategory || d?.productCategory || d?.product?.category || '',
+      barcode: d?.barcode || '',
       cost: Number(d?.cost) || Number(d?.costPrice) || 0,
       lastPrice: Number(d?.lastPrice) || 0,
       salesPrice: Number(d?.salesPrice) || Number(d?.retailPrice) || 0,
@@ -247,6 +249,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
         searchKey: form.searchKey,
         name: form.name,
         productCategory: form.productCategory || 'HARDWARE',
+        barcode: (form as any).barcode || undefined,
         cost: form.cost,
         lastPrice: form.lastPrice,
         salesPrice: form.salesPrice,
@@ -336,6 +339,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                 <FieldGroup label={t('addProductModal.productName')} icon={<Package className="w-3 h-3" />}>
                   <ClearableInput value={form.name} isDark={isDark} onChange={(v) => handleStrUpdate('name', v)} placeholder={t('addProductModal.productNamePlaceholder')} hasError={!!errors.name} />
                   {errors.name && <p className="text-[9px] text-red-400 mt-0.5">{errors.name}</p>}
+                </FieldGroup>
+              </div>
+              {/* Barcode */}
+              <div className="lg:col-span-3">
+                <FieldGroup label="බාර්කෝඩ් අංකය (Barcode)" icon={<ScanLine className="w-3 h-3" />}>
+                  <ClearableInput
+                    value={(form as any).barcode || ''}
+                    isDark={isDark}
+                    onChange={(v) => updateField('barcode', v)}
+                    placeholder="බාර්කෝඩ් එක ස්කෑන් කරන්න හෝ ඇතුළත් කරන්න"
+                  />
                 </FieldGroup>
               </div>
               {/* Product Category — dynamic + nested add button */}

@@ -2,7 +2,7 @@
 
 // ──────────────────────────────────────────────
 
-export const inventoryItems: InventoryProduct[] = [
+const rawInventoryItems: InventoryProduct[] = [
   { id: 'p-2', searchKey: 'GI BOX 3/4"X3/4"', name: 'ජී  අයි බොක්ස් බාර් 3/4"X3/4" (0.9mm) මෙල්වා', productCategory: 'MELWA BOX BAR', categoryId: 'cat-melwa-box-bar', cost: 781, lastPrice: 930, salesPrice: 950, displayPrice: 970, storeQty: 50, salesType: 'Piece', unitQty: 1, oneUnitPrice: 950, status: 'Available' as const },
   { id: 'p-3', searchKey: 'GI BOX 3/4"X3/4"', name: 'ජී  අයි බොක්ස් බාර් 3/4"X3/4"  (1.1 mm) මෙල්වා', productCategory: 'MELWA BOX BAR', categoryId: 'cat-melwa-box-bar', cost: 958, lastPrice: 1080, salesPrice: 1100, displayPrice: 1120, storeQty: 50, salesType: 'Piece', unitQty: 1, oneUnitPrice: 1100, status: 'Available' as const },
   { id: 'p-4', searchKey: 'GI BOX 3/4"X3/4"', name: 'ජී  අයි බොක්ස් බාර් 3/4"X3/4" (1.2mm) මෙල්වා', productCategory: 'MELWA BOX BAR', categoryId: 'cat-melwa-box-bar', cost: 1071, lastPrice: 1230, salesPrice: 1250, displayPrice: 1270, storeQty: 50, salesType: 'Piece', unitQty: 1, oneUnitPrice: 1250, status: 'Available' as const },
@@ -3541,3 +3541,12 @@ export const inventoryItems: InventoryProduct[] = [
   { id: 'p-ITEM-3535', searchKey: 'HAVELLS--', name: 'HAVELLS සිවිලිම් ෆෑන්', productCategory: 'General', categoryId: 'cat-general', cost: 0, lastPrice: 0, salesPrice: 0, displayPrice: 0, storeQty: 50, salesType: 'Piece', unitQty: 1, oneUnitPrice: 0, status: 'Out of Stock' as const },
   { id: 'p-ITEM-3536', searchKey: 'STAND-', name: 'STAND ෆෑන්', productCategory: 'General', categoryId: 'cat-general', cost: 0, lastPrice: 0, salesPrice: 0, displayPrice: 0, storeQty: 50, salesType: 'Piece', unitQty: 1, oneUnitPrice: 0, status: 'Out of Stock' as const }
 ];
+
+// ── Barcode hydration layer ──────────────────────────────────────────────────
+// Generates a deterministic LHD-xxxxxxx fallback code for every product that
+// was imported from Excel without a physical barcode value.  If a row already
+// carries a barcode (future imports or manual overrides), it is preserved as-is.
+export const inventoryItems: InventoryProduct[] = rawInventoryItems.map((item) => ({
+  ...item,
+  barcode: item.barcode || `LHD-${(1000000 + Number(item.id.replace(/[^0-9]/g, '')) || 0).toString().slice(0, 7)}`,
+}));

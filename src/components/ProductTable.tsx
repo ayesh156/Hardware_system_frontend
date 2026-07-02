@@ -26,6 +26,7 @@ const columns: { key: keyof InventoryProduct | null; label: string; align: 'left
   { key: 'searchKey',       label: 'Search Key',        align: 'left',   editable: false },
   { key: 'name',            label: 'Name',              align: 'left',   editable: false },
   { key: 'productCategory', label: 'Product Category',  align: 'left',   editable: false },
+  { key: 'barcode',         label: 'Barcode',           align: 'left',   editable: false },
   { key: 'cost',            label: 'Cost[0]',           align: 'right',  editable: true },
   { key: 'lastPrice',       label: 'Last Price[1]',     align: 'right',  editable: true },
   { key: 'salesPrice',      label: 'Sales Price[3]',    align: 'right',  editable: true },
@@ -408,6 +409,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
                           'Search Key': t('productTable.searchKey'),
                           'Name': t('productTable.name'),
                           'Product Category': t('productTable.category'),
+                          'Barcode': 'බාර්කෝඩ්',
                           'Cost[0]': t('productTable.cost'),
                           'Last Price[1]': t('productTable.lastPrice'),
                           'Sales Price[3]': t('productTable.salesPrice'),
@@ -478,6 +480,13 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
                         </td>
                       );
                     })()}
+
+                    {/* Barcode cell */}
+                    <td className="px-2 py-1.5">
+                      <span className={`text-[10px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {item.barcode || '—'}
+                      </span>
+                    </td>
 
                     {(['cost', 'lastPrice', 'salesPrice', 'displayPrice'] as const).map((field) => {
                       const isEditing = inlineEdit?.itemId === item.id && inlineEdit?.field === field;

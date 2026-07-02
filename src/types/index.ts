@@ -131,6 +131,7 @@ export interface InventoryProduct {
   productCategory: string;
   categoryId?: string;
   categorySi?: string;   // Sinhala category name (e.g., "ACL කේබල්")
+  barcode?: string;      // Physical barcode / fallback LHD-xxxxxxx code
   cost: number;
   lastPrice: number;
   salesPrice: number;

@@ -277,25 +277,54 @@ export const QuickCheckout: React.FC = () => {
   }, [soundEnabled]);
 
   // ── Search inventoryItems directly from live CatalogContext ──
+  // Multi-word matching: every space-separated word token in the query must appear
+  // somewhere in the product name OR searchKey. Raw spaces are preserved in the
+  // input — never stripped — so "7 යතුරු" and "GI BOX 1x1" both resolve correctly.
   const filteredProducts = useMemo((): any[] => {
     if (!productSearch.trim()) return [];
-    
-    const query = productSearch.trim().toLowerCase();
-    
+
+    const raw = productSearch.trim();
+    const normalizedQuery = raw.toLowerCase();
+
+    // ── Priority 1: exact barcode match — surface as single result ──
+    const barcodeHit = inventoryItems.find(
+      item => item.barcode && item.barcode.trim() === raw
+    );
+    if (barcodeHit) {
+      return [{
+        flatId: barcodeHit.id,
+        product: { nameAlt: barcodeHit.name, sku: barcodeHit.searchKey, category: barcodeHit.productCategory } as any,
+        variant: undefined,
+        displayName: barcodeHit.name,
+        displaySku: barcodeHit.searchKey,
+        displayBarcode: barcodeHit.barcode,
+        costPrice: barcodeHit.cost,
+        wholesalePrice: barcodeHit.displayPrice,
+        retailPrice: barcodeHit.salesPrice,
+        discountedPrice: undefined,
+        hasDiscount: false,
+        stock: barcodeHit.storeQty,
+        minStock: 0,
+        isVariant: false,
+        variantLabel: undefined,
+      }];
+    }
+
+    // ── Priority 2: multi-word fuzzy text search ──
+    // Split on whitespace → every token must appear in name or searchKey.
+    const words = normalizedQuery.split(/\s+/).filter(Boolean);
     return inventoryItems.filter(item => {
       if (!item.searchKey && !item.name) return false;
-      return (
-        item.searchKey?.toLowerCase() === query ||
-        item.name?.toLowerCase().includes(query) ||
-        item.searchKey?.toLowerCase().includes(query)
-      );
+      const targetName = item.name.toLowerCase();
+      const targetKey  = (item.searchKey || '').toLowerCase();
+      return words.every(w => targetName.includes(w) || targetKey.includes(w));
     }).slice(0, 12).map(item => ({
       flatId: item.id,
       product: { nameAlt: item.name, sku: item.searchKey, category: item.productCategory } as any,
       variant: undefined,
       displayName: item.name,
       displaySku: item.searchKey,
-      displayBarcode: item.searchKey,
+      displayBarcode: item.barcode || item.searchKey,
       costPrice: item.cost,
       wholesalePrice: item.displayPrice,
       retailPrice: item.salesPrice,
@@ -446,6 +475,56 @@ export const QuickCheckout: React.FC = () => {
       playBeep('add');
     }
   }, [findExactMatch, addProductToCart, playBeep, t]);
+
+  // ── Barcode hot-scan dispatcher ──────────────────────────────────────────
+  // On exact barcode hit: populate the search field with the product name,
+  // store it as pendingProduct, and shift focus to the qty input so the
+  // cashier confirms quantity before the item enters the cart.
+  // Returns true when a barcode was matched (caller should stop propagation).
+  const handleBarcodeScanDispatch = useCallback((scannedValue: string): boolean => {
+    const trimmed = scannedValue.trim();
+    if (!trimmed || trimmed.length < 4) return false;
+
+    const foundProduct = inventoryItems.find(
+      p => p.barcode && p.barcode.trim() === trimmed
+    );
+    if (!foundProduct) return false;
+
+    // Build a FlattenedProduct shell so pendingProduct / addProductToCart work normally
+    const fp: FlattenedProduct = {
+      flatId: foundProduct.id,
+      product: { nameAlt: foundProduct.name, sku: foundProduct.searchKey, category: foundProduct.productCategory } as any,
+      variant: undefined,
+      displayName: foundProduct.name,
+      displaySku: foundProduct.searchKey,
+      displayBarcode: foundProduct.barcode,
+      costPrice: foundProduct.cost,
+      wholesalePrice: foundProduct.displayPrice,
+      retailPrice: foundProduct.salesPrice,
+      discountedPrice: undefined,
+      hasDiscount: false,
+      stock: foundProduct.storeQty,
+      minStock: 0,
+      isVariant: false,
+      variantLabel: undefined,
+    } as FlattenedProduct;
+
+    // Stage the item — do NOT add to cart yet
+    setPendingProduct(fp);
+    setProductSearch(foundProduct.name);
+    setQuantity(1);
+    setSelectedProductIndex(-1);
+    playBeep('add');
+    toast.info(`${foundProduct.name} — ${t('quickCheckout.enterQuantity')}`, { duration: 2000 });
+
+    // Shift focus to the qty input so cashier can confirm / change qty then hit Enter
+    setTimeout(() => {
+      quantityInputRef.current?.focus();
+      quantityInputRef.current?.select();
+    }, 30);
+
+    return true;
+  }, [inventoryItems, playBeep, t]);
 
   // Remove item from cart
   const removeItem = useCallback((itemId: string) => {
@@ -1308,6 +1387,11 @@ export const QuickCheckout: React.FC = () => {
                 value={productSearch}
                 onChange={(e) => {
                   const val = e.target.value;
+
+                  // ── Barcode hot-scan: exact barcode match → stage in pendingProduct ──
+                  if (handleBarcodeScanDispatch(val)) return;
+
+                  // ── Scan multiplier pattern only (e.g. "3*CUT 4") ──
                   const parsed = parseScanInput(val);
                   if (parsed?.qty && parsed?.code) {
                     const match = flattenedProducts.find(
@@ -1318,10 +1402,13 @@ export const QuickCheckout: React.FC = () => {
                       setProductSearch('');
                       return;
                     }
+                    // code portion only — preserve it including spaces
                     setProductSearch(parsed.code);
                     return;
                   }
-                  setProductSearch(parsed?.code || val);
+
+                  // ── Normal typing: pass raw value unchanged (spaces allowed) ──
+                  setProductSearch(val);
                   setSelectedProductIndex(-1);
                 }}
                 onFocus={() => {
@@ -1366,6 +1453,7 @@ export const QuickCheckout: React.FC = () => {
               </button>
               <input
                 ref={quantityInputRef}
+                id="main-checkout-qty-input"
                 type="number"
                 inputMode="decimal"
                 min="0.01"
@@ -1384,6 +1472,12 @@ export const QuickCheckout: React.FC = () => {
                     e.preventDefault();
                     addProductToCart(pendingProduct);
                     setPendingProduct(null);
+                    setProductSearch('');
+                    setQuantity(1);
+                    setTimeout(() => {
+                      searchInputRef.current?.focus();
+                      searchInputRef.current?.select();
+                    }, 30);
                   }
                 }}
                 className={`w-10 py-2 text-center font-bold text-sm bg-transparent focus:outline-none ${isDark ? 'text-white' : 'text-slate-900'}`}
@@ -1779,8 +1873,12 @@ export const QuickCheckout: React.FC = () => {
                       }}
                       onChange={(e) => {
                         const val = e.target.value;
-                        const parsed = parseScanInput(val);
 
+                        // ── Barcode hot-scan: exact barcode match → stage in pendingProduct ──
+                        if (handleBarcodeScanDispatch(val)) return;
+
+                        // ── Scan multiplier pattern only (e.g. "3*CUT 4") ──
+                        const parsed = parseScanInput(val);
                         if (parsed?.qty && parsed?.code) {
                           const match = flattenedProducts.find(
                             (fp) => fp.displayBarcode === parsed.code || fp.displaySku.toLowerCase() === parsed.code.toLowerCase()
@@ -1791,17 +1889,13 @@ export const QuickCheckout: React.FC = () => {
                             setSelectedProductIndex(-1);
                             return;
                           }
+                          // code portion only — preserve it including spaces
                           setProductSearch(parsed.code);
                           setSelectedProductIndex(-1);
                           return;
                         }
 
-                        if (parsed?.code) {
-                          setProductSearch(parsed.code);
-                          setSelectedProductIndex(-1);
-                          return;
-                        }
-
+                        // ── Normal typing: pass raw value unchanged (spaces allowed) ──
                         setProductSearch(val);
                         setSelectedProductIndex(-1);
                       }}
@@ -1847,6 +1941,7 @@ export const QuickCheckout: React.FC = () => {
                     </button>
                     <input
                       ref={quantityInputRef}
+                      id="main-checkout-qty-input"
                       type="number"
                       min="0.01"
                       step="any"
@@ -1867,6 +1962,12 @@ export const QuickCheckout: React.FC = () => {
                           e.preventDefault();
                           addProductToCart(pendingProduct);
                           setPendingProduct(null);
+                          setProductSearch('');
+                          setQuantity(1);
+                          setTimeout(() => {
+                            searchInputRef.current?.focus();
+                            searchInputRef.current?.select();
+                          }, 30);
                         }
                       }}
                       className={`w-14 py-1.5 text-sm text-center font-bold border-2 rounded-lg focus:outline-none transition-all ${
