@@ -298,9 +298,9 @@ export const QuickCheckout: React.FC = () => {
         displayName: barcodeHit.name,
         displaySku: barcodeHit.searchKey,
         displayBarcode: barcodeHit.barcode,
-        costPrice: barcodeHit.cost,
-        wholesalePrice: barcodeHit.displayPrice,
-        retailPrice: barcodeHit.salesPrice,
+        costPrice:    barcodeHit.cost,
+        wholesalePrice: barcodeHit.displayPrice,  // display/marked price (shown struck-through)
+        retailPrice:  barcodeHit.salesPrice,      // our actual selling price
         discountedPrice: undefined,
         hasDiscount: false,
         stock: barcodeHit.storeQty,
@@ -325,9 +325,9 @@ export const QuickCheckout: React.FC = () => {
       displayName: item.name,
       displaySku: item.searchKey,
       displayBarcode: item.barcode || item.searchKey,
-      costPrice: item.cost,
-      wholesalePrice: item.displayPrice,
-      retailPrice: item.salesPrice,
+      costPrice:    item.cost,
+      wholesalePrice: item.displayPrice,  // display/marked price (shown struck-through)
+      retailPrice:  item.salesPrice,      // our actual selling price
       discountedPrice: undefined,
       hasDiscount: false,
       stock: item.storeQty,
@@ -377,76 +377,75 @@ export const QuickCheckout: React.FC = () => {
 
   // Add product to cart
   const addProductToCart = useCallback((flatProduct: FlattenedProduct, overrideQty?: number) => {
-    const normalPrice = flatProduct.retailPrice;
-    const effectivePrice = flatProduct.hasDiscount && flatProduct.discountedPrice 
-      ? flatProduct.discountedPrice 
-      : normalPrice;
     const addQty = Math.max(1, overrideQty ?? quantity);
-    
+
+    // ── Single source of truth: all pricing pulled directly from inventoryItems ──
+    // Lookup is strictly by unique `id` (flatId) — NEVER by searchKey string,
+    // which is non-unique and causes price cloning across products that share a key.
+    // retailPrice  = salesPrice   (our actual charge — maps to ourPrice)
+    // wholesalePrice = displayPrice (marked/RRP shown struck-through on receipt)
+    const masterProduct = inventoryItems.find(
+      inv => inv.id === flatProduct.flatId
+    );
+    const ourPriceVal     = Number(masterProduct?.salesPrice   ?? flatProduct.retailPrice    ?? 0);
+    const displayPriceVal = Number(masterProduct?.displayPrice ?? flatProduct.wholesalePrice ?? 0);
+    const costVal         = Number(masterProduct?.cost         ?? flatProduct.costPrice      ?? 0);
+    const lastPriceVal    = Number(masterProduct?.lastPrice    ?? 0);
+    const storeQtyVal     = Number(masterProduct?.storeQty     ?? flatProduct.stock          ?? 0);
+
     const existingItem = items.find((i) => i.productId === flatProduct.flatId);
     if (existingItem) {
-      if (existingItem.quantity + addQty > flatProduct.stock) {
+      if (existingItem.quantity + addQty > storeQtyVal) {
         playBeep('error');
-        toast.error(`${t('quickCheckout.insufficientStock')}: ${flatProduct.stock} ${t('invoice.available')}`);
+        toast.error(`${t('quickCheckout.insufficientStock')}: ${storeQtyVal} ${t('invoice.available')}`);
         return;
       }
-      
       setItems(
         items.map((i) =>
           i.productId === flatProduct.flatId
-            ? { ...i, quantity: i.quantity + addQty, total: (i.quantity + addQty) * i.unitPrice }
+            ? { ...i, quantity: i.quantity + addQty, total: (i.quantity + addQty) * lastPriceVal }
             : i
         )
       );
     } else {
-      if (addQty > flatProduct.stock) {
+      if (addQty > storeQtyVal) {
         playBeep('error');
-        toast.error(`${t('quickCheckout.insufficientStock')}: ${flatProduct.stock} ${t('invoice.available')}`);
+        toast.error(`${t('quickCheckout.insufficientStock')}: ${storeQtyVal} ${t('invoice.available')}`);
         return;
       }
-      
-      // Look up master product data from inventoryItems for distinct cost/lastPrice/salesPrice/storeQty
-      const masterProduct = inventoryItems.find(
-        inv => inv.id === flatProduct.flatId || inv.searchKey === flatProduct.displaySku
-      );
       const newItem: QuickInvoiceItem = {
-        id: `item-${Date.now()}`,
-        productId: flatProduct.flatId,
-        productName: flatProduct.displayName,
+        id:            `item-${Date.now()}`,
+        productId:     flatProduct.flatId,
+        productName:   flatProduct.displayName,
         productNameSi: flatProduct.product.nameAlt || flatProduct.displayName,
-        variantId: flatProduct.variant?.id,
-        size: flatProduct.variant?.size,
-        quantity: addQty,
-        unitPrice: effectivePrice,
-        originalPrice: normalPrice,
-        total: addQty * effectivePrice,
-        cost: masterProduct ? Number(masterProduct.cost) || 0 : 0,
-        lastPrice: masterProduct ? Number(masterProduct.lastPrice) || 0 : 0,
-        salesPrice: masterProduct ? Number(masterProduct.salesPrice) || 0 : 0,
-        displayPrice: masterProduct ? Number(masterProduct.displayPrice || masterProduct.lastPrice) || 0 : 0,
-        ourPrice: masterProduct ? Number((masterProduct as any).ourPrice || masterProduct.salesPrice) || 0 : 0,
-        storeQty: masterProduct ? Number(masterProduct.storeQty) || 0 : 0,
+        variantId:     flatProduct.variant?.id,
+        size:          flatProduct.variant?.size,
+        quantity:      addQty,
+        unitPrice:     lastPriceVal,    // lastPrice is the billing rate
+        originalPrice: displayPriceVal, // displayPrice — shown struck-through on receipt
+        total:         addQty * lastPriceVal,
+        cost:          costVal,
+        lastPrice:     lastPriceVal,
+        salesPrice:    ourPriceVal,
+        displayPrice:  displayPriceVal,
+        ourPrice:      ourPriceVal,
+        storeQty:      storeQtyVal,
       };
       setItems([...items, newItem]);
-      
-      if (flatProduct.hasDiscount) {
-        const savings = normalPrice - effectivePrice;
-        toast.success(`${flatProduct.displayName} - ${t('invoice.perItemDiscount')}: ${t('common.currency')} ${savings.toLocaleString()}`);
-      }
     }
-    
+
     playBeep('add');
     setQuantity(1);
     setProductSearch('');
     setSelectedProductIndex(-1);
     searchInputRef.current?.focus();
-    
+
     setTimeout(() => {
       if (cartItemsContainerRef.current) {
         cartItemsContainerRef.current.scrollTop = cartItemsContainerRef.current.scrollHeight;
       }
     }, 50);
-  }, [items, quantity, playBeep, t]);
+  }, [items, quantity, inventoryItems, playBeep, t]);
 
   // ── findExactMatch: checks if input is a fully-qualified barcode/SKU ──
   const findExactMatch = useCallback((input: string): FlattenedProduct | undefined => {
@@ -498,9 +497,9 @@ export const QuickCheckout: React.FC = () => {
       displayName: foundProduct.name,
       displaySku: foundProduct.searchKey,
       displayBarcode: foundProduct.barcode,
-      costPrice: foundProduct.cost,
-      wholesalePrice: foundProduct.displayPrice,
-      retailPrice: foundProduct.salesPrice,
+      costPrice:      foundProduct.cost,
+      wholesalePrice: foundProduct.displayPrice,  // display/marked price (shown struck-through)
+      retailPrice:    foundProduct.salesPrice,    // our actual selling price
       discountedPrice: undefined,
       hasDiscount: false,
       stock: foundProduct.storeQty,
@@ -576,7 +575,7 @@ export const QuickCheckout: React.FC = () => {
     
     setItems(items.map(i => 
       i.id === itemId 
-        ? { ...i, quantity: newQuantity, total: newQuantity * i.unitPrice }
+        ? { ...i, quantity: newQuantity, total: newQuantity * Number(i.lastPrice || i.unitPrice) }
         : i
     ));
   }, [items, flattenedProducts, removeItem, playBeep, t]);
@@ -653,28 +652,30 @@ export const QuickCheckout: React.FC = () => {
     }, 50);
   }, [quickAddName, quickAddPrice, quickAddQty, playBeep, t]);
 
-  // ── Computed totals (ourPrice-based) ──────────────────────────────────────
-  // These must be declared before any downstream `const` that references them.
+  // ── Computed totals (lastPrice-based) ────────────────────────────────────
+  // lastPrice is the definitive transaction rate used for all billing maths.
+  // displayPrice is shown on receipt column 2 (struck-through reference price).
+  // salesPrice / ourPrice are preserved on the item for internal reference only.
 
   const computedSubtotal = useMemo(() => {
-    return items.reduce((acc, item) => acc + (Number(item.ourPrice || 0) * item.quantity), 0);
+    return items.reduce((acc, item) => acc + (Number(item.lastPrice || 0) * item.quantity), 0);
   }, [items]);
 
   const computedDiscount = Number(discount) || 0;
   const computedFinalTotal = Math.max(0, computedSubtotal - computedDiscount);
 
-  // Computed customer profit: Σ((displayPrice - ourPrice) × qty) + manual discount
+  // Gross profit: Σ((lastPrice - cost) × qty) + manual discount
   const computedCustomerProfit = useMemo(() => {
-    const priceGapSavings = items.reduce((acc, item) => {
-      const display = Number(item.displayPrice || item.lastPrice || 0);
-      const our = Number(item.ourPrice || item.salesPrice || 0);
-      return acc + ((display - our) * item.quantity);
+    const grossProfit = items.reduce((acc, item) => {
+      const last = Number(item.lastPrice || 0);
+      const cost = Number(item.cost || 0);
+      return acc + ((last - cost) * item.quantity);
     }, 0);
-    return priceGapSavings + (Number(discount) || 0);
+    return grossProfit + (Number(discount) || 0);
   }, [items, discount]);
 
   // Legacy subtotal kept for applyDiscountToAll (uses item.unitPrice based totals)
-  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const subtotal = items.reduce((sum, item) => sum + (Number(item.lastPrice || 0) * item.quantity), 0);
 
   const [receivedAmount, setReceivedAmount] = useState<number>(0);
   const receivedAmountInputRef = useRef<HTMLInputElement>(null);
@@ -714,13 +715,13 @@ export const QuickCheckout: React.FC = () => {
     
     const invoiceNumber = generateNextInvoiceNumberSync();
     const invoiceDiscount = Math.round(computedDiscount * 100) / 100;
-    // Build invoice items preserving displayPrice / ourPrice for print template
+    // Build invoice items — lastPrice drives all line totals
     const invoiceItems = items.map(item => ({
       ...item,
-      unitPrice: Number(item.ourPrice || item.unitPrice),
-      total: Number(item.ourPrice || item.unitPrice) * item.quantity,
+      unitPrice: Number(item.lastPrice || item.unitPrice),
+      total: Number(item.lastPrice || item.unitPrice) * item.quantity,
       displayPrice: Number(item.displayPrice || item.lastPrice || item.unitPrice),
-      ourPrice: Number(item.ourPrice || item.salesPrice || item.unitPrice),
+      ourPrice: Number(item.lastPrice || item.salesPrice || item.unitPrice),
     }));
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
@@ -782,13 +783,13 @@ export const QuickCheckout: React.FC = () => {
     
     const invoiceNumber = generateNextInvoiceNumberSync();
     const invoiceDiscount = Math.round(computedDiscount * 100) / 100;
-    // Build invoice items preserving displayPrice / ourPrice
+    // Build invoice items — lastPrice drives all line totals
     const invoiceItems = items.map(item => ({
       ...item,
-      unitPrice: Number(item.ourPrice || item.unitPrice),
-      total: Number(item.ourPrice || item.unitPrice) * item.quantity,
+      unitPrice: Number(item.lastPrice || item.unitPrice),
+      total: Number(item.lastPrice || item.unitPrice) * item.quantity,
       displayPrice: Number(item.displayPrice || item.lastPrice || item.unitPrice),
-      ourPrice: Number(item.ourPrice || item.salesPrice || item.unitPrice),
+      ourPrice: Number(item.lastPrice || item.salesPrice || item.unitPrice),
     }));
     const invoice: Invoice = {
       id: `inv-${Date.now()}`,
@@ -2136,8 +2137,8 @@ export const QuickCheckout: React.FC = () => {
                   <div className="col-span-3">Product</div>
                   <div className="col-span-1 text-right">Cost</div>
                   <div className="col-span-1 text-right">Last</div>
+                  <div className="col-span-1 text-right">Sales</div>
                   <div className="col-span-1 text-right">Display</div>
-                  <div className="col-span-1 text-right">Our</div>
                   <div className="col-span-1 text-center">Stock</div>
                   <div className="col-span-2 text-center">Qty</div>
                   <div className="col-span-2 text-right">Subtotal</div>
@@ -2196,25 +2197,25 @@ export const QuickCheckout: React.FC = () => {
                       {/* col 4: Cost */}
                       <div className="col-span-1 text-right">
                         <span className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                          {Number(item.cost || 0).toLocaleString()}
+                          {Number(item.cost || 0).toFixed(2)}
                         </span>
                       </div>
                       {/* col 5: Last Price */}
                       <div className="col-span-1 text-right">
                         <span className={`text-[10px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {Number(item.lastPrice || 0).toLocaleString()}
+                          {Number(item.lastPrice || 0).toFixed(2)}
                         </span>
                       </div>
-                      {/* col 6: Display Price */}
+                      {/* col 6: Sales Price (Sales) */}
                       <div className="col-span-1 text-right">
                         <span className={`text-[10px] font-semibold font-mono ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
-                          {Number(item.displayPrice || 0).toLocaleString()}
+                          {Number(item.salesPrice || 0).toFixed(2)}
                         </span>
                       </div>
-                      {/* col 7: Our Price */}
+                      {/* col 7: DISPLAY — displayPrice (reference price shown on receipt) */}
                       <div className="col-span-1 text-right">
                         <span className={`text-[10px] font-bold font-mono ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>
-                          {Number(item.ourPrice || 0).toLocaleString()}
+                          {Number(item.displayPrice || 0).toFixed(2)}
                         </span>
                       </div>
                       {/* col 8: Stock */}
@@ -2245,10 +2246,10 @@ export const QuickCheckout: React.FC = () => {
                           <Plus className="w-2.5 h-2.5" />
                         </button>
                       </div>
-                      {/* col 11-12: Line total (ourPrice × qty) */}
+                      {/* col 11-12: Line total (lastPrice × qty) */}
                       <div className="col-span-2 text-right pr-4">
                         <span className={`text-[11px] font-bold font-mono tabular-nums ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {(Number(item.ourPrice || 0) * item.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          {(Number(item.lastPrice || 0) * item.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                       {/* Hover remove button */}
@@ -2276,20 +2277,28 @@ export const QuickCheckout: React.FC = () => {
                 </h3>
               </div>
               <CategoryGrid onItemSelect={(item, category) => {
-                // Set pending product to show quantity input inline
+                // Resolve the master inventory row for exact price fidelity.
+                // Lookup is strictly by unique `id` — never by sku/searchKey string
+                // to prevent price cloning across products that share a search key.
+                const masterInv = inventoryItems.find(
+                  inv => inv.id === item.id
+                );
                 const fp: FlattenedProduct = {
-                  flatId: `pos-${category.id}-${item.id}`,
+                  // Use item.id as flatId so addProductToCart master-lookup hits by inv.id
+                  flatId:        item.id,
                   product: { nameAlt: item.nameSi || item.name, sku: item.sku, category: category.name } as any,
-                  displayName: item.name,
-                  displaySku: item.sku,
-                  retailPrice: item.unitRate,
-                  stock: item.stock,
-                  costPrice: item.unitRate,
-                  wholesalePrice: item.unitRate,
-                  hasDiscount: false,
+                  displayName:   item.name,
+                  displaySku:    item.sku,
+                  // retailPrice  = salesPrice  (our charge)
+                  // wholesalePrice = displayPrice (marked/RRP, struck-through on receipt)
+                  retailPrice:   masterInv ? Number(masterInv.salesPrice)   : item.unitRate,
+                  wholesalePrice: masterInv ? Number(masterInv.displayPrice) : item.unitRate,
+                  costPrice:     masterInv ? Number(masterInv.cost)         : 0,
+                  stock:         masterInv ? Number(masterInv.storeQty)     : item.stock,
+                  hasDiscount:   false,
                   discountedPrice: undefined,
-                  minStock: 0,
-                  isVariant: false,
+                  minStock:      0,
+                  isVariant:     false,
                 } as FlattenedProduct;
                 setPendingProduct(fp);
                 setProductSearch('');

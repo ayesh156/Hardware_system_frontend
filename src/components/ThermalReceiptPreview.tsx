@@ -46,10 +46,13 @@ const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = memo(({
       customerName: customer?.name ?? 'සාමාන්‍ය පාරිභෝගිකයා',
       items: items.map(item => ({
         ...item,
-        unitPrice: Number(item.ourPrice || item.unitPrice),
-        total: Number(item.ourPrice || item.unitPrice) * item.quantity,
-        displayPrice: Number(item.displayPrice || item.lastPrice || item.unitPrice),
-        ourPrice: Number(item.ourPrice || item.salesPrice || item.unitPrice),
+        // Strict field extraction — no || fallback that would corrupt 0-value prices
+        unitPrice:    Number(item.ourPrice     ?? item.unitPrice),
+        total:        Number(item.ourPrice     ?? item.unitPrice) * item.quantity,
+        displayPrice: Number(item.displayPrice ?? item.unitPrice),
+        ourPrice:     Number(item.ourPrice     ?? item.unitPrice),
+        cost:         Number((item as any).cost      ?? 0),
+        lastPrice:    Number((item as any).lastPrice ?? 0),
       })) as any,
       subtotal,
       discount,

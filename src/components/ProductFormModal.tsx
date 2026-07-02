@@ -166,8 +166,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
         displayPrice: 0,
         storeQty: 0,
         salesType: '',
-        unitQty: 1,
-        oneUnitPrice: 0,
       };
     }
     const d = initialData as any;
@@ -182,8 +180,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
       displayPrice: Number(d?.displayPrice) || Number(d?.wholesalePrice) || Number(d?.retailPrice) || 0,
       storeQty: Number(d?.storeQty) || Number(d?.stock) || 0,
       salesType: d?.salesType || '',
-      unitQty: Number(d?.unitQty) || 1,
-      oneUnitPrice: Number(d?.oneUnitPrice) || Number(d?.retailPrice) || 0,
     };
   };
 
@@ -236,8 +232,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
     if (form.salesPrice < 0) errs.salesPrice = t('addProductModal.salesPriceRequired');
     if (form.displayPrice < 0) errs.displayPrice = t('addProductModal.displayPriceRequired');
     if (form.storeQty < 0) errs.storeQty = t('addProductModal.storeQtyRequired');
-    if (form.unitQty <= 0) errs.unitQty = t('addProductModal.unitQtyRequired');
-    if (form.oneUnitPrice < 0) errs.oneUnitPrice = t('addProductModal.unitPriceRequired');
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -256,8 +250,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
         displayPrice: form.displayPrice,
         storeQty: form.storeQty,
         salesType: (form.salesType || 'Piece') as InventoryProduct['salesType'],
-        unitQty: form.unitQty,
-        oneUnitPrice: form.oneUnitPrice,
         status: derivedStatus,
       };
       addInventoryItem(newProduct);
@@ -343,12 +335,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
               </div>
               {/* Barcode */}
               <div className="lg:col-span-3">
-                <FieldGroup label="බාර්කෝඩ් අංකය (Barcode)" icon={<ScanLine className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.barcodeLabel')} icon={<ScanLine className="w-3 h-3" />}>
                   <ClearableInput
                     value={(form as any).barcode || ''}
                     isDark={isDark}
                     onChange={(v) => updateField('barcode', v)}
-                    placeholder="බාර්කෝඩ් එක ස්කෑන් කරන්න හෝ ඇතුළත් කරන්න"
+                    placeholder={t('addProductModal.barcodePlaceholder')}
                   />
                 </FieldGroup>
               </div>
@@ -399,14 +391,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                   <FieldGroup label={t('addProductModal.storeQty')} icon={<Hash className="w-3 h-3" />}>
                     <ClearableInput value={form.storeQty} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('storeQty', v)} hasError={!!errors.storeQty} className="font-bold" min="0" />
                     {errors.storeQty && <p className="text-[9px] text-red-400 mt-0.5">{errors.storeQty}</p>}
-                  </FieldGroup>
-                  <FieldGroup label={t('addProductModal.unitQty')} icon={<Layers className="w-3 h-3" />}>
-                    <ClearableInput value={form.unitQty} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('unitQty', v)} hasError={!!errors.unitQty} min="1" />
-                    {errors.unitQty && <p className="text-[9px] text-red-400 mt-0.5">{errors.unitQty}</p>}
-                  </FieldGroup>
-                  <FieldGroup label={t('addProductModal.unitPrice')} icon={<DollarSign className="w-3 h-3" />}>
-                    <ClearableInput value={form.oneUnitPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('oneUnitPrice', v)} hasError={!!errors.oneUnitPrice} min="0" step="0.01" />
-                    {errors.oneUnitPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.oneUnitPrice}</p>}
                   </FieldGroup>
                   <div className="flex items-center justify-center">
                     <div className={`text-center p-2 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>

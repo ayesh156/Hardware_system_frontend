@@ -138,8 +138,6 @@ export interface InventoryProduct {
   displayPrice: number;
   storeQty: number;
   salesType: 'Full' | 'Half' | 'Quarter' | 'Piece' | 'Kg' | 'Box' | 'Set' | string;
-  unitQty: number;
-  oneUnitPrice: number;
   status: 'Available' | 'Out of Stock' | 'Low Stock' | 'Discontinued';
 }
 

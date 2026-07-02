@@ -18,12 +18,12 @@ export const generateReceiptHTML = (
     invoice.changeAmount ||
     (receivedAmount > 0 ? Math.max(0, receivedAmount - invoice.total) : 0);
 
-  // Customer savings: Σ((displayPrice - ourPrice) × qty) + manual discount
+  // Customer savings: Σ((displayPrice - lastPrice) × qty) + manual discount
   const totalItemDiscounts = invoice.items.reduce((sum, item) => {
     const ext = item as any;
-    const dp = Number(ext.displayPrice || ext.originalPrice || item.unitPrice || 0);
-    const op = Number(ext.ourPrice || ext.salesPrice || item.unitPrice || 0);
-    const gap = (dp - op) * item.quantity;
+    const dp   = Number(ext.displayPrice ?? ext.originalPrice ?? item.unitPrice ?? 0);
+    const last = Number(ext.lastPrice    ?? ext.ourPrice      ?? ext.salesPrice ?? item.unitPrice ?? 0);
+    const gap  = (dp - last) * item.quantity;
     return sum + (gap > 0 ? gap : 0);
   }, 0);
 
@@ -38,23 +38,25 @@ export const generateReceiptHTML = (
       const ext = item as any;
       const displayName =
         item.productNameSi || translateToSinhala(item.productName);
+      // Col 2 (25%): displayPrice — marked/RRP shown struck-through
+      // Col 3 (25%): lastPrice   — our actual billing rate ("අපේ මිල")
+      // Col 4 (35%): lastPrice × qty — line total
       const displayPrice = Number(
-        ext.displayPrice || ext.originalPrice || item.unitPrice || 0
+        ext.displayPrice ?? ext.originalPrice ?? item.unitPrice ?? 0
       );
-      const ourPrice = Number(
-        ext.ourPrice || ext.salesPrice || item.unitPrice || 0
+      const lastPrice = Number(
+        ext.lastPrice ?? ext.ourPrice ?? ext.salesPrice ?? item.unitPrice ?? 0
       );
-      const lineTotal = ourPrice * item.quantity;
-      const hasPriceGap = displayPrice > ourPrice;
+      const lineTotal = lastPrice * item.quantity;
 
       return `
-      <div style="border-bottom:1px solid #000;padding:4px 0;">
-        <div style="font-weight:800;font-size:12px;color:#000;margin-bottom:2px;">${displayName}</div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;font-family:'Courier New',monospace;color:#000;">
-          <span style="width:15%;text-align:center;">${item.quantity}</span>
-          <span style="width:25%;text-align:right;${hasPriceGap ? 'text-decoration:line-through;' : ''}">${displayPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-          <span style="width:25%;text-align:right;font-weight:800;">${ourPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-          <span style="width:30%;text-align:right;font-weight:900;">${lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+      <div style="border-bottom:1px dashed #000;padding:4px 0;">
+        <div style="font-weight:800;font-size:12px;color:#000;margin-bottom:2px;word-break:break-word;">${displayName}</div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;font-family:'Courier New',monospace;color:#000;width:100%;">
+          <span style="width:15%;text-align:left;flex-shrink:0;">${item.quantity}</span>
+          <span style="width:25%;text-align:right;text-decoration:line-through;color:#000;opacity:0.6;flex-shrink:0;">${displayPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+          <span style="width:25%;text-align:right;font-weight:800;color:#000;flex-shrink:0;">${lastPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+          <span style="width:35%;text-align:right;font-weight:900;color:#000;flex-shrink:0;">${lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
         </div>
       </div>`;
     })
@@ -166,11 +168,11 @@ export const generateReceiptHTML = (
   <!-- ITEMS HEADER -->
   <div style="padding:3px 0 2px;border-bottom:2px solid #000;">
     <div style="font-size:11px;font-weight:800;margin-bottom:3px;">භාණ්ඩය</div>
-    <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:800;">
-      <span style="width:15%;text-align:center;">ප්‍රමාණය</span>
-      <span style="width:25%;text-align:right;">සදහන් මිල</span>
-      <span style="width:25%;text-align:right;">අපේ මිල</span>
-      <span style="width:30%;text-align:right;">එකතුව</span>
+    <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:800;font-family:'Courier New',monospace;width:100%;">
+      <span style="width:15%;text-align:left;flex-shrink:0;">ප්‍රමාණය</span>
+      <span style="width:25%;text-align:right;flex-shrink:0;">සඳහන් මිල</span>
+      <span style="width:25%;text-align:right;flex-shrink:0;">අපේ මිල</span>
+      <span style="width:35%;text-align:right;flex-shrink:0;">එකතුව</span>
     </div>
   </div>
 

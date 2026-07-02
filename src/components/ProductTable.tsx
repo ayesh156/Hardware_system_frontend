@@ -17,7 +17,7 @@ function deriveStatus(storeQty: number): InventoryProduct['status'] {
   return 'Available';
 }
 
-const editableNumericFields = ['cost', 'lastPrice', 'salesPrice', 'displayPrice', 'storeQty', 'unitQty', 'oneUnitPrice'] as const;
+const editableNumericFields = ['cost', 'lastPrice', 'salesPrice', 'displayPrice', 'storeQty'] as const;
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 interface CellEditState { itemId: string; field: string; rect: DOMRect; }
@@ -33,8 +33,6 @@ const columns: { key: keyof InventoryProduct | null; label: string; align: 'left
   { key: 'displayPrice',    label: 'Display Price[4]',  align: 'right',  editable: true },
   { key: 'storeQty',        label: 'Store Qty',          align: 'right',  editable: true },
   { key: null,              label: 'Sales Type',          align: 'left',   editable: false },
-  { key: 'unitQty',         label: 'Unit Qty',           align: 'right',  editable: true },
-  { key: 'oneUnitPrice',    label: '1 Unit Price',       align: 'right',  editable: true },
   { key: null,              label: 'Status',              align: 'center', editable: false },
   { key: null,              label: 'Actions',             align: 'center', editable: false },
 ];
@@ -251,8 +249,8 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
 
   const fieldLabels: Record<string, string> = {
     cost: t('products.costTitle'), lastPrice: t('products.lastPriceTitle'), salesPrice: t('products.salesPriceTitle'),
-    displayPrice: t('products.displayPriceTitle'), storeQty: t('products.storeQtyTitle'), unitQty: t('products.unitQtyTitle'),
-    oneUnitPrice: t('products.oneUnitPriceTitle'), searchKey: t('products.searchKey'), name: t('common.name'),
+    displayPrice: t('products.displayPriceTitle'), storeQty: t('products.storeQtyTitle'),
+    searchKey: t('products.searchKey'), name: t('common.name'),
   };
 
   const categories = useMemo(() => {
@@ -341,7 +339,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
   const renderCellValue = (item: InventoryProduct, field: keyof InventoryProduct) => {
     const val = item[field];
     if (typeof val === 'number') {
-      if (field === 'storeQty' || field === 'unitQty') return val.toLocaleString();
+      if (field === 'storeQty') return val.toLocaleString();
       return formatPrice(val);
     }
     return val;
@@ -354,7 +352,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
       return isDark ? 'text-white' : 'text-slate-900';
     }
     switch (field) {
-      case 'cost': case 'lastPrice': case 'oneUnitPrice': case 'unitQty': return isDark ? 'text-slate-300' : 'text-slate-700';
+      case 'cost': case 'lastPrice': return isDark ? 'text-slate-300' : 'text-slate-700';
       case 'salesPrice': return isDark ? 'text-cyan-400' : 'text-cyan-600';
       case 'displayPrice': return isDark ? 'text-green-400' : 'text-green-600';
       default: return isDark ? 'text-white' : 'text-slate-900';
@@ -409,15 +407,13 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
                           'Search Key': t('productTable.searchKey'),
                           'Name': t('productTable.name'),
                           'Product Category': t('productTable.category'),
-                          'Barcode': 'බාර්කෝඩ්',
+                          'Barcode': t('productTable.barcode'),
                           'Cost[0]': t('productTable.cost'),
                           'Last Price[1]': t('productTable.lastPrice'),
                           'Sales Price[3]': t('productTable.salesPrice'),
                           'Display Price[4]': t('productTable.displayPrice'),
                           'Store Qty': t('productTable.storeQty'),
                           'Sales Type': t('productTable.salesType'),
-                          'Unit Qty': t('productTable.unitQty'),
-                          '1 Unit Price': t('productTable.unitPrice'),
                           'Status': t('productTable.status'),
                           'Actions': t('productTable.actions'),
                         };
@@ -524,40 +520,6 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
                     <td className="px-2 py-1.5">
                       <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.salesType}</span>
                     </td>
-
-                    {(() => {
-                      const field = 'unitQty';
-                      const isEditing = inlineEdit?.itemId === item.id && inlineEdit?.field === field;
-                      return (
-                        <td className="px-2 py-1.5 text-right relative group cursor-pointer" onClick={(e) => !isEditing && openCellEdit(item.id, field, e)}>
-                          {isEditing ? (
-                            <InlineNumberInput value={item.unitQty} isDark={isDark} onSave={(val) => handleInlineSave(item.id, field, val)} onCancel={() => setInlineEdit(null)} />
-                          ) : (
-                            <>
-                              <span className={`text-[11px] font-mono ${getCellColor(item, field)} hover:text-orange-400 transition-colors`}>{item.unitQty.toLocaleString()}</span>
-                              <span className={`absolute -right-0.5 top-0.5 w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Pencil className="w-2.5 h-2.5" /></span>
-                            </>
-                          )}
-                        </td>
-                      );
-                    })()}
-
-                    {(() => {
-                      const field = 'oneUnitPrice';
-                      const isEditing = inlineEdit?.itemId === item.id && inlineEdit?.field === field;
-                      return (
-                        <td className="px-2 py-1.5 text-right relative group cursor-pointer" onClick={(e) => !isEditing && openCellEdit(item.id, field, e)}>
-                          {isEditing ? (
-                            <InlineNumberInput value={item.oneUnitPrice} isDark={isDark} onSave={(val) => handleInlineSave(item.id, field, val)} onCancel={() => setInlineEdit(null)} />
-                          ) : (
-                            <>
-                              <span className={`text-[11px] font-mono ${getCellColor(item, 'oneUnitPrice')} hover:text-orange-400 transition-colors`}>{formatPrice(item.oneUnitPrice)}</span>
-                              <span className={`absolute -right-0.5 top-0.5 w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Pencil className="w-2.5 h-2.5" /></span>
-                            </>
-                          )}
-                        </td>
-                      );
-                    })()}
 
                     <td className="px-2 py-1.5 text-center">
                       <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium ${st.bg} ${st.text} ${st.border} border`}>
