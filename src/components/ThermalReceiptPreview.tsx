@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, memo } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { Invoice, InvoiceItem, Customer } from '../types/index';
 import { generateReceiptHTML } from '../lib/receiptGenerator';
 
@@ -33,6 +34,8 @@ const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = memo(({
   language = 'si',
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -91,18 +94,18 @@ const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = memo(({
   }, [items, discount, receivedAmount, paymentMethod, subtotal, total, customer, invoiceNumber, language]);
 
   return (
-    <div className="bg-white border-2 border-slate-700 shadow-lg rounded-xl p-4 flex flex-col gap-3">
+    <div className={`${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-700'} border-2 shadow-lg rounded-xl p-4 flex flex-col gap-3`}>
       {/* Header bar */}
-      <div className="flex items-center justify-between border-b border-slate-600 pb-2">
-        <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+      <div className={`flex items-center justify-between border-b pb-2 ${isDark ? 'border-slate-700' : 'border-slate-600'}`}>
+        <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
           Live Receipt Preview
         </span>
-        <span className="text-[10px] font-bold text-slate-800 font-mono">{invoiceNumber}</span>
+        <span className={`text-[10px] font-bold font-mono ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{invoiceNumber}</span>
       </div>
 
       {/* Paper receipt container */}
-      <div className="bg-white rounded-lg overflow-hidden shadow-xl shadow-slate-700/40 ring-1 ring-slate-700">
+      <div className={`rounded-lg overflow-hidden shadow-xl ${isDark ? 'bg-slate-950 shadow-slate-950/80 ring-1 ring-slate-800' : 'bg-white shadow-slate-700/40 ring-1 ring-slate-700'}`}>
         <iframe
           ref={iframeRef}
           title="receipt-preview"

@@ -2570,7 +2570,10 @@ export const QuickCheckout: React.FC = () => {
                                   {cellPopoverInput.length > 0 && (
                                     <button
                                       type="button"
-                                      onClick={() => setCellPopoverInput('')}
+                                      onClick={() => { 
+                                        setCellPopoverInput('');
+                                        setTimeout(() => cellPopoverInputRef.current?.focus(), 0);
+                                      }}
                                       className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'}`}
                                       tabIndex={-1}
                                     >
@@ -2689,7 +2692,10 @@ export const QuickCheckout: React.FC = () => {
                                   {cellPopoverInput.length > 0 && (
                                     <button
                                       type="button"
-                                      onClick={() => setCellPopoverInput('')}
+                                      onClick={() => { 
+                                        setCellPopoverInput('');
+                                        setTimeout(() => cellPopoverInputRef.current?.focus(), 0);
+                                      }}
                                       className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200'}`}
                                       tabIndex={-1}
                                     >
