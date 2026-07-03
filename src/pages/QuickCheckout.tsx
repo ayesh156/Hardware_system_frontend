@@ -276,6 +276,16 @@ export const QuickCheckout: React.FC = () => {
   const filteredCustomers = useMemo(() => mockCustomers.filter(c =>
     c.name.toLowerCase().includes(customerSearch.toLowerCase())), [customerSearch]);
 
+  // ── Inline new-customer registration modal ──
+  const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
+  const [newCustName,    setNewCustName]    = useState('');
+  const [newCustPhone,   setNewCustPhone]   = useState('');
+  const [newCustEmail,   setNewCustEmail]   = useState('');
+  const [newCustAddress, setNewCustAddress] = useState('');
+
+  // ── ADD BOX live-search filter ──
+  const [addCategorySearch, setAddCategorySearch] = useState('');
+
   // Helper functions for decimal-preserving quantity adjustments (rely on numeric quantity)
   const incrementQuantity = useCallback((currentQty: number): number => {
     const intPart = Math.floor(currentQty);
@@ -2464,7 +2474,7 @@ export const QuickCheckout: React.FC = () => {
                     >
                       {/* col 1-3: Product name */}
                       <div className="col-span-3 min-w-0">
-                        <p className={`text-[11px] font-medium truncate leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        <p className={`text-xs font-semibold truncate leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {isSinhala ? (item.productNameSi || item.productName) : item.productName}
                         </p>
                         {isPriceEditing && isCartFocused && index === selectedCartIndex && (
@@ -2475,13 +2485,13 @@ export const QuickCheckout: React.FC = () => {
                       </div>
                       {/* col 4: Cost */}
                       <div className="col-span-1 text-right">
-                        <span className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        <span className={`text-xs font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                           {Number(item.cost || 0).toFixed(2)}
                         </span>
                       </div>
                       {/* col 5: Last Price */}
                       <div className="col-span-1 text-right">
-                        <span className={`text-[10px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span className={`text-xs font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                           {Number(item.lastPrice || 0).toFixed(2)}
                         </span>
                       </div>
@@ -2493,7 +2503,7 @@ export const QuickCheckout: React.FC = () => {
                           onChange={(e) => handleUpdateCartItemPrice(item.id, Number(e.target.value))}
                           onFocus={(e) => e.target.select()}
                           onClick={(e) => e.stopPropagation()}
-                          className={`w-full max-w-[80px] ml-auto px-1 py-0.5 text-[10px] font-semibold font-mono text-center rounded-lg border focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          className={`w-full max-w-[80px] ml-auto px-1 py-0.5 text-xs font-semibold font-mono text-center rounded-lg border focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                             isDark 
                               ? 'bg-slate-800 border-slate-700 text-amber-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30' 
                               : 'bg-white border-slate-200 text-amber-600 focus:border-amber-500 focus:ring-1 focus:ring-amber-200'
@@ -2502,13 +2512,13 @@ export const QuickCheckout: React.FC = () => {
                       </div>
                       {/* col 7: DISPLAY — displayPrice (reference price shown on receipt) */}
                       <div className="col-span-1 text-right">
-                        <span className={`text-[10px] font-bold font-mono ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>
+                        <span className={`text-xs font-bold font-mono ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>
                           {Number(item.displayPrice || 0).toFixed(2)}
                         </span>
                       </div>
                       {/* col 8: Stock */}
                       <div className="col-span-1 text-center">
-                        <span className={`text-[10px] font-mono ${
+                        <span className={`text-xs font-mono ${
                           item.storeQty !== undefined && item.storeQty < 10
                             ? 'text-amber-500 font-bold animate-pulse'
                             : isDark ? 'text-slate-400' : 'text-slate-500'
@@ -2524,7 +2534,7 @@ export const QuickCheckout: React.FC = () => {
                         >
                           <Minus className="w-2.5 h-2.5" />
                         </button>
-                        <span className={`w-6 text-center font-bold text-[10px] tabular-nums ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        <span className={`w-7 text-center font-bold text-xs tabular-nums ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {item.quantity}
                         </span>
                         <button
@@ -2536,7 +2546,7 @@ export const QuickCheckout: React.FC = () => {
                       </div>
                       {/* col 11-12: Line total (salesPrice × qty) */}
                       <div className="col-span-2 text-right pr-4">
-                        <span className={`text-[11px] font-bold font-mono tabular-nums ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        <span className={`text-sm font-bold font-mono tabular-nums ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {(Number(item.salesPrice || item.ourPrice || 0) * item.quantity).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
@@ -2687,7 +2697,7 @@ export const QuickCheckout: React.FC = () => {
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => setIsAddDropdownOpen(!isAddDropdownOpen)}
+                        onClick={() => { setIsAddDropdownOpen(!isAddDropdownOpen); setAddCategorySearch(''); }}
                         className={`w-full min-h-[85px] border-2 border-dashed border-slate-800 hover:border-emerald-500/40 bg-slate-950/20 hover:bg-emerald-950/5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all group ${
                           isDark ? '' : 'bg-slate-50/50 border-slate-300 hover:border-emerald-400/40 hover:bg-emerald-50/30'
                         }`}
@@ -2696,46 +2706,69 @@ export const QuickCheckout: React.FC = () => {
                         <span className="text-[9px] font-bold text-slate-500 group-hover:text-emerald-400 uppercase tracking-wider">Add Box</span>
                       </button>
 
-                      {/* ── CUSTOM FLOATING DARK DROPDOWN - ADD CATEGORY ── */}
+                      {/* ── LIVE-SEARCH FLOATING POPOVER - ADD CATEGORY ── */}
                       {isAddDropdownOpen && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setIsAddDropdownOpen(false)} />
-                          <div className={`absolute bottom-full left-0 mb-2 w-64 max-h-60 overflow-y-auto rounded-xl shadow-2xl p-2 z-50 animate-fade-in ${
-                            isDark 
-                              ? 'bg-slate-950 border border-slate-800' 
+                          <div className={`absolute bottom-full left-0 mb-2 w-72 rounded-xl shadow-2xl z-50 animate-fade-in overflow-hidden ${
+                            isDark
+                              ? 'bg-slate-950 border border-slate-800'
                               : 'bg-white border border-slate-200 shadow-lg'
                           }`}>
-                            <div className={`px-2 py-1.5 text-[9px] font-black tracking-wider uppercase border-b mb-1 ${
-                              isDark ? 'text-slate-500 border-slate-800' : 'text-slate-400 border-slate-200'
-                            }`}>
-                              Select Category to Append
+                            {/* Live search input */}
+                            <div className={`p-2 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                              <input
+                                autoFocus
+                                type="text"
+                                value={addCategorySearch}
+                                onChange={e => setAddCategorySearch(e.target.value)}
+                                placeholder="Search categories..."
+                                className={`w-full px-3 py-1.5 text-xs font-medium rounded-lg focus:outline-none border ${
+                                  isDark
+                                    ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-emerald-500'
+                                    : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-emerald-400'
+                                }`}
+                              />
                             </div>
-                            {allCategoryNames
-                              .filter(c => !quickCategories.includes(c))
-                              .map((cat) => (
-                                <button
-                                  key={cat}
-                                  type="button"
-                                  onClick={() => {
-                                    setQuickCategories([...quickCategories, cat]);
-                                    setIsAddDropdownOpen(false);
-                                    toast.success(`Added "${cat}" to grid`);
-                                  }}
-                                  className={`w-full text-left px-3 py-2 text-xs font-medium rounded-lg transition-all flex items-center gap-2 ${
-                                    isDark 
-                                      ? 'text-slate-300 hover:text-white hover:bg-slate-900/60' 
-                                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                                  }`}
-                                >
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                  {cat}
-                                </button>
-                              ))}
-                            {allCategoryNames.filter(c => !quickCategories.includes(c)).length === 0 && (
-                              <div className="text-center py-4 text-xs text-slate-600 font-bold">
-                                All items are already on layout grid!
-                              </div>
-                            )}
+                            {/* Filtered results */}
+                            <div className="max-h-56 overflow-y-auto p-1.5">
+                              {(() => {
+                                const available = allCategoryNames.filter(c =>
+                                  !quickCategories.includes(c) &&
+                                  (addCategorySearch.trim() === '' ||
+                                    c.toLowerCase().includes(addCategorySearch.toLowerCase()))
+                                );
+                                if (available.length === 0) {
+                                  return (
+                                    <div className={`text-center py-4 text-xs font-bold ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+                                      {allCategoryNames.filter(c => !quickCategories.includes(c)).length === 0
+                                        ? 'All categories are already on the grid!'
+                                        : 'No matching categories'}
+                                    </div>
+                                  );
+                                }
+                                return available.map(cat => (
+                                  <button
+                                    key={cat}
+                                    type="button"
+                                    onClick={() => {
+                                      setQuickCategories([...quickCategories, cat]);
+                                      setIsAddDropdownOpen(false);
+                                      setAddCategorySearch('');
+                                      toast.success(`Added "${cat}" to grid`);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-xs font-medium rounded-lg transition-all flex items-center gap-2 ${
+                                      isDark
+                                        ? 'text-slate-300 hover:text-white hover:bg-slate-900/60'
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                                    {cat}
+                                  </button>
+                                ));
+                              })()}
+                            </div>
                           </div>
                         </>
                       )}
@@ -2748,10 +2781,10 @@ export const QuickCheckout: React.FC = () => {
                     {/* ── CATEGORY PRODUCT POPOVER ── */}
             {activeCategoryPopover && categoryPopoverAnchor && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => { setActiveCategoryPopover(null); setQuantityPromptProduct(null); setActiveCategoryItemIndex(0); }} />
+                <div className="fixed inset-0 z-[200]" onClick={() => { setActiveCategoryPopover(null); setQuantityPromptProduct(null); setActiveCategoryItemIndex(0); }} />
                 <div 
                   ref={categoryPopoverRef}
-                  className="fixed z-50 rounded-xl border shadow-2xl overflow-hidden animate-fade-in"
+                  className="fixed z-[201] rounded-xl border shadow-2xl overflow-hidden animate-fade-in"
                   style={{
                     top: Math.max(8, categoryPopoverAnchor.top - 360),
                     left: Math.max(8, Math.min(categoryPopoverAnchor.left, window.innerWidth - 360)),
@@ -3296,6 +3329,119 @@ export const QuickCheckout: React.FC = () => {
                   </div>
                 ) : null;
               })()}
+
+              {/* ── New Customer Registration Button ── */}
+              <button
+                onClick={() => {
+                  setNewCustName('');
+                  setNewCustPhone('');
+                  setNewCustEmail('');
+                  setNewCustAddress('');
+                  setShowNewCustomerModal(true);
+                  setCustomerOpen(false);
+                }}
+                className={`mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed text-[10px] font-semibold transition-all ${
+                  isDark
+                    ? 'border-slate-700 text-slate-400 hover:border-emerald-500/50 hover:text-emerald-400 hover:bg-emerald-500/5'
+                    : 'border-slate-300 text-slate-500 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'
+                }`}
+              >
+                <Plus className="w-3 h-3" />
+                New Customer
+              </button>
+
+              {/* ── Inline New Customer Modal ── */}
+              {showNewCustomerModal && (
+                <>
+                  <div
+                    className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm"
+                    onClick={() => setShowNewCustomerModal(false)}
+                  />
+                  <div className={`fixed z-[201] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-2xl border shadow-2xl p-5 ${
+                    isDark ? 'bg-slate-800 border-slate-700/50' : 'bg-white border-slate-200'
+                  }`}>
+                    {/* Modal header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
+                          <User className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          Register Customer
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => setShowNewCustomerModal(false)}
+                        className={`p-1 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Form fields */}
+                    <div className="space-y-3">
+                      {[
+                        { label: 'Name *', value: newCustName,    setter: setNewCustName,    placeholder: 'Full name', type: 'text' },
+                        { label: 'Phone', value: newCustPhone,   setter: setNewCustPhone,   placeholder: '07X XXX XXXX', type: 'tel' },
+                        { label: 'Email', value: newCustEmail,   setter: setNewCustEmail,   placeholder: 'email@example.com', type: 'email' },
+                        { label: 'Address', value: newCustAddress, setter: setNewCustAddress, placeholder: 'Street, City', type: 'text' },
+                      ].map(({ label, value, setter, placeholder, type }) => (
+                        <div key={label}>
+                          <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {label}
+                          </label>
+                          <input
+                            type={type}
+                            value={value}
+                            onChange={e => setter(e.target.value)}
+                            placeholder={placeholder}
+                            className={`w-full px-3 py-2 text-xs font-medium rounded-lg border focus:outline-none focus:ring-2 transition-all ${
+                              isDark
+                                ? 'bg-slate-700/50 border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-emerald-500/20'
+                                : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:ring-emerald-200'
+                            }`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Submit */}
+                    <button
+                      onClick={() => {
+                        const trimmedName = newCustName.trim();
+                        if (!trimmedName) {
+                          toast.error('Customer name is required');
+                          return;
+                        }
+                        const newId = `cust-new-${Date.now()}`;
+                        const newCustomer: Customer = {
+                          id: newId,
+                          name: trimmedName,
+                          businessName: trimmedName,
+                          email: newCustEmail.trim(),
+                          phone: newCustPhone.trim(),
+                          address: newCustAddress.trim(),
+                          registrationDate: new Date().toISOString().split('T')[0],
+                          totalSpent: 0,
+                          customerType: 'regular',
+                          isActive: true,
+                          loanBalance: 0,
+                        };
+                        // Append to the live mockCustomers array so filteredCustomers picks it up
+                        mockCustomers.push(newCustomer);
+                        // Auto-select the new customer
+                        setSelectedCustomerId(newId);
+                        setCustomerSearch(trimmedName);
+                        setShowNewCustomerModal(false);
+                        toast.success(`Customer "${trimmedName}" registered`);
+                      }}
+                      className="mt-4 w-full py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow shadow-emerald-500/30 transition-all"
+                    >
+                      Register &amp; Select
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Payment Method */}
