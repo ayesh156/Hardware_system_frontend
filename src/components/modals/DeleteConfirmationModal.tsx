@@ -28,8 +28,10 @@ export const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = (
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className={`rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border ${
+    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 w-screen h-screen min-w-full min-h-full">
+      {/* Full-viewport backdrop — no gap, no leakage */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm w-screen h-screen min-w-full min-h-full block" />
+      <div className={`relative rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border ${
         theme === 'dark' 
           ? 'bg-slate-900 border-slate-700/50' 
           : 'bg-white border-slate-200'

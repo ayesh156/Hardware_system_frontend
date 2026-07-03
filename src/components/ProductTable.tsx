@@ -11,6 +11,7 @@ import SortButton from '../components/ui/SortButton';
 import { InventoryProduct } from '../types';
 import { CellPopover } from './CellPopover';
 import { ProductFormModal } from './ProductFormModal';
+import { DeleteConfirmationModal } from './modals/DeleteConfirmationModal';
 
 function deriveStatus(storeQty: number): InventoryProduct['status'] {
   if (storeQty === 0) return 'Out of Stock';
@@ -293,6 +294,8 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
     else { setSortField(field); setSortDir('asc'); }
   };
 
+  const [deleteTarget, setDeleteTarget] = useState<InventoryProduct | null>(null);
+  
   const handleDeleteProduct = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }, [setItems]);
@@ -557,7 +560,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
                           className={`p-1.5 rounded-lg transition-all hover:scale-110 active:scale-90 ${isDark ? 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/15' : 'text-slate-500 hover:text-orange-600 hover:bg-orange-50'}`} title="Edit full row">
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => handleDeleteProduct(item.id)}
+                        <button onClick={() => setDeleteTarget(item)}
                           className={`p-1.5 rounded-lg transition-all hover:scale-110 active:scale-90 ${isDark ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-500/15' : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'}`} title="Delete item">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -628,6 +631,17 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
           initialData={rowEditItem}
         />
       )}
+      <DeleteConfirmationModal
+        isOpen={!!deleteTarget}
+        title={t('products.deleteTitle')}
+        message={t('products.deleteMessage')}
+        itemName={deleteTarget?.name}
+        onConfirm={() => {
+          if (deleteTarget) handleDeleteProduct(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };

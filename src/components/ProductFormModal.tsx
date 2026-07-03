@@ -139,9 +139,9 @@ interface FieldGroupProps {
   label: string; icon?: React.ReactNode; children: React.ReactNode;
 }
 
-const FieldGroup: React.FC<FieldGroupProps> = ({ label, icon, children }) => (
+const FieldGroup: React.FC<FieldGroupProps & { isDark?: boolean }> = ({ label, icon, children, isDark }) => (
   <div className="space-y-1">
-    <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{icon}{label}</label>
+    <label className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>{icon}{label}</label>
     {children}
   </div>
 );
@@ -316,26 +316,26 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Search Key */}
               <div className="lg:col-span-2">
-                <FieldGroup label={t('addProductModal.searchKey')} icon={<Tag className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.searchKey')} isDark={isDark} icon={<Tag className="w-3 h-3" />}>
                   <ClearableInput value={form.searchKey} isDark={isDark} onChange={(v) => handleStrUpdate('searchKey', v)} placeholder={t('addProductModal.searchKeyPlaceholder')} hasError={!!errors.searchKey} />
                   {errors.searchKey && <p className="text-[9px] text-red-400 mt-0.5">{errors.searchKey}</p>}
                 </FieldGroup>
               </div>
               <div>
-                <FieldGroup label={t('addProductModal.status')} icon={<AlertTriangle className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.status')} isDark={isDark} icon={<AlertTriangle className="w-3 h-3" />}>
                   <input type="text" value={derivedStatus} disabled className={`w-full px-2.5 py-1.5 text-xs border rounded-lg opacity-70 cursor-not-allowed ${isDark ? 'bg-slate-700/30 border-slate-600 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'}`} />
                 </FieldGroup>
               </div>
               {/* Name */}
               <div className="lg:col-span-3">
-                <FieldGroup label={t('addProductModal.productName')} icon={<Package className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.productName')} isDark={isDark} icon={<Package className="w-3 h-3" />}>
                   <ClearableInput value={form.name} isDark={isDark} onChange={(v) => handleStrUpdate('name', v)} placeholder={t('addProductModal.productNamePlaceholder')} hasError={!!errors.name} />
                   {errors.name && <p className="text-[9px] text-red-400 mt-0.5">{errors.name}</p>}
                 </FieldGroup>
               </div>
               {/* Barcode */}
               <div className="lg:col-span-3">
-                <FieldGroup label={t('addProductModal.barcodeLabel')} icon={<ScanLine className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.barcodeLabel')} isDark={isDark} icon={<ScanLine className="w-3 h-3" />}>
                   <ClearableInput
                     value={(form as any).barcode || ''}
                     isDark={isDark}
@@ -346,13 +346,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
               </div>
               {/* Product Category — dynamic + nested add button */}
               <div className="lg:col-span-2">
-                <FieldGroup label={t('addProductModal.category')} icon={<Layers className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.category')} isDark={isDark} icon={<Layers className="w-3 h-3" />}>
                   <SearchCombobox options={categoryOptions} value={form.productCategory} onChange={(v) => updateField('productCategory', v)} placeholder={t('addProductModal.categoryPlaceholder')} isDark={isDark} onAddCategory={() => setShowAddCategory(true)} />
                 </FieldGroup>
               </div>
               {/* Sales Type */}
               <div>
-                <FieldGroup label={t('addProductModal.salesType')} icon={<ShoppingCart className="w-3 h-3" />}>
+                <FieldGroup label={t('addProductModal.salesType')} isDark={isDark} icon={<ShoppingCart className="w-3 h-3" />}>
                   <SearchCombobox options={SALES_TYPE_OPTIONS} value={form.salesType} onChange={(v) => updateField('salesType', v)} placeholder={t('addProductModal.salesTypePlaceholder')} isDark={isDark} />
                 </FieldGroup>
               </div>
@@ -363,19 +363,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                   <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('addProductModal.pricing')}</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <FieldGroup label={t('addProductModal.cost')} icon={<DollarSign className="w-3 h-3" />}>
+                  <FieldGroup label={t('addProductModal.cost')} isDark={isDark} icon={<DollarSign className="w-3 h-3" />}>
                     <ClearableInput value={form.cost} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('cost', v)} hasError={!!errors.cost} min="0" step="0.01" />
                     {errors.cost && <p className="text-[9px] text-red-400 mt-0.5">{errors.cost}</p>}
                   </FieldGroup>
-                  <FieldGroup label={t('addProductModal.lastPrice')} icon={<BarChart3 className="w-3 h-3" />}>
+                  <FieldGroup label={t('addProductModal.lastPrice')} isDark={isDark} icon={<BarChart3 className="w-3 h-3" />}>
                     <ClearableInput value={form.lastPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('lastPrice', v)} hasError={!!errors.lastPrice} min="0" step="0.01" />
                     {errors.lastPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.lastPrice}</p>}
                   </FieldGroup>
-                  <FieldGroup label={t('addProductModal.salesPrice')} icon={<Tag className="w-3 h-3" />}>
+                  <FieldGroup label={t('addProductModal.salesPrice')} isDark={isDark} icon={<Tag className="w-3 h-3" />}>
                     <ClearableInput value={form.salesPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('salesPrice', v)} hasError={!!errors.salesPrice} className="font-medium text-cyan-400" min="0" step="0.01" />
                     {errors.salesPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.salesPrice}</p>}
                   </FieldGroup>
-                  <FieldGroup label={t('addProductModal.displayPrice')} icon={<Tag className="w-3 h-3" />}>
+                  <FieldGroup label={t('addProductModal.displayPrice')} isDark={isDark} icon={<Tag className="w-3 h-3" />}>
                     <ClearableInput value={form.displayPrice} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('displayPrice', v)} hasError={!!errors.displayPrice} className="font-bold text-green-400" min="0" step="0.01" />
                     {errors.displayPrice && <p className="text-[9px] text-red-400 mt-0.5">{errors.displayPrice}</p>}
                   </FieldGroup>
@@ -388,7 +388,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({ isOpen, onCl
                   <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('addProductModal.stock')}</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <FieldGroup label={t('addProductModal.storeQty')} icon={<Hash className="w-3 h-3" />}>
+                  <FieldGroup label={t('addProductModal.storeQty')} isDark={isDark} icon={<Hash className="w-3 h-3" />}>
                     <ClearableInput value={form.storeQty} type="number" isNumeric isDark={isDark} onChange={(v) => handleStrUpdate('storeQty', v)} hasError={!!errors.storeQty} className="font-bold" min="0" />
                     {errors.storeQty && <p className="text-[9px] text-red-400 mt-0.5">{errors.storeQty}</p>}
                   </FieldGroup>
