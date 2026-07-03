@@ -91,18 +91,18 @@ const ThermalReceiptPreview: React.FC<ThermalReceiptPreviewProps> = memo(({
   }, [items, discount, receivedAmount, paymentMethod, subtotal, total, customer, invoiceNumber, language]);
 
   return (
-    <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+    <div className="bg-white border-2 border-slate-700 shadow-lg rounded-xl p-4 flex flex-col gap-3">
       {/* Header bar */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+      <div className="flex items-center justify-between border-b border-slate-600 pb-2">
+        <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
           Live Receipt Preview
         </span>
-        <span className="text-[10px] text-slate-500 font-mono">{invoiceNumber}</span>
+        <span className="text-[10px] font-bold text-slate-800 font-mono">{invoiceNumber}</span>
       </div>
 
       {/* Paper receipt container */}
-      <div className="bg-white rounded-lg overflow-hidden shadow-2xl shadow-black/60 ring-1 ring-white/10">
+      <div className="bg-white rounded-lg overflow-hidden shadow-xl shadow-slate-700/40 ring-1 ring-slate-700">
         <iframe
           ref={iframeRef}
           title="receipt-preview"

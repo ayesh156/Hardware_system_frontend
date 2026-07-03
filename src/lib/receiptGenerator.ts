@@ -38,7 +38,9 @@ export const generateReceiptHTML = (
       const ext = item as any;
       const displayName =
         item.productNameSi || translateToSinhala(item.productName);
-      // Col 2 (25%): displayPrice — marked/RRP shown struck-through
+      // Col 2 (25%): displayPrice — marked/RRP, conditionally struck-through
+      //   ONLY apply line-through if salesPrice < displayPrice.
+      //   If prices are equal or salesPrice > displayPrice, NO strikethrough.
       // Col 3 (25%): salesPrice  — our actual billing rate ("අපේ මිල")
       // Col 4 (35%): salesPrice × qty — line total
       const displayPrice = Number(
@@ -48,6 +50,7 @@ export const generateReceiptHTML = (
         ext.salesPrice ?? ext.ourPrice ?? ext.lastPrice ?? item.unitPrice ?? 0
       );
       const lineTotal = salesPrice * item.quantity;
+      const showStrikethrough = salesPrice < displayPrice;
 
       // Display quantity with up to 3 decimal places (e.g., 0.5, 0.125, 1.5)
       const displayQty = Number(item.quantity) % 1 === 0
@@ -58,7 +61,7 @@ export const generateReceiptHTML = (
         <div style="font-weight:800;font-size:12px;color:#000;margin-bottom:2px;word-break:break-word;">${displayName}</div>
         <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;font-family:'Courier New',monospace;color:#000;width:100%;">
           <span style="width:15%;text-align:left;flex-shrink:0;">${displayQty}</span>
-          <span style="width:25%;text-align:right;text-decoration:line-through;color:#000;opacity:0.6;flex-shrink:0;">${displayPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+          <span style="width:25%;text-align:right;${showStrikethrough ? 'text-decoration:line-through;' : ''}color:#000;opacity:0.6;flex-shrink:0;">${displayPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
           <span style="width:25%;text-align:right;font-weight:800;color:#000;flex-shrink:0;">${salesPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
           <span style="width:35%;text-align:right;font-weight:900;color:#000;flex-shrink:0;">${lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
         </div>
