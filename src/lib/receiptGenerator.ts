@@ -49,11 +49,15 @@ export const generateReceiptHTML = (
       );
       const lineTotal = salesPrice * item.quantity;
 
+      // Display quantity with up to 3 decimal places (e.g., 0.5, 0.125, 1.5)
+      const displayQty = Number(item.quantity) % 1 === 0
+        ? Number(item.quantity).toString()
+        : Number(item.quantity).toFixed(3).replace(/\.?0+$/, '');
       return `
       <div style="border-bottom:1px dashed #000;padding:4px 0;">
         <div style="font-weight:800;font-size:12px;color:#000;margin-bottom:2px;word-break:break-word;">${displayName}</div>
         <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;font-family:'Courier New',monospace;color:#000;width:100%;">
-          <span style="width:15%;text-align:left;flex-shrink:0;">${item.quantity}</span>
+          <span style="width:15%;text-align:left;flex-shrink:0;">${displayQty}</span>
           <span style="width:25%;text-align:right;text-decoration:line-through;color:#000;opacity:0.6;flex-shrink:0;">${displayPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
           <span style="width:25%;text-align:right;font-weight:800;color:#000;flex-shrink:0;">${salesPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
           <span style="width:35%;text-align:right;font-weight:900;color:#000;flex-shrink:0;">${lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>

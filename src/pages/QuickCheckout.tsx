@@ -170,6 +170,7 @@ export const QuickCheckout: React.FC = () => {
   const [items, setItems] = useState<QuickInvoiceItem[]>([]);
   const [productSearch, setProductSearch] = useState('');
   const [quantity, setQuantity] = useState<number>(1);
+  const [quantityStr, setQuantityStr] = useState<string>("1");
   const [discount, setDiscount] = useState<number>(0);
   const [bulkDiscountPercent, setBulkDiscountPercent] = useState<number>(0);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -177,6 +178,11 @@ export const QuickCheckout: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit'>('cash');
   const [pendingProduct, setPendingProduct] = useState<FlattenedProduct | null>(null);
+  // ── Search scope toggles ──
+  // searchByKey:  match against product.searchKey  (default ON)
+  // searchByName: match against product.name       (default OFF)
+  const [searchByKey,  setSearchByKey]  = useState<boolean>(true);
+  const [searchByName, setSearchByName] = useState<boolean>(false);
   
   // Stepped navigation state
   const [currentStep, setCurrentStep] = useState<QuickCheckoutStep>('products');
@@ -217,6 +223,7 @@ export const QuickCheckout: React.FC = () => {
   
   const [showProductFormModal, setShowProductFormModal] = useState(false);
   const [selectedProductIndex, setSelectedProductIndex] = useState<number>(-1);
+  const [activeMainSearchIndex, setActiveMainSearchIndex] = useState<number>(-1);
   const [selectedCartIndex, setSelectedCartIndex] = useState<number>(-1);
   const [isCartFocused, setIsCartFocused] = useState(false);
   const [isPaymentFocused, setIsPaymentFocused] = useState(false);
@@ -269,7 +276,7 @@ export const QuickCheckout: React.FC = () => {
   const filteredCustomers = useMemo(() => mockCustomers.filter(c =>
     c.name.toLowerCase().includes(customerSearch.toLowerCase())), [customerSearch]);
 
-  // Helper functions for decimal-preserving quantity adjustments
+  // Helper functions for decimal-preserving quantity adjustments (rely on numeric quantity)
   const incrementQuantity = useCallback((currentQty: number): number => {
     const intPart = Math.floor(currentQty);
     const decimalPart = currentQty - intPart;
@@ -315,16 +322,24 @@ export const QuickCheckout: React.FC = () => {
   }, [soundEnabled]);
 
   // ── Search inventoryItems directly from live CatalogContext ──
-  // Multi-word matching: every space-separated word token in the query must appear
-  // somewhere in the product name OR searchKey. Raw spaces are preserved in the
-  // input — never stripped — so "7 යතුරු" and "GI BOX 1x1" both resolve correctly.
+  // Scope is controlled by searchByKey / searchByName toggles.
+  //
+  // Matching tiers (searchKey path, space-insensitive):
+  //   Tier 0 — stripped exact equality:  "be1" === stripped("BE 1")   → exact hit
+  //   Tier 1 — word-token exact equality: ["be","1"] === tokens("BE 1") → exact hit
+  //   Tier 2 — stripped prefix:  stripped("BE 10").startsWith("be1")  → prefix only
+  //            ↑ only surfaced when zero tier-0/1 results exist
+  //
+  // Containment (.includes) is NOT used — it caused "BE 10/11/12" to flood
+  // the results when the cashier typed "BE 1".
+  // Priority 1 is always exact barcode — toggles do not affect that path.
   const filteredProducts = useMemo((): any[] => {
     if (!productSearch.trim()) return [];
 
     const raw = productSearch.trim();
     const normalizedQuery = raw.toLowerCase();
 
-    // ── Priority 1: exact barcode match — surface as single result ──
+    // ── Priority 1: exact barcode match — single result, toggle-agnostic ──
     const barcodeHit = inventoryItems.find(
       item => item.barcode && item.barcode.trim() === raw
     );
@@ -337,8 +352,8 @@ export const QuickCheckout: React.FC = () => {
         displaySku: barcodeHit.searchKey,
         displayBarcode: barcodeHit.barcode,
         costPrice:    barcodeHit.cost,
-        wholesalePrice: barcodeHit.displayPrice,  // display/marked price (shown struck-through)
-        retailPrice:  barcodeHit.salesPrice,      // our actual selling price
+        wholesalePrice: barcodeHit.displayPrice,
+        retailPrice:  barcodeHit.salesPrice,
         discountedPrice: undefined,
         hasDiscount: false,
         stock: barcodeHit.storeQty,
@@ -348,15 +363,13 @@ export const QuickCheckout: React.FC = () => {
       }];
     }
 
-    // ── Priority 2: multi-word fuzzy text search ──
-    // Split on whitespace → every token must appear in name or searchKey.
-    const words = normalizedQuery.split(/\s+/).filter(Boolean);
-    return inventoryItems.filter(item => {
-      if (!item.searchKey && !item.name) return false;
-      const targetName = item.name.toLowerCase();
-      const targetKey  = (item.searchKey || '').toLowerCase();
-      return words.every(w => targetName.includes(w) || targetKey.includes(w));
-    }).slice(0, 12).map(item => ({
+    // ── Priority 2: scope-aware tiered text search ──
+    const strippedQuery = normalizedQuery.replace(/\s+/g, '');
+    // Word tokens of the typed query (e.g. "BE 1" → ["be","1"])
+    const queryTokens   = normalizedQuery.split(/\s+/).filter(Boolean);
+
+    // Helper: build a FlattenedProduct shell from an InventoryProduct row
+    const toFlat = (item: typeof inventoryItems[0]) => ({
       flatId: item.id,
       product: { nameAlt: item.name, sku: item.searchKey, category: item.productCategory } as any,
       variant: undefined,
@@ -364,16 +377,61 @@ export const QuickCheckout: React.FC = () => {
       displaySku: item.searchKey,
       displayBarcode: item.barcode || item.searchKey,
       costPrice:    item.cost,
-      wholesalePrice: item.displayPrice,  // display/marked price (shown struck-through)
-      retailPrice:  item.salesPrice,      // our actual selling price
+      wholesalePrice: item.displayPrice,
+      retailPrice:  item.salesPrice,
       discountedPrice: undefined,
       hasDiscount: false,
       stock: item.storeQty,
       minStock: 0,
       isVariant: false,
       variantLabel: undefined,
-    }));
-  }, [inventoryItems, productSearch]);
+    });
+
+    // Evaluate one field string against the query, returning a tier score:
+    //   0  → no match
+    //   2  → tier 0/1 exact match
+    //   1  → tier 2 prefix match
+    const scoreField = (fieldRaw: string): 0 | 1 | 2 => {
+      if (!fieldRaw) return 0;
+      const field         = fieldRaw.toLowerCase();
+      const strippedField = field.replace(/\s+/g, '');
+      const fieldTokens   = field.split(/\s+/).filter(Boolean);
+
+      // Tier 0: stripped equality — "be1" === "be1"
+      if (strippedField === strippedQuery) return 2;
+
+      // Tier 1: word-token exact equality — ["be","1"] deepEqual ["be","1"]
+      if (
+        queryTokens.length === fieldTokens.length &&
+        queryTokens.every((tok, i) => tok === fieldTokens[i])
+      ) return 2;
+
+      // Tier 2: stripped prefix — "be10".startsWith("be1") — only if query ≥ 1 char
+      if (strippedQuery.length > 0 && strippedField.startsWith(strippedQuery)) return 1;
+
+      return 0;
+    };
+
+    // Score every item
+    const scored: Array<{ item: typeof inventoryItems[0]; score: number }> = [];
+    for (const item of inventoryItems) {
+      let score = 0;
+      if (searchByKey)  score = Math.max(score, scoreField(item.searchKey || ''));
+      if (searchByName) score = Math.max(score, scoreField(item.name));
+      if (score > 0) scored.push({ item, score });
+    }
+
+    // If any tier-0/1 exact matches exist, suppress all tier-2 prefix results
+    const hasExact = scored.some(s => s.score === 2);
+    const filtered = hasExact
+      ? scored.filter(s => s.score === 2)
+      : scored; // fall through to prefix results only when no exact match
+
+    // Sort: exact (score 2) before prefix (score 1), stable within each tier
+    filtered.sort((a, b) => b.score - a.score);
+
+    return filtered.map(s => toFlat(s.item));
+  }, [inventoryItems, productSearch, searchByKey, searchByName]);
   const parseScanInput = (input: string): { code?: string; qty?: number } | null => {
     if (!input) return null;
     const trimmed = input.trim();
@@ -402,6 +460,7 @@ export const QuickCheckout: React.FC = () => {
         setProductSearch('');
         setSelectedProductIndex(-1);
         setQuantity(1);
+        setQuantityStr("1");
         setIsQuantityFocused(true);
         setTimeout(() => {
           quantityInputRef.current?.focus();
@@ -413,9 +472,55 @@ export const QuickCheckout: React.FC = () => {
     }
   }, [filteredProducts, productSearch, playBeep, t]);
 
+  // ── REFACTORED: Parse fraction string (e.g. "1/2"→0.5, ".2"→0.2, "1/4"→0.25, "3/4"→0.75) or plain decimal ──
+  // Returns NaN for invalid inputs — caller must guard.
+  const parseQuantityInput = useCallback((input: string): number => {
+    const trimmed = input.trim();
+    if (!trimmed.length) return NaN;
+    // Leading dot normalization (.2 → 0.2)
+    if (trimmed.startsWith('.')) {
+      return parseFloat('0' + trimmed);
+    }
+    // Check for fraction pattern: digits/digits
+    const fractionMatch = trimmed.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (fractionMatch) {
+      const num = parseInt(fractionMatch[1], 10);
+      const den = parseInt(fractionMatch[2], 10);
+      if (den > 0) return num / den;
+    }
+    // Mixed number pattern: digits space digits/digits (e.g. "1 1/2")
+    const mixedMatch = trimmed.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+    if (mixedMatch) {
+      const whole = parseInt(mixedMatch[1], 10);
+      const num = parseInt(mixedMatch[2], 10);
+      const den = parseInt(mixedMatch[3], 10);
+      if (den > 0) return whole + num / den;
+    }
+    // Fallback to plain float
+    return parseFloat(trimmed);
+  }, []);
+
+  // ── REFACTORED: Parse quantity string buffer → high-precision float at submission time ──
+  // NO rounding coercion — returns the exact computed value.
+  const getCartQuantity = useCallback((overrideQty?: number): number => {
+    const raw = overrideQty !== undefined ? String(overrideQty) : quantityStr;
+    const parsed = parseQuantityInput(raw);
+    if (isNaN(parsed) || parsed <= 0) return 0.001;
+    return parsed; // preserve full precision — no Math.round truncation
+  }, [quantityStr, parseQuantityInput]);
+
+  // Sync numeric `quantity` from the string buffer whenever appropriate.
+  // Called after cart mutation or blur to keep increment/decrement buttons coherent.
+  const syncQuantityFromStr = useCallback(() => {
+    const parsed = parseQuantityInput(quantityStr);
+    if (!isNaN(parsed) && parsed > 0) {
+      setQuantity(parsed);
+    }
+  }, [quantityStr, parseQuantityInput]);
+
   // Add product to cart
   const addProductToCart = useCallback((flatProduct: FlattenedProduct, overrideQty?: number) => {
-    const addQty = Math.max(1, overrideQty ?? quantity);
+    const addQty = getCartQuantity(overrideQty);
 
     // ── Single source of truth: all pricing pulled directly from inventoryItems ──
     // Lookup is strictly by unique `id` (flatId) — NEVER by searchKey string,
@@ -474,6 +579,7 @@ export const QuickCheckout: React.FC = () => {
 
     playBeep('add');
     setQuantity(1);
+    setQuantityStr("1");
     setProductSearch('');
     setSelectedProductIndex(-1);
     searchInputRef.current?.focus();
@@ -483,7 +589,7 @@ export const QuickCheckout: React.FC = () => {
         cartItemsContainerRef.current.scrollTop = cartItemsContainerRef.current.scrollHeight;
       }
     }, 50);
-  }, [items, quantity, inventoryItems, playBeep, t]);
+  }, [items, inventoryItems, getCartQuantity, playBeep, t]);
 
   // ── findExactMatch: checks if input is a fully-qualified barcode/SKU ──
   const findExactMatch = useCallback((input: string): FlattenedProduct | undefined => {
@@ -550,6 +656,7 @@ export const QuickCheckout: React.FC = () => {
     setPendingProduct(fp);
     setProductSearch(foundProduct.name);
     setQuantity(1);
+    setQuantityStr("1");
     setSelectedProductIndex(-1);
     playBeep('add');
     toast.info(`${foundProduct.name} — ${t('quickCheckout.enterQuantity')}`, { duration: 2000 });
@@ -742,6 +849,7 @@ export const QuickCheckout: React.FC = () => {
     setItems([]);
     setProductSearch('');
     setQuantity(1);
+    setQuantityStr("1");
     setDiscount(0);
     setReceivedAmount(0);
     setPendingProduct(null);
@@ -949,6 +1057,7 @@ export const QuickCheckout: React.FC = () => {
             setCurrentMode('cart');
             (document.activeElement as HTMLElement)?.blur();
             cartListRef.current?.focus?.({ preventScroll: true } as FocusOptions) ?? cartListRef.current?.focus();
+
             playBeep('add');
           }
           break;
@@ -1076,7 +1185,7 @@ export const QuickCheckout: React.FC = () => {
             }
           } else if (filteredProducts.length > 0 && isInSearchInput) {
             e.preventDefault();
-            setSelectedProductIndex((prev) => 
+            setActiveMainSearchIndex((prev) => 
               prev < filteredProducts.length - 1 ? prev + 1 : prev
             );
           }
@@ -1093,7 +1202,7 @@ export const QuickCheckout: React.FC = () => {
             }
           } else if (filteredProducts.length > 0 && isInSearchInput) {
             e.preventDefault();
-            setSelectedProductIndex((prev) => prev > 0 ? prev - 1 : 0);
+            setActiveMainSearchIndex((prev) => prev > 0 ? prev - 1 : 0);
           }
           break;
           
@@ -1105,7 +1214,9 @@ export const QuickCheckout: React.FC = () => {
               updateItemQuantity(item.id, decrementQuantity(item.quantity, 0.01));
             }
           } else if (isInQuantityInput) {
-            setQuantity(q => decrementQuantity(q, 0.01));
+            const newQty = decrementQuantity(quantity, 0.01);
+            setQuantity(newQty);
+            setQuantityStr(String(newQty));
           } else if (isPaymentFocused) {
             setPaymentMethod('cash');
             playBeep('add');
@@ -1120,7 +1231,9 @@ export const QuickCheckout: React.FC = () => {
               updateItemQuantity(item.id, incrementQuantity(item.quantity));
             }
           } else if (isInQuantityInput) {
-            setQuantity(q => incrementQuantity(q));
+            const newQty = incrementQuantity(quantity);
+            setQuantity(newQty);
+            setQuantityStr(String(newQty));
           } else if (isPaymentFocused) {
             setPaymentMethod('credit');
             playBeep('add');
@@ -1272,14 +1385,16 @@ export const QuickCheckout: React.FC = () => {
             searchInputRef.current?.focus();
           } else if (isInSearchInput && filteredProducts.length > 0) {
             e.preventDefault();
-            const productToSelect = selectedProductIndex >= 0 
-              ? filteredProducts[selectedProductIndex] 
-              : filteredProducts[0];
+            // Use activeMainSearchIndex if available, else fall back to selectedProductIndex or first result
+            const useIndex = activeMainSearchIndex >= 0 ? activeMainSearchIndex : (selectedProductIndex >= 0 ? selectedProductIndex : 0);
+            const productToSelect = filteredProducts[useIndex];
             if (productToSelect) {
               setPendingProduct(productToSelect);
               setProductSearch('');
               setSelectedProductIndex(-1);
+              setActiveMainSearchIndex(-1);
               setQuantity(1);
+              setQuantityStr("1");
               setIsQuantityFocused(true);
               setCurrentMode('quantity');
               setTimeout(() => {
@@ -1400,6 +1515,27 @@ export const QuickCheckout: React.FC = () => {
                 <h1 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {t('quickCheckout.title')}
                 </h1>
+                {/* ── Search scope toggles (mobile) ── */}
+                <div className="flex items-center gap-2 mt-0.5">
+                  <label className={`flex items-center gap-1 cursor-pointer select-none text-[9px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <input
+                      type="checkbox"
+                      checked={searchByKey}
+                      onChange={e => setSearchByKey(e.target.checked)}
+                      className="accent-amber-500 w-2.5 h-2.5 rounded"
+                    />
+                    Search Key
+                  </label>
+                  <label className={`flex items-center gap-1 cursor-pointer select-none text-[9px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <input
+                      type="checkbox"
+                      checked={searchByName}
+                      onChange={e => setSearchByName(e.target.checked)}
+                      className="accent-amber-500 w-2.5 h-2.5 rounded"
+                    />
+                    Product Name
+                  </label>
+                </div>
               </div>
             </div>
             
@@ -1477,9 +1613,10 @@ export const QuickCheckout: React.FC = () => {
                     return;
                   }
 
-                  // ── Normal typing: pass raw value unchanged (spaces allowed) ──
-                  setProductSearch(val);
-                  setSelectedProductIndex(-1);
+                        // ── Normal typing: pass raw value unchanged (spaces allowed) ──
+                        setProductSearch(val);
+                        setSelectedProductIndex(-1);
+                        setActiveMainSearchIndex(-1);
                 }}
                 onFocus={() => {
                   setMobileSearchFocused(true);
@@ -1510,13 +1647,21 @@ export const QuickCheckout: React.FC = () => {
               )}
             </div>
             
+            {/* ── REFACTORED MOBILE QUANTITY INPUT ── */}
+            {/* Changed from type="number" with numeric quantity state to type="text"
+                with quantityStr string state. This allows '.' / '.2' / '1/2' / '1/4'
+                to be typed freely without premature numeric coercion or jank. */}
             <div className={`flex items-center gap-1 px-1.5 rounded-xl border-2 ${
               pendingProduct
                 ? isDark ? 'border-amber-500 bg-amber-500/10' : 'border-amber-400 bg-amber-50'
                 : isDark ? 'border-slate-700 bg-slate-800/80' : 'border-slate-200 bg-white'
             }`}>
               <button
-                onClick={() => setQuantity(q => decrementQuantity(q, 0.01))}
+                onClick={() => {
+                  const newQty = decrementQuantity(quantity, 0.01);
+                  setQuantity(newQty);
+                  setQuantityStr(String(newQty));
+                }}
                 className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90 ${isDark ? 'active:bg-slate-700 text-slate-400' : 'active:bg-slate-200 text-slate-600'}`}
               >
                 <Minus className="w-3 h-3" />
@@ -1524,12 +1669,13 @@ export const QuickCheckout: React.FC = () => {
               <input
                 ref={quantityInputRef}
                 id="main-checkout-qty-input"
-                type="number"
+                type="text"
                 inputMode="decimal"
-                min="0.01"
-                step="any"
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
+                value={quantityStr}
+                onChange={(e) => {
+                  // Permissive: store raw string — no parsing, no coercion.
+                  setQuantityStr(e.target.value);
+                }}
                 onFocus={() => {
                   setIsCartFocused(false);
                   setSelectedCartIndex(-1);
@@ -1537,13 +1683,19 @@ export const QuickCheckout: React.FC = () => {
                   setPriceEditBuffer('');
                   setIsPriceEditing(false);
                 }}
+                onBlur={() => {
+                  // Sync numeric quantity from string buffer for downstream increment/decrement
+                  syncQuantityFromStr();
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && pendingProduct) {
                     e.preventDefault();
+                    // Ensure numeric quantity is synced before cart insertion
+                    syncQuantityFromStr();
                     addProductToCart(pendingProduct);
                     setPendingProduct(null);
                     setProductSearch('');
-                    setQuantity(1);
+                    setQuantityStr("1");
                     setTimeout(() => {
                       searchInputRef.current?.focus();
                       searchInputRef.current?.select();
@@ -1553,7 +1705,11 @@ export const QuickCheckout: React.FC = () => {
                 className={`w-10 py-2 text-center font-bold text-sm bg-transparent focus:outline-none ${isDark ? 'text-white' : 'text-slate-900'}`}
               />
               <button
-                onClick={() => setQuantity(q => incrementQuantity(q))}
+                onClick={() => {
+                  const newQty = incrementQuantity(quantity);
+                  setQuantity(newQty);
+                  setQuantityStr(String(newQty));
+                }}
                 className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90 ${isDark ? 'active:bg-slate-700 text-slate-400' : 'active:bg-slate-200 text-slate-600'}`}
               >
                 <Plus className="w-3 h-3" />
@@ -1574,7 +1730,23 @@ export const QuickCheckout: React.FC = () => {
                         if (el) productItemRefs.current.set(index, el);
                         else productItemRefs.current.delete(index);
                       }}
-                      onClick={() => quickAddProduct(flatProduct)}
+                      onClick={() => {
+                        // Stage as pendingProduct and hand off focus to qty input —
+                        // never insert directly into the cart from the dropdown.
+                        setPendingProduct(flatProduct);
+                        setProductSearch('');
+                        setSelectedProductIndex(-1);
+                        setQuantity(1);
+                        setQuantityStr("1");
+                        setIsQuantityFocused(true);
+                        setCurrentMode('quantity');
+                        setTimeout(() => {
+                          quantityInputRef.current?.focus();
+                          quantityInputRef.current?.select();
+                        }, 50);
+                        playBeep('add');
+                        toast.info(`${flatProduct.displayName} - ${t('quickCheckout.enterQuantity')}`);
+                      }}
                       className={`w-full flex items-center gap-2 p-2.5 text-left transition-all active:scale-[0.98] border-b last:border-b-0 ${
                         index === selectedProductIndex
                           ? isDark ? 'bg-amber-500/20' : 'bg-amber-50'
@@ -1863,6 +2035,27 @@ export const QuickCheckout: React.FC = () => {
             <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {t('quickCheckout.title')}
             </span>
+            {/* ── Search scope toggles ── */}
+            <div className="flex items-center gap-2 ml-2">
+              <label className={`flex items-center gap-1 cursor-pointer select-none text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <input
+                  type="checkbox"
+                  checked={searchByKey}
+                  onChange={e => setSearchByKey(e.target.checked)}
+                  className="accent-amber-500 w-3 h-3 rounded"
+                />
+                Search Key
+              </label>
+              <label className={`flex items-center gap-1 cursor-pointer select-none text-[10px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <input
+                  type="checkbox"
+                  checked={searchByName}
+                  onChange={e => setSearchByName(e.target.checked)}
+                  className="accent-amber-500 w-3 h-3 rounded"
+                />
+                Product Name
+              </label>
+            </div>
           </div>
           
           <div className="flex items-center gap-1.5">
@@ -2007,6 +2200,7 @@ export const QuickCheckout: React.FC = () => {
                                 setProductSearch('');
                                 setSelectedProductIndex(-1);
                                 setQuantity(1);
+                                setQuantityStr("1");
                                 setIsQuantityFocused(true);
                                 setCurrentMode('quantity');
                                 setTimeout(() => {
@@ -2017,9 +2211,11 @@ export const QuickCheckout: React.FC = () => {
                                 toast.info(`${flatProduct.displayName} - ${t('quickCheckout.enterQuantity')}`);
                               }}
                               className={`w-full flex items-center gap-2 p-2 text-left transition-colors border-b last:border-b-0 rounded-lg ${
-                                index === selectedProductIndex
-                                  ? isDark ? 'bg-amber-500/20 border-amber-500/30' : 'bg-amber-50 border-amber-200'
-                                  : isDark ? 'hover:bg-slate-700/50 border-slate-700' : 'hover:bg-white border-slate-200'
+                                index === activeMainSearchIndex
+                                  ? isDark ? 'bg-slate-800 border-l-4 border-amber-500 shadow-xl' : 'bg-amber-100 border-l-4 border-amber-500 shadow'
+                                  : index === selectedProductIndex
+                                    ? isDark ? 'bg-amber-500/20 border-amber-500/30' : 'bg-amber-50 border-amber-200'
+                                    : isDark ? 'hover:bg-slate-700/50 border-slate-700' : 'hover:bg-white border-slate-200'
                               }`}
                             >
                               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-white'}`}>
@@ -2078,7 +2274,11 @@ export const QuickCheckout: React.FC = () => {
                   <label className={`text-[10px] font-medium mr-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Qty:</label>
                   <div className="relative flex items-center">
                     <button
-                      onClick={() => setQuantity(q => decrementQuantity(q, 0.01))}
+                      onClick={() => {
+                        const newQty = decrementQuantity(quantity, 0.01);
+                        setQuantity(newQty);
+                        setQuantityStr(String(newQty));
+                      }}
                       className={`p-1 rounded ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
                     >
                       <ChevronDown className="w-3 h-3" />
@@ -2086,11 +2286,12 @@ export const QuickCheckout: React.FC = () => {
                     <input
                       ref={quantityInputRef}
                       id="main-checkout-qty-input"
-                      type="number"
-                      min="0.01"
-                      step="any"
-                      value={quantity}
-                      onChange={(e) => setQuantity(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
+                      type="text"
+                      inputMode="decimal"
+                      value={quantityStr}
+                      onChange={(e) => {
+                        setQuantityStr(e.target.value);
+                      }}
                       onFocus={() => {
                         setIsQuantityFocused(true);
                         setIsCartFocused(false);
@@ -2100,14 +2301,18 @@ export const QuickCheckout: React.FC = () => {
                         setIsPriceEditing(false);
                         setCurrentMode('quantity');
                       }}
-                      onBlur={() => setIsQuantityFocused(false)}
+                      onBlur={() => {
+                        setIsQuantityFocused(false);
+                        syncQuantityFromStr();
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && pendingProduct) {
                           e.preventDefault();
+                          syncQuantityFromStr();
                           addProductToCart(pendingProduct);
                           setPendingProduct(null);
                           setProductSearch('');
-                          setQuantity(1);
+                          setQuantityStr("1");
                           setTimeout(() => {
                             searchInputRef.current?.focus();
                             searchInputRef.current?.select();
@@ -2125,7 +2330,11 @@ export const QuickCheckout: React.FC = () => {
                       }`}
                     />
                     <button
-                      onClick={() => setQuantity(q => incrementQuantity(q))}
+                      onClick={() => {
+                        const newQty = incrementQuantity(quantity);
+                        setQuantity(newQty);
+                        setQuantityStr(String(newQty));
+                      }}
                       className={`p-1 rounded ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
                     >
                       <ChevronUp className="w-3 h-3" />
@@ -2578,20 +2787,24 @@ export const QuickCheckout: React.FC = () => {
                       <div className={`${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border relative`}>
                         {/* Conditionally render quantity overlay OR the standard popover content */}
                         {quantityPromptProduct ? (
-                          /* ── EMBEDDED QUANTITY PROMPT OVERLAY ── */
+                          /* ── REFACTORED: EMBEDDED QUANTITY PROMPT OVERLAY ── */
+                          /* Uses parseFloat + no integer flooring for fractional qty support */
                           <div className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center p-6 animate-fade-in">
                             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full text-center shadow-2xl">
                               <span className="text-[10px] text-amber-500 font-black tracking-widest uppercase block mb-1">අවශ්‍ය ප්‍රමාණය ඇතුළත් කරන්න</span>
                               <h3 className="text-xs font-black text-slate-200 mb-4 line-clamp-2">{quantityPromptProduct.name}</h3>
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="decimal"
                                 autoFocus
                                 value={categoryPromptQty}
                                 onChange={(e) => setCategoryPromptQty(e.target.value)}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
                                     e.preventDefault();
-                                    const finalQty = Math.max(1, parseInt(categoryPromptQty) || 1);
+                                    // ── REFACTORED: parseFloat for fractional support; no parseInt floor ──
+                                    const parsed = parseQuantityInput(categoryPromptQty);
+                                    const finalQty = !isNaN(parsed) && parsed > 0 ? parsed : 1;
                                     // Build the FlattenedProduct shell and add to cart with custom qty
                                     const fp: FlattenedProduct = {
                                       flatId: quantityPromptProduct.id,
@@ -2693,22 +2906,61 @@ export const QuickCheckout: React.FC = () => {
                                           stock: Number(targetedProduct.storeQty),
                                           hasDiscount: false,
                                         } as FlattenedProduct;
-                                        setPendingProduct(fp);
-                                        setProductSearch(targetedProduct.name);
-                                        // Close the category popover cleanly
+
+                                        // Determine which token to write into the search field
+                                        // based on the active search-scope toggle.
+                                        const searchToken = searchByKey ? targetedProduct.searchKey : targetedProduct.name;
+
+                                        // Count how many inventory items will match this token
+                                        // using the same scoring logic as filteredProducts useMemo.
+                                        // We do this synchronously here because state hasn't updated yet.
+                                        const normToken   = searchToken.toLowerCase();
+                                        const strippedTok = normToken.replace(/\s+/g, '');
+                                        const tokTokens   = normToken.split(/\s+/).filter(Boolean);
+                                        let exactMatchCount = 0;
+                                        for (const inv of inventoryItems) {
+                                          const field         = searchByKey ? (inv.searchKey || '').toLowerCase() : inv.name.toLowerCase();
+                                          const strippedField = field.replace(/\s+/g, '');
+                                          const fieldTokens   = field.split(/\s+/).filter(Boolean);
+                                          const isExact =
+                                            strippedField === strippedTok ||
+                                            (tokTokens.length === fieldTokens.length &&
+                                              tokTokens.every((t, i) => t === fieldTokens[i]));
+                                          if (isExact) exactMatchCount++;
+                                        }
+
+                                        // Populate the search field with the toggle-aware token
+                                        setProductSearch(searchToken);
+                                        // Close the category popover
                                         setActiveCategoryPopover(null);
                                         setCategoryPopoverFilter('');
                                         setActiveCategoryItemIndex(0);
-                                        setQuantity(1);
-                                        setIsQuantityFocused(true);
-                                        setCurrentMode('quantity');
-                                        // Focus the top main qty input (id="main-checkout-qty-input") for instant quantity confirmation
-                                        setTimeout(() => {
-                                          quantityInputRef.current?.focus();
-                                          quantityInputRef.current?.select();
-                                        }, 50);
-                                        playBeep('add');
-                                        toast.info(`${targetedProduct.name} - ${t('quickCheckout.enterQuantity')}`);
+
+                                        if (exactMatchCount > 1) {
+                                          // Multiple products share this key — stay in search mode
+                                          // so the cashier can arrow-navigate the dropdown to the
+                                          // correct variant before pressing Enter a second time.
+                                          setPendingProduct(null);
+                                          setActiveMainSearchIndex(0);
+                                          setCurrentMode('search');
+                                          setTimeout(() => {
+                                            searchInputRef.current?.focus();
+                                          }, 50);
+                                          playBeep('add');
+                                        } else {
+                                          // Unique match — stage and hand off to qty input immediately
+                                          setPendingProduct(fp);
+                                          setQuantity(1);
+                                          setQuantityStr("1");
+                                          setIsQuantityFocused(true);
+                                          setCurrentMode('quantity');
+                                          setTimeout(() => {
+                                            quantityInputRef.current?.focus();
+                                            quantityInputRef.current?.select();
+                                          }, 50);
+                                          playBeep('add');
+                                          toast.info(`${targetedProduct.name} - ${t('quickCheckout.enterQuantity')}`);
+                                        }
                                       }
                                     } else if (e.key === 'Escape') {
                                       e.preventDefault();
@@ -2742,9 +2994,71 @@ export const QuickCheckout: React.FC = () => {
                                         key={item.id}
                                         data-cat-index={idx}
                                         onClick={() => {
-                                          setActiveCategoryItemIndex(idx);
-                                          setQuantityPromptProduct(item);
-                                          setCategoryPromptQty("1");
+                                          // Build FlattenedProduct shell for potential single-match staging
+                                          const fp: FlattenedProduct = {
+                                            flatId: item.id,
+                                            product: { nameAlt: item.name, sku: item.searchKey, category: activeCategoryPopover } as any,
+                                            displayName: item.name,
+                                            displaySku: item.searchKey,
+                                            retailPrice: Number(item.salesPrice),
+                                            wholesalePrice: Number(item.displayPrice),
+                                            costPrice: Number(item.cost),
+                                            stock: Number(item.storeQty),
+                                            hasDiscount: false,
+                                          } as FlattenedProduct;
+
+                                          // Determine which token to write into the search field
+                                          // based on the active search-scope toggle.
+                                          const searchToken = searchByKey ? item.searchKey : item.name;
+
+                                          // Count how many inventory items will match this token
+                                          // using the same scoring logic as filteredProducts useMemo.
+                                          const normToken   = searchToken.toLowerCase();
+                                          const strippedTok = normToken.replace(/\s+/g, '');
+                                          const tokTokens   = normToken.split(/\s+/).filter(Boolean);
+                                          let exactMatchCount = 0;
+                                          for (const inv of inventoryItems) {
+                                            const field         = searchByKey ? (inv.searchKey || '').toLowerCase() : inv.name.toLowerCase();
+                                            const strippedField = field.replace(/\s+/g, '');
+                                            const fieldTokens   = field.split(/\s+/).filter(Boolean);
+                                            const isExact =
+                                              strippedField === strippedTok ||
+                                              (tokTokens.length === fieldTokens.length &&
+                                                tokTokens.every((t, i) => t === fieldTokens[i]));
+                                            if (isExact) exactMatchCount++;
+                                          }
+
+                                          // Populate the search field with the toggle-aware token
+                                          setProductSearch(searchToken);
+                                          // Close the category popover
+                                          setActiveCategoryPopover(null);
+                                          setCategoryPopoverFilter('');
+                                          setActiveCategoryItemIndex(0);
+
+                                          if (exactMatchCount > 1) {
+                                            // Multiple products share this key — keep the main search
+                                            // dropdown open so the cashier can pick the correct variant.
+                                            setPendingProduct(null);
+                                            setActiveMainSearchIndex(0);
+                                            setCurrentMode('search');
+                                            setTimeout(() => {
+                                              searchInputRef.current?.focus();
+                                            }, 50);
+                                            playBeep('add');
+                                          } else {
+                                            // Unique match — stage and hand off to qty input immediately
+                                            setPendingProduct(fp);
+                                            setQuantity(1);
+                                            setQuantityStr("1");
+                                            setIsQuantityFocused(true);
+                                            setCurrentMode('quantity');
+                                            setTimeout(() => {
+                                              quantityInputRef.current?.focus();
+                                              quantityInputRef.current?.select();
+                                            }, 50);
+                                            playBeep('add');
+                                            toast.info(`${item.name} - ${t('quickCheckout.enterQuantity')}`);
+                                          }
                                         }}
                                         className={`p-2.5 rounded-xl flex items-center gap-2 transition-all duration-150 cursor-pointer border-l-4 ${
                                           isFocusedRow 
