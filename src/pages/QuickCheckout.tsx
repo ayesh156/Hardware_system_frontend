@@ -285,6 +285,7 @@ export const QuickCheckout: React.FC = () => {
 
   // ── ADD BOX live-search filter ──
   const [addCategorySearch, setAddCategorySearch] = useState('');
+  const [addBoxAnchor, setAddBoxAnchor] = useState<DOMRect | null>(null);
 
   // Helper functions for decimal-preserving quantity adjustments (rely on numeric quantity)
   const incrementQuantity = useCallback((currentQty: number): number => {
@@ -2697,7 +2698,12 @@ export const QuickCheckout: React.FC = () => {
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => { setIsAddDropdownOpen(!isAddDropdownOpen); setAddCategorySearch(''); }}
+                        onClick={(e) => {
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          setAddBoxAnchor(rect);
+                          setIsAddDropdownOpen(!isAddDropdownOpen);
+                          setAddCategorySearch('');
+                        }}
                         className={`w-full min-h-[85px] border-2 border-dashed border-slate-800 hover:border-emerald-500/40 bg-slate-950/20 hover:bg-emerald-950/5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all group ${
                           isDark ? '' : 'bg-slate-50/50 border-slate-300 hover:border-emerald-400/40 hover:bg-emerald-50/30'
                         }`}
@@ -2706,16 +2712,28 @@ export const QuickCheckout: React.FC = () => {
                         <span className="text-[9px] font-bold text-slate-500 group-hover:text-emerald-400 uppercase tracking-wider">Add Box</span>
                       </button>
 
-                      {/* ── LIVE-SEARCH FLOATING POPOVER - ADD CATEGORY ── */}
-                      {isAddDropdownOpen && (
+                      {/* ── LIVE-SEARCH FLOATING POPOVER — fixed portal, z-[101], upward-facing ── */}
+                      {isAddDropdownOpen && addBoxAnchor && (
                         <>
-                          <div className="fixed inset-0 z-40" onClick={() => setIsAddDropdownOpen(false)} />
-                          <div className={`absolute bottom-full left-0 mb-2 w-72 rounded-xl shadow-2xl z-50 animate-fade-in overflow-hidden ${
-                            isDark
-                              ? 'bg-slate-950 border border-slate-800'
-                              : 'bg-white border border-slate-200 shadow-lg'
-                          }`}>
-                            {/* Live search input */}
+                          {/* Backdrop — closes panel on outside click */}
+                          <div
+                            className="fixed inset-0 z-[100]"
+                            onClick={() => { setIsAddDropdownOpen(false); setAddBoxAnchor(null); }}
+                          />
+                          {/* Panel — fixed above the ADD BOX button, not clipped by overflow ancestors */}
+                          <div
+                            className={`fixed z-[101] w-72 rounded-xl shadow-2xl animate-fade-in overflow-hidden ${
+                              isDark
+                                ? 'bg-slate-950 border border-slate-800'
+                                : 'bg-white border border-slate-200 shadow-lg'
+                            }`}
+                            style={{
+                              // Anchor bottom of panel to the top of the button, with 8 px gap
+                              bottom: Math.max(8, window.innerHeight - addBoxAnchor.top + 8),
+                              left:   Math.max(8, Math.min(addBoxAnchor.left, window.innerWidth - 296)),
+                            }}
+                          >
+                            {/* Live search input — autofocused */}
                             <div className={`p-2 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
                               <input
                                 autoFocus
@@ -2730,7 +2748,7 @@ export const QuickCheckout: React.FC = () => {
                                 }`}
                               />
                             </div>
-                            {/* Filtered results */}
+                            {/* Filtered results list */}
                             <div className="max-h-56 overflow-y-auto p-1.5">
                               {(() => {
                                 const available = allCategoryNames.filter(c =>
@@ -2754,6 +2772,7 @@ export const QuickCheckout: React.FC = () => {
                                     onClick={() => {
                                       setQuickCategories([...quickCategories, cat]);
                                       setIsAddDropdownOpen(false);
+                                      setAddBoxAnchor(null);
                                       setAddCategorySearch('');
                                       toast.success(`Added "${cat}" to grid`);
                                     }}
