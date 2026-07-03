@@ -110,7 +110,7 @@ const App = () => (
                     </AdminLayout>
                   </ProtectedRoute>
                 } />
-                <Route path="/categories" element={
+                <Route path="/product-category" element={
                   <ProtectedRoute>
                     <AdminLayout>
                       <Categories />

@@ -7,6 +7,7 @@ import {
   Edit3, Trash2, Pencil, ChevronLeft, ChevronRight,
   ChevronsLeft, ChevronsRight, ChevronDown, X,
 } from 'lucide-react';
+import SortButton from '../components/ui/SortButton';
 import { InventoryProduct } from '../types';
 import { CellPopover } from './CellPopover';
 import { ProductFormModal } from './ProductFormModal';
@@ -376,15 +377,38 @@ export const ProductTable: React.FC<ProductTableProps> = ({ items, setItems }) =
           <div className="relative flex-1 max-w-xl">
             <Search className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
             <input type="text" placeholder={t('products.searchPlaceholder')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-8 pr-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${isDark ? 'bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200'}`} />
+              className={`w-full pl-8 pr-9 py-2 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${isDark ? 'bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200'}`} />
+            {searchQuery.length > 0 && (
+              <button onClick={() => setSearchQuery('')}
+                className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'}`}>
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-          <div className="min-w-[200px] w-64">
+          <div className="relative min-w-[200px] w-64">
             <SearchableSelect options={categories} value={categoryFilter} onChange={(v) => setCategoryFilter(v)} placeholder="Search category..." isDark={isDark} allLabel={t('filters.allCategories')} />
+            {categoryFilter !== 'all' && (
+              <button onClick={() => setCategoryFilter('all')}
+                className={`absolute -right-2 -top-2 z-10 w-4 h-4 rounded-full flex items-center justify-center transition-colors shadow-sm ${
+                  isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-300'
+                }`} title="Reset category filter">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            )}
           </div>
-          <div className="min-w-[180px] w-52">
+          <div className="relative min-w-[180px] w-52">
             <SearchableSelect options={['Available', 'Low Stock', 'Out of Stock']} value={statusFilter} onChange={(v) => setStatusFilter(v)} placeholder="Search status..." isDark={isDark} allLabel={t('filters.allStatus')} />
+            {statusFilter !== 'all' && (
+              <button onClick={() => setStatusFilter('all')}
+                className={`absolute -right-2 -top-2 z-10 w-4 h-4 rounded-full flex items-center justify-center transition-colors shadow-sm ${
+                  isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-300'
+                }`} title="Reset status filter">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2 ml-auto">
+            <SortButton currentSortOrder={sortDir} onSortToggle={() => handleSort(sortField)} />
             {hasActiveFilters && <button onClick={clearFilters} className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}><RefreshCw className="w-3 h-3" /></button>}
             <span className={`text-[10px] font-medium whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('products.itemsCount', { count: filteredItems.length })}</span>
           </div>

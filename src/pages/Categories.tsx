@@ -10,10 +10,11 @@ import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmation
 import { CellPopover } from '../components/CellPopover';
 import { 
   Plus, Search, Edit2, Trash2, FolderTree, Package, Layers, Tag,
-  SortAsc, SortDesc, RefreshCw, Pencil,
+  RefreshCw, Pencil, X,
   ChevronLeft, ChevronRight as ChevronRightIcon,
   ChevronsLeft, ChevronsRight
 } from 'lucide-react';
+import SortButton from '../components/ui/SortButton';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -150,8 +151,6 @@ export const Categories: React.FC = () => {
   const startItem = (currentPage - 1) * rowsPerPage + 1;
   const endItem = Math.min(currentPage * rowsPerPage, filteredCategories.length);
 
-  const SortIcon = sortOrder === 'asc' ? SortAsc : SortDesc;
-
   return (
     <div className={`space-y-4 ${isMobile ? 'pb-20' : ''}`}>
       {/* ── Floating Cell Popover (for text fields: name, nameAlt, description) ── */}
@@ -170,7 +169,7 @@ export const Categories: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            {t('categories.title')}
+            Product Category
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             {t('categories.subtitle')}
@@ -215,28 +214,25 @@ export const Categories: React.FC = () => {
       {/* ── Toolbar (flat — no type or parent filter, just search + sort) ── */}
       <div className={`p-3 rounded-lg border ${isDark ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
         <div className="flex items-center gap-2">
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative flex-1 max-w-xl">
             <Search className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
             <input type="text"
               placeholder={t('categories.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-8 pr-3 py-1.5 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${
+              className={`w-full pl-8 pr-9 py-1.5 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${
                 isDark ? 'bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200'
               }`}
             />
+            {searchQuery.length > 0 && (
+              <button onClick={() => setSearchQuery('')}
+                className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'}`}>
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
 
-          {hasActiveFilters && (
-            <button onClick={() => setSearchQuery('')}
-              className={`p-1.5 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>
-              <RefreshCw className="w-3 h-3" />
-            </button>
-          )}
-          <button onClick={() => setSortOrder(s => s === 'asc' ? 'desc' : 'asc')}
-            className={`p-1.5 rounded-lg transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}>
-            <SortIcon className="w-3 h-3" />
-          </button>
+          <SortButton currentSortOrder={sortOrder} onSortToggle={() => setSortOrder(s => s === 'asc' ? 'desc' : 'asc')} />
           <span className={`text-[10px] font-medium ml-auto ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             {filteredCategories.length} categories
           </span>

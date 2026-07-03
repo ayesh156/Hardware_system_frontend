@@ -6,9 +6,10 @@ import { mockInvoices, mockCustomers } from '../data/mockData';
 import {
   FileText, Search, Plus, Eye, Edit2, Trash2, Printer,
   Clock, CheckCircle, AlertTriangle, XCircle, Filter, RefreshCw,
-  TrendingUp, SortAsc, SortDesc, ChevronLeft, ChevronRight,
+  TrendingUp, ChevronLeft, ChevronRight,
   ChevronsLeft, ChevronsRight, ChevronDown, X,
 } from 'lucide-react';
+import SortButton from '../components/ui/SortButton';
 import { Invoice } from '../types/index';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { InvoicePreviewModal } from '../components/modals/InvoicePreviewModal';
@@ -212,9 +213,15 @@ export const Invoices: React.FC = () => {
           <div className="relative flex-1 max-w-xl">
             <Search className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
             <input type="text" placeholder={t('invoices.searchByInvoiceOrCustomer')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-8 pr-3 py-2 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${isDark ? 'bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200'}`} />
+              className={`w-full pl-8 pr-9 py-2 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all ${isDark ? 'bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200'}`} />
+            {searchQuery.length > 0 && (
+              <button onClick={() => setSearchQuery('')}
+                className={`absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'}`}>
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-          <div className="min-w-[200px] w-56">
+          <div className="relative min-w-[200px] w-56">
             <SearchableSelect options={[
               { value: 'all', label: t('invoices.allStatuses') },
               { value: 'paid', label: t('invoices.paidLabel') },
@@ -222,11 +229,15 @@ export const Invoices: React.FC = () => {
               { value: 'overdue', label: t('invoices.overdueLabel') },
               { value: 'cancelled', label: t('invoices.cancelledLabel') },
             ]} value={statusFilter} onChange={(v) => setStatusFilter(v)} placeholder={t('invoices.searchStatus')} isDark={isDark} />
+            {statusFilter !== 'all' && (
+              <button onClick={() => setStatusFilter('all')}
+                className={`absolute -right-2 -top-2 z-10 w-4 h-4 rounded-full flex items-center justify-center transition-colors shadow-sm ${isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600' : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-300'}`} title="Reset status filter">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2 ml-auto">
-            <button onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} className={`p-1.5 rounded-lg border transition-colors flex-shrink-0 ${isDark ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`} title={t('common.sort')}>
-              {sortOrder === 'asc' ? <SortAsc className="w-3.5 h-3.5" /> : <SortDesc className="w-3.5 h-3.5" />}
-            </button>
+            <SortButton currentSortOrder={sortOrder} onSortToggle={() => setSortOrder(s => s === 'asc' ? 'desc' : 'asc')} />
             {hasActiveFilters && <button onClick={clearFilters} className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}><RefreshCw className="w-3 h-3" /></button>}
             <span className={`text-[10px] font-medium whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t('invoices.invoicesCount', { count: filteredInvoices.length })}</span>
           </div>

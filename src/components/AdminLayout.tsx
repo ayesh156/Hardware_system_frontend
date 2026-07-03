@@ -41,7 +41,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { path: '/invoices/quick-checkout', icon: Zap, label: 'quickCheckout.title', badge: null },
     { path: '/invoices', icon: FileText, label: 'nav.invoices', badge: '12' },
     { path: '/products', icon: Package, label: 'nav.products', badge: null },
-    { path: '/categories', icon: FolderTree, label: 'nav.productCategory', badge: null },
+    { path: '/product-category', icon: FolderTree, label: 'nav.productCategory', badge: null },
     { path: '/suppliers', icon: Truck, label: 'nav.suppliers', badge: null },
     { path: '/customers', icon: Users, label: 'nav.customers', badge: '3' },
     { path: '/financial-reports', icon: TrendingUp, label: 'nav.financialReports', badge: null },

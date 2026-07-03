@@ -4,7 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useIsMobile } from '../hooks/use-mobile';
 import {
   Package, Plus, AlertTriangle, XCircle,
-  Box, BarChart3, ScanLine, SortAsc, SortDesc
+  Box, BarChart3, ScanLine, SortAsc, SortDesc, ArrowUpDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
